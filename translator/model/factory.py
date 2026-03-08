@@ -29,6 +29,8 @@ class AttentionProtocol(Protocol):
         is_causal: bool = False,
     ) -> tuple[torch.Tensor, torch.Tensor | None]: ...
 
+    def eval(self) -> "AttentionProtocol": ...
+
 
 ATTENTION_CHOICES = ("torch", "simple_sdp")
 
