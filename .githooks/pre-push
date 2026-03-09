@@ -1,2 +1,3 @@
 #!/usr/bin/env sh
-python tools/git_quality_gate.py pre-push
+PYTHON_EXE="${TRANSLATOR2_PYTHON:-/c/Users/mwehle/AppData/Local/Programs/Python/Python313/python.exe}"
+"$PYTHON_EXE" tools/git_quality_gate.py pre-push
