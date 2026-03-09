@@ -80,6 +80,8 @@ def validate_records_contract(
 
     inferred_bos = max(bos_candidates, key=lambda tok: bos_candidates[tok])
     inferred_eos = max(eos_candidates, key=lambda tok: eos_candidates[tok])
+    bos_consistency = bos_candidates[inferred_bos] / total
+    eos_consistency = eos_candidates[inferred_eos] / total
 
     return {
         "num_examples": total,
@@ -91,4 +93,6 @@ def validate_records_contract(
         "max_tgt_token_id": max_tgt_token,
         "inferred_tgt_bos_id": inferred_bos,
         "inferred_tgt_eos_id": inferred_eos,
+        "bos_consistency": bos_consistency,
+        "eos_consistency": eos_consistency,
     }

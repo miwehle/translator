@@ -18,6 +18,8 @@ def test_validate_records_contract_collects_basic_stats():
     assert out["max_tgt_token_id"] == 22
     assert out["inferred_tgt_bos_id"] == 2
     assert out["inferred_tgt_eos_id"] == 3
+    assert out["bos_consistency"] == 1.0
+    assert out["eos_consistency"] == 1.0
 
 
 def test_validate_records_contract_rejects_duplicate_ids():

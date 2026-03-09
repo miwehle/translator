@@ -60,9 +60,6 @@ def train_prod(
     spike_factor: float = 3.0,
     device: str | torch.device | None = None,
 ) -> dict[str, Any]:
-    if tgt_sos_idx is None:
-        tgt_sos_idx = tgt_pad_idx
-
     _set_seed(seed)
     train_device = _resolve_device(device)
 
@@ -77,8 +74,30 @@ def train_prod(
         tgt_field=tgt_field,
     )
 
-    src_vocab_size = int(stats["max_src_token_id"]) + 1
-    tgt_vocab_size = int(stats["max_tgt_token_id"]) + 1
+    inferred_tgt_bos_id = int(stats["inferred_tgt_bos_id"])
+    if tgt_sos_idx is None:
+        bos_consistency = float(stats["bos_consistency"])
+        if bos_consistency >= 0.95:
+            tgt_sos_idx = inferred_tgt_bos_id
+            print(
+                "INFO "
+                f"tgt_sos_idx not provided; using inferred_tgt_bos_id={tgt_sos_idx} "
+                f"(consistency={bos_consistency:.2%})."
+            )
+        else:
+            tgt_sos_idx = tgt_pad_idx
+            print(
+                "INFO "
+                "tgt_sos_idx not provided and inferred BOS is not stable; "
+                f"using tgt_pad_idx={tgt_sos_idx} instead "
+                f"(inferred_bos_id={inferred_tgt_bos_id}, "
+                f"consistency={bos_consistency:.2%})."
+            )
+
+    src_vocab_size = max(int(stats["max_src_token_id"]), int(src_pad_idx)) + 1
+    tgt_vocab_size = (
+        max(int(stats["max_tgt_token_id"]), int(tgt_pad_idx), int(tgt_sos_idx)) + 1
+    )
 
     dataset = ArrowTranslationDataset(
         dataset_path,
@@ -170,5 +189,6 @@ def train_prod(
         "device": str(train_device),
         "src_vocab_size": src_vocab_size,
         "tgt_vocab_size": tgt_vocab_size,
+        "tgt_sos_idx": tgt_sos_idx,
         "last_spike": last_spike,
     }
