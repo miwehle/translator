@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import os
+import platform
 import re
+import time
 from pathlib import Path
 from typing import Mapping, cast
 
@@ -9,7 +11,6 @@ import pytest
 
 from translator.data_prod.arrow_dataset import load_arrow_records
 from translator.train_prod import train_prod
-
 
 LOSS_LINE_RE = re.compile(r"\bloss=(?P<loss>\d+(?:\.\d+)?)\b")
 STEP_LINE_RE = re.compile(r"^step=(?P<step>\d+)\s+epoch=(?P<epoch>\d+)\s+loss=(?P<loss>\d+(?:\.\d+)?)\b")
@@ -131,6 +132,7 @@ def test_train_prod_loss_trend_decreases(capsys: pytest.CaptureFixture[str]) -> 
         "log_every": 1,
         "device": "cpu",
     }
+    t0 = time.perf_counter()
     out = train_prod(
         dataset_path=dataset_path,
         src_pad_idx=src_pad_idx,
@@ -149,6 +151,7 @@ def test_train_prod_loss_trend_decreases(capsys: pytest.CaptureFixture[str]) -> 
         log_every=1,
         device="cpu",
     )
+    training_duration_seconds = time.perf_counter() - t0
 
     assert out["global_step"] > 0
 
@@ -169,6 +172,9 @@ def test_train_prod_loss_trend_decreases(capsys: pytest.CaptureFixture[str]) -> 
             "first_avg": first_avg,
             "last_avg": last_avg,
             "num_logged_steps": len(losses),
+            "training_duration_seconds": round(training_duration_seconds, 3),
+            "run_host": platform.node(),
+            "run_platform": platform.platform(),
         },
         stdout_text=captured.out,
     )

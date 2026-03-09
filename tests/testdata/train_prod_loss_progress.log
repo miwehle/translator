@@ -23,6 +23,9 @@ summary:
   global_step=32
   last_avg=8.5818
   num_logged_steps=32
+  run_host=CLI-PF2DXKHR
+  run_platform=Windows-10-10.0.19045-SP0
+  training_duration_seconds=28.662
 
 loss_curve (step, epoch, loss):
 1,1,10.917100
