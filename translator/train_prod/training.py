@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import random
 from collections import deque
 from pathlib import Path
@@ -34,6 +35,36 @@ def _resolve_device(device: str | torch.device | None) -> torch.device:
     return torch.device(device)
 
 
+def _save_training_checkpoint(
+    *,
+    checkpoint_path: str | Path,
+    model: Seq2Seq,
+    summary: dict[str, Any],
+    train_config: dict[str, Any],
+) -> Path:
+    checkpoint_file = Path(checkpoint_path)
+    checkpoint_file.parent.mkdir(parents=True, exist_ok=True)
+    torch.save(
+        {
+            "model_state_dict": model.state_dict(),
+            "summary": summary,
+            "train_config": train_config,
+        },
+        checkpoint_file,
+    )
+    return checkpoint_file
+
+
+def _write_summary_json(summary_path: str | Path, summary: dict[str, Any]) -> Path:
+    summary_file = Path(summary_path)
+    summary_file.parent.mkdir(parents=True, exist_ok=True)
+    summary_file.write_text(
+        json.dumps(summary, indent=2, sort_keys=True),
+        encoding="utf-8",
+    )
+    return summary_file
+
+
 def train_prod(
     *,
     dataset_path: str | Path,
@@ -59,6 +90,8 @@ def train_prod(
     spike_window: int = 100,
     spike_factor: float = 3.0,
     device: str | torch.device | None = None,
+    checkpoint_path: str | Path | None = None,
+    summary_path: str | Path | None = None,
 ) -> dict[str, Any]:
     _set_seed(seed)
     train_device = _resolve_device(device)
@@ -182,7 +215,7 @@ def train_prod(
                     f"batch_ids={batch_ids}"
                 )
 
-    return {
+    summary = {
         "num_examples": stats["num_examples"],
         "final_loss": last_loss,
         "global_step": global_step,
@@ -192,3 +225,46 @@ def train_prod(
         "tgt_sos_idx": tgt_sos_idx,
         "last_spike": last_spike,
     }
+
+    train_config: dict[str, Any] = {
+        "dataset_path": str(dataset_path),
+        "id_field": id_field,
+        "src_field": src_field,
+        "tgt_field": tgt_field,
+        "src_pad_idx": src_pad_idx,
+        "tgt_pad_idx": tgt_pad_idx,
+        "tgt_sos_idx": tgt_sos_idx,
+        "emb_dim": emb_dim,
+        "hidden_dim": hidden_dim,
+        "num_heads": num_heads,
+        "num_layers": num_layers,
+        "dropout": dropout,
+        "lr": lr,
+        "batch_size": batch_size,
+        "epochs": epochs,
+        "seed": seed,
+        "attention": attention,
+        "max_examples": max_examples,
+        "shuffle": shuffle,
+        "log_every": log_every,
+        "spike_window": spike_window,
+        "spike_factor": spike_factor,
+        "device": str(train_device),
+    }
+
+    if checkpoint_path is not None:
+        checkpoint_file = _save_training_checkpoint(
+            checkpoint_path=checkpoint_path,
+            model=model,
+            summary=summary,
+            train_config=train_config,
+        )
+        summary["checkpoint_path"] = str(checkpoint_file)
+        print(f"INFO saved checkpoint to {checkpoint_file}")
+
+    if summary_path is not None:
+        summary_file = _write_summary_json(summary_path, summary)
+        summary["summary_path"] = str(summary_file)
+        print(f"INFO wrote summary to {summary_file}")
+
+    return summary

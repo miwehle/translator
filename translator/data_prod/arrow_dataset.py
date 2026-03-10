@@ -21,6 +21,30 @@ def load_arrow_records(dataset_path: str | Path):
     return loaded
 
 
+def infer_pad_idx(
+    dataset_path: str | Path,
+    field: str,
+) -> int:
+    records = load_arrow_records(dataset_path)
+    max_token = -1
+    for row in records:
+        item = cast(Mapping[str, Any], row)
+        values_obj = item.get(field)
+        if not isinstance(values_obj, list):
+            raise ValueError(
+                f"Expected list[int] in field '{field}', got "
+                f"{type(values_obj).__name__}."
+            )
+        values = [int(x) for x in values_obj]
+        if not values:
+            raise ValueError(f"Field '{field}' contains an empty sequence.")
+        max_token = max(max_token, max(values))
+
+    if max_token < 0:
+        raise ValueError(f"Could not infer pad idx from field '{field}'.")
+    return max_token + 1
+
+
 class ArrowTranslationDataset(Dataset):
     def __init__(
         self,
