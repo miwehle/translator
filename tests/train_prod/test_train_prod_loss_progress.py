@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Mapping, cast
 
 import pytest
+from datasets import Dataset
 
 from translator.data_prod.arrow_dataset import load_arrow_records
 from translator.train_prod import train_prod
@@ -38,6 +39,16 @@ def _find_mapped_dataset() -> Path:
             "Expected a directory like '.../europarl.mapped'."
         )
     return candidates[0]
+
+
+def _create_valid_mapped_dataset(dataset_dir: Path) -> Path:
+    rows = {
+        "id": list(range(512)),
+        "src_ids": [[10, 100 + (i % 17), 11] for i in range(512)],
+        "tgt_ids": [[2, 20 + (i % 9), 3] for i in range(512)],
+    }
+    Dataset.from_dict(rows).save_to_disk(str(dataset_dir))
+    return dataset_dir
 
 
 def _parse_losses(stdout_text: str) -> list[float]:
@@ -109,8 +120,11 @@ def _write_training_log(
     return log_path
 
 
-def test_train_prod_loss_trend_decreases(capsys: pytest.CaptureFixture[str]) -> None:
-    dataset_path = _find_mapped_dataset()
+def test_train_prod_loss_trend_decreases(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    dataset_path = _create_valid_mapped_dataset(tmp_path / "valid_train_prod.mapped")
     src_pad_idx = _pad_index_from_records(dataset_path, "src_ids")
     tgt_pad_idx = _pad_index_from_records(dataset_path, "tgt_ids")
 
