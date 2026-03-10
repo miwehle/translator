@@ -105,27 +105,19 @@ def train_prod(
         id_field=id_field,
         src_field=src_field,
         tgt_field=tgt_field,
+        src_pad_idx=src_pad_idx,
+        tgt_pad_idx=tgt_pad_idx,
     )
 
     inferred_tgt_bos_id = int(stats["inferred_tgt_bos_id"])
     if tgt_sos_idx is None:
         bos_consistency = float(stats["bos_consistency"])
-        if bos_consistency >= 0.95:
-            tgt_sos_idx = inferred_tgt_bos_id
-            print(
-                "INFO "
-                f"tgt_sos_idx not provided; using inferred_tgt_bos_id={tgt_sos_idx} "
-                f"(consistency={bos_consistency:.2%})."
-            )
-        else:
-            tgt_sos_idx = tgt_pad_idx
-            print(
-                "INFO "
-                "tgt_sos_idx not provided and inferred BOS is not stable; "
-                f"using tgt_pad_idx={tgt_sos_idx} instead "
-                f"(inferred_bos_id={inferred_tgt_bos_id}, "
-                f"consistency={bos_consistency:.2%})."
-            )
+        tgt_sos_idx = inferred_tgt_bos_id
+        print(
+            "INFO "
+            f"tgt_sos_idx not provided; using inferred_tgt_bos_id={tgt_sos_idx} "
+            f"(consistency={bos_consistency:.2%})."
+        )
 
     src_vocab_size = max(int(stats["max_src_token_id"]), int(src_pad_idx)) + 1
     tgt_vocab_size = (
