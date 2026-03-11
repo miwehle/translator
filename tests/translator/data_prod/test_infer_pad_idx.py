@@ -4,7 +4,9 @@ from pathlib import Path
 
 from translator.data_prod import infer_pad_idx
 
-from tests.train_prod.test_train_prod_loss_progress import _find_mapped_dataset
+from tests.translator.train_prod.test_train_prod_loss_progress import (
+    _find_mapped_dataset,
+)
 
 
 def test_infer_pad_idx_returns_next_token_id() -> None:

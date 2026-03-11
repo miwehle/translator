@@ -4,7 +4,9 @@ from pathlib import Path
 
 from translator.train_prod import build_train_prod_config, run_train_prod
 
-from .test_train_prod_loss_progress import _create_valid_mapped_dataset
+from tests.translator.train_prod.test_train_prod_loss_progress import (
+    _create_valid_mapped_dataset,
+)
 
 
 def test_train_prod_writes_checkpoint_and_summary(tmp_path: Path) -> None:

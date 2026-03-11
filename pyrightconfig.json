@@ -1,10 +1,16 @@
 {
-  "include": ["translator", "tests"],
+  "include": ["src", "tests"],
   "exclude": [
     "**/__pycache__",
     ".pytest_tmp",
     "checkpoints",
     "pytest-cache-files-*"
+  ],
+  "executionEnvironments": [
+    {
+      "root": ".",
+      "extraPaths": ["src"]
+    }
   ],
   "typeCheckingMode": "basic",
   "reportMissingImports": "none",

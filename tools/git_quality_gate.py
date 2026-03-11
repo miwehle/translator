@@ -72,7 +72,7 @@ def staged_python_files(env: dict[str, str]) -> list[str]:
 def main() -> int:
     stage = sys.argv[1] if len(sys.argv) > 1 else "pre-push"
     env = os.environ.copy()
-    env["PYTHONPATH"] = str(REPO_ROOT)
+    env["PYTHONPATH"] = str(REPO_ROOT / "src")
 
     if stage == "pre-commit":
         files = staged_python_files(env)

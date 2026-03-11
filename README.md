@@ -10,10 +10,10 @@ Dieses Projekt enthaelt einen bewusst einfachen Transformer-Translator mit:
 ## Struktur
 
 - `simple_attention_translator.py` (Entry-Point)
-- `translator/constants.py` (Sondertokens)
-- `translator/data.py` (Vokabular, Dataset, Collate, Toy-Korpus)
-- `translator/model.py` (Transformer-Modell)
-- `translator/train.py` (Training, CLI, Beispiel-Inferenz)
+- `src/translator/constants.py` (Sondertokens)
+- `src/translator/data.py` (Vokabular, Dataset, Collate, Toy-Korpus)
+- `src/translator/model.py` (Transformer-Modell)
+- `src/translator/train.py` (Training, CLI, Beispiel-Inferenz)
 
 ## Start
 

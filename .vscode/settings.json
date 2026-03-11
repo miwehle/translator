@@ -4,6 +4,9 @@
   "python.testing.pytestArgs": [
     "tests"
   ],
+  "python.analysis.extraPaths": [
+    "${workspaceFolder}/src"
+  ],
   "python.analysis.diagnosticMode": "workspace",
   "python.analysis.typeCheckingMode": "basic",
   "editor.codeActionsOnSave": {
@@ -16,9 +19,11 @@
 
   "files.exclude": {
       // __pycache__ im Explorer ausblenden
+    ".githooks": true,
     "**/__pycache__": true,
     "**/.pytest_cache": true,
     "**/.pytest_tmp": true,
+    "**/.ruff_cache": true,
     "**/pytest-cache-files-*": true,
 
       // .coverage auch
