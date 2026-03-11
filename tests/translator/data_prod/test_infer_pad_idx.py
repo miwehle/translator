@@ -1,12 +1,35 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
+
+import pytest
 
 from translator.data_prod import infer_pad_idx
 
-from tests.translator.train_prod.test_train_prod_loss_progress import (
-    _find_mapped_dataset,
-)
+
+def _find_mapped_dataset() -> Path:
+    configured = os.getenv("TRANSLATOR2_TESTDATA_MAPPED")
+    if configured:
+        candidate = Path(configured).expanduser().resolve()
+        if candidate.is_dir():
+            return candidate
+        pytest.skip(
+            "TRANSLATOR2_TESTDATA_MAPPED is set but does not point to a directory: "
+            f"{candidate}"
+        )
+
+    testdata_dir = Path(__file__).resolve().parents[2] / "testdata"
+    if not testdata_dir.exists():
+        pytest.skip(f"Missing test data directory: {testdata_dir}")
+
+    candidates = sorted(p for p in testdata_dir.rglob("europarl.mapped") if p.is_dir())
+    if not candidates:
+        pytest.skip(
+            "No mapped Arrow dataset found under tests/testdata. "
+            "Expected a directory like '.../europarl.mapped'."
+        )
+    return candidates[0]
 
 
 def test_infer_pad_idx_returns_next_token_id() -> None:

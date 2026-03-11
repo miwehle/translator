@@ -6,5 +6,8 @@ __pycache__/
 pytest-cache-files-*/
 tests/.pytest_tmp_local/
 tests/.test_artifacts/
+tests/**/.log/
+tests/**/train_prod_loss_progress.log
+tests/translator/train_prod/.log/
 .coverage
 .coverage.*

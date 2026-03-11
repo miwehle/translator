@@ -1,22 +1,25 @@
 {
   "schema_version": "1",
-  "created_at_utc": "2026-03-09T23:25:38.882382Z",
-  "datapreprocessor_git_commit": "58814d9fc44a",
+  "created_at_utc": "2026-03-11T20:03:57.812040Z",
+  "datapreprocessor_git_commit": "bdb9a414fb5a",
   "datapreprocessor_git_status": "no local changes",
   "dataset_schema_version": "1",
   "dataset": "Helsinki-NLP/europarl",
   "config": "de-en",
   "split": "train",
+  "write_jsonl": false,
   "paths": {
-    "raw_output": "C:\\Users\\mwehle\\Documents\\_P\\KI\\DataPreprocessor\\data\\tmp\\0309\\europarl_de-en_train_10000 (2)\\europarl.raw.jsonl",
-    "norm_output": "C:\\Users\\mwehle\\Documents\\_P\\KI\\DataPreprocessor\\data\\tmp\\0309\\europarl_de-en_train_10000 (2)\\europarl.norm.jsonl",
-    "filter_output": "C:\\Users\\mwehle\\Documents\\_P\\KI\\DataPreprocessor\\data\\tmp\\0309\\europarl_de-en_train_10000 (2)\\europarl.filtered.jsonl",
-    "tokenize_output": "C:\\Users\\mwehle\\Documents\\_P\\KI\\DataPreprocessor\\data\\tmp\\0309\\europarl_de-en_train_10000 (2)\\europarl.tokenized.jsonl",
-    "map_output": "C:\\Users\\mwehle\\Documents\\_P\\KI\\DataPreprocessor\\data\\tmp\\0309\\europarl_de-en_train_10000 (2)\\europarl.mapped",
-    "norm_report": "C:\\Users\\mwehle\\Documents\\_P\\KI\\DataPreprocessor\\data\\tmp\\0309\\europarl_de-en_train_10000 (2)\\norm_report.txt",
-    "flaw_report": "C:\\Users\\mwehle\\Documents\\_P\\KI\\DataPreprocessor\\data\\tmp\\0309\\europarl_de-en_train_10000 (2)\\flaw_report.txt",
-    "tokenize_report": "C:\\Users\\mwehle\\Documents\\_P\\KI\\DataPreprocessor\\data\\tmp\\0309\\europarl_de-en_train_10000 (2)\\tokenize_report.txt",
-    "preprocess_config": "C:\\Users\\mwehle\\Documents\\_P\\KI\\DataPreprocessor\\data\\tmp\\0309\\europarl_de-en_train_10000 (2)\\preprocess_config.json"
+    "raw_output": "C:\\Users\\mwehle\\Documents\\_P\\KI\\datasets\\europarl_de-en_train_10000\\.stages\\europarl.raw",
+    "norm_output": "C:\\Users\\mwehle\\Documents\\_P\\KI\\datasets\\europarl_de-en_train_10000\\.stages\\europarl.norm",
+    "filter_output": "C:\\Users\\mwehle\\Documents\\_P\\KI\\datasets\\europarl_de-en_train_10000\\.stages\\europarl.filtered",
+    "tokenize_output": "C:\\Users\\mwehle\\Documents\\_P\\KI\\datasets\\europarl_de-en_train_10000\\.stages\\europarl.tokenized",
+    "map_output": "C:\\Users\\mwehle\\Documents\\_P\\KI\\datasets\\europarl_de-en_train_10000\\.stages\\europarl.mapped",
+    "preprocessed_output": "C:\\Users\\mwehle\\Documents\\_P\\KI\\datasets\\europarl_de-en_train_10000\\europarl.preprocessed",
+    "norm_report": "C:\\Users\\mwehle\\Documents\\_P\\KI\\datasets\\europarl_de-en_train_10000\\norm_report.txt",
+    "flaw_report": "C:\\Users\\mwehle\\Documents\\_P\\KI\\datasets\\europarl_de-en_train_10000\\flaw_report.txt",
+    "tokenize_report": "C:\\Users\\mwehle\\Documents\\_P\\KI\\datasets\\europarl_de-en_train_10000\\tokenize_report.txt",
+    "preprocess_config": "C:\\Users\\mwehle\\Documents\\_P\\KI\\datasets\\europarl_de-en_train_10000\\preprocess_config.json",
+    "dataset_meta": "C:\\Users\\mwehle\\Documents\\_P\\KI\\datasets\\europarl_de-en_train_10000\\dataset_meta.json"
   },
   "download_cfg": {
     "max_records": 10000,
@@ -31,10 +34,7 @@
   "filter_cfg": {},
   "tokenize_cfg": {
     "tokenizer_model_name": "Helsinki-NLP/opus-mt-de-en",
-    "tokenizer_kwargs": {
-      "truncation": true,
-      "max_length": 256
-    },
+    "tokenizer_kwargs": null,
     "tokenize_debug": false
   },
   "map_cfg": {
@@ -42,6 +42,8 @@
     "tokenized_key": "tokenized_translation",
     "src_lang": "de",
     "tgt_lang": "en",
+    "tgt_bos_id": 58101,
+    "tgt_eos_id": 0,
     "include_text": false
   }
 }
