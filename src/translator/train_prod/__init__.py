@@ -1,11 +1,13 @@
-from .preflight import validate_records_contract
 from typing import Any
+
+from .preflight import check_examples
 
 __all__ = [
     "build_train_prod_config",
     "run_train_prod",
+    "run_train_prod_2",
     "train_prod",
-    "validate_records_contract",
+    "check_examples",
 ]
 
 
@@ -19,6 +21,12 @@ def run_train_prod(*args: Any, **kwargs: Any) -> dict[str, Any]:
     from .session import run_train_prod as _run_train_prod
 
     return _run_train_prod(*args, **kwargs)
+
+
+def run_train_prod_2(*args: Any, **kwargs: Any) -> dict[str, Any]:
+    from .session import run_train_prod_2 as _run_train_prod_2
+
+    return _run_train_prod_2(*args, **kwargs)
 
 
 def train_prod(*args: Any, **kwargs: Any) -> dict[str, Any]:

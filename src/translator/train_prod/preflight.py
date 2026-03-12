@@ -10,8 +10,8 @@ def _format_example_ids(example_ids: list[int], limit: int = 5) -> str:
     return f"{shown}{suffix}"
 
 
-def validate_records_contract(
-    records: Iterable[Any],
+def check_examples(
+    examples: Iterable[Any],
     *,
     id_field: str = "id",
     src_field: str = "src_ids",
@@ -36,13 +36,13 @@ def validate_records_contract(
     src_pad_example_ids: list[int] = []
     tgt_pad_example_ids: list[int] = []
 
-    for item in records:
+    for item in examples:
         total += 1
         if not isinstance(item, Mapping):
-            raise ValueError(f"Record #{total} is not a mapping/object.")
+            raise ValueError(f"Example #{total} is not a mapping/object.")
         if id_field not in item or src_field not in item or tgt_field not in item:
             raise ValueError(
-                f"Missing required fields in record #{total}: "
+                f"Missing required fields in example #{total}: "
                 f"expected '{id_field}', '{src_field}', '{tgt_field}'."
             )
 
@@ -51,12 +51,12 @@ def validate_records_contract(
         tgt = item[tgt_field]
         if not isinstance(src, list) or not isinstance(tgt, list):
             raise ValueError(
-                f"Record id={ex_id} has invalid types: "
+                f"Example id={ex_id} has invalid types: "
                 f"{src_field}/{tgt_field} must be list[int]."
             )
         if len(src) < min_seq_len or len(tgt) < min_seq_len:
             raise ValueError(
-                f"Record id={ex_id} violates min_seq_len={min_seq_len}: "
+                f"Example id={ex_id} violates min_seq_len={min_seq_len}: "
                 f"len(src)={len(src)} len(tgt)={len(tgt)}."
             )
 
@@ -65,7 +65,7 @@ def validate_records_contract(
             tgt_ids = [int(x) for x in tgt]
         except Exception as exc:
             raise ValueError(
-                f"Record id={ex_id} contains non-integer token IDs."
+                f"Example id={ex_id} contains non-integer token IDs."
             ) from exc
 
         if require_unique_ids:

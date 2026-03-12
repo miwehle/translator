@@ -17,7 +17,7 @@ from ..data_prod import (
     load_arrow_records,
 )
 from ..model import Seq2Seq
-from .preflight import validate_records_contract
+from .preflight import check_examples
 
 
 def _set_seed(seed: int) -> None:
@@ -93,6 +93,7 @@ def train_prod(
     checkpoint_path: str | Path | None = None,
     summary_path: str | Path | None = None,
 ) -> dict[str, Any]:
+    """Deprecated. Use Trainer instead."""
     _set_seed(seed)
     train_device = _resolve_device(device)
 
@@ -100,7 +101,7 @@ def train_prod(
     if max_examples is not None:
         raw_records = raw_records.select(range(min(max_examples, len(raw_records))))
 
-    stats = validate_records_contract(
+    stats = check_examples(
         raw_records,
         id_field=id_field,
         src_field=src_field,
@@ -260,3 +261,178 @@ def train_prod(
         print(f"INFO wrote summary to {summary_file}")
 
     return summary
+
+
+class Trainer:
+    def __init__(
+        self,
+        *,
+        dataset_path: str | Path,
+        id_field: str = "id",
+        src_field: str = "src_ids",
+        tgt_field: str = "tgt_ids",
+        src_pad_idx: int,
+        tgt_pad_idx: int,
+        tgt_sos_idx: int | None = None,
+        src_vocab_size: int | None = None,
+        tgt_vocab_size: int | None = None,
+        emb_dim: int = 256,
+        hidden_dim: int = 1024,
+        num_heads: int = 8,
+        num_layers: int = 4,
+        dropout: float = 0.1,
+        attention: str = "torch",
+        batch_size: int = 64,
+        shuffle: bool = True,
+        max_examples: int | None = None,
+        device: str | torch.device | None = None,
+        seed: int = 42,
+    ) -> None:
+        _set_seed(seed)
+        self.tgt_pad_idx = tgt_pad_idx
+        self.device = _resolve_device(device)
+        raw_records = load_arrow_records(dataset_path)
+        if max_examples is not None:
+            raw_records = raw_records.select(range(min(max_examples, len(raw_records))))
+
+        stats = check_examples(
+            raw_records,
+            id_field=id_field,
+            src_field=src_field,
+            tgt_field=tgt_field,
+            src_pad_idx=src_pad_idx,
+            tgt_pad_idx=tgt_pad_idx,
+        )
+        self.num_examples = int(stats["num_examples"])
+
+        inferred_tgt_bos_id = int(stats["inferred_tgt_bos_id"])
+        if tgt_sos_idx is None:
+            bos_consistency = float(stats["bos_consistency"])
+            tgt_sos_idx = inferred_tgt_bos_id
+            print(
+                "INFO "
+                f"tgt_sos_idx not provided; using inferred_tgt_bos_id={tgt_sos_idx} "
+                f"(consistency={bos_consistency:.2%})."
+            )
+
+        if src_vocab_size is None:
+            src_vocab_size = max(int(stats["max_src_token_id"]), int(src_pad_idx)) + 1
+        if tgt_vocab_size is None:
+            tgt_vocab_size = (
+                max(int(stats["max_tgt_token_id"]), int(tgt_pad_idx), int(tgt_sos_idx))
+                + 1
+            )
+
+        self.loader = DataLoader(
+            ArrowTranslationDataset(
+                dataset_path,
+                id_field=id_field,
+                src_field=src_field,
+                tgt_field=tgt_field,
+                max_examples=max_examples,
+            ),
+            batch_size=batch_size,
+            shuffle=shuffle,
+            collate_fn=lambda batch: collate_fn_prod(
+                batch,
+                src_pad_idx,
+                tgt_pad_idx,
+            ),
+        )
+        self.model = Seq2Seq(
+            src_vocab_size=src_vocab_size,
+            tgt_vocab_size=tgt_vocab_size,
+            d_model=emb_dim,
+            ff_dim=hidden_dim,
+            num_heads=num_heads,
+            num_layers=num_layers,
+            src_pad_idx=src_pad_idx,
+            tgt_pad_idx=tgt_pad_idx,
+            tgt_sos_idx=tgt_sos_idx,
+            dropout=dropout,
+            attention=attention,
+        ).to(self.device)
+
+    def train(
+        self,
+        *,
+        lr: float = 3e-4,
+        epochs: int = 1,
+        log_every: int = 50,
+        spike_window: int = 100,
+        spike_factor: float = 3.0,
+        num_examples: int | None = None,
+        checkpoint_path: str | Path | None = None,
+    ) -> dict[str, Any]:
+        criterion = nn.CrossEntropyLoss(ignore_index=self.tgt_pad_idx)
+        optim = torch.optim.Adam(self.model.parameters(), lr=lr)
+        self.model.train()
+
+        loss_history: deque[float] = deque(maxlen=spike_window)
+        global_step = 0
+        last_loss = None
+        last_spike: dict[str, Any] | None = None
+
+        for epoch in range(1, epochs + 1):
+            for src, tgt, batch_ids in self.loader:
+                src = src.to(self.device)
+                tgt = tgt.to(self.device)
+
+                optim.zero_grad()
+                logits = self.model(src, tgt)
+                loss = criterion(
+                    logits.reshape(-1, logits.size(-1)),
+                    tgt[:, 1:].reshape(-1),
+                )
+                loss.backward()
+                grad_norm = float(
+                    nn.utils.clip_grad_norm_(self.model.parameters(), 1.0)
+                )
+                optim.step()
+
+                global_step += 1
+                current_loss = float(loss.item())
+                median_loss = median(loss_history) if loss_history else current_loss
+                is_spike = bool(loss_history) and (
+                    current_loss > (median_loss * spike_factor)
+                )
+                loss_history.append(current_loss)
+                last_loss = current_loss
+
+                if is_spike:
+                    last_spike = {
+                        "step": global_step,
+                        "epoch": epoch,
+                        "loss": current_loss,
+                        "median_window_loss": median_loss,
+                        "batch_ids": list(batch_ids),
+                    }
+                    print(
+                        "SPIKE "
+                        f"step={global_step} epoch={epoch} loss={current_loss:.4f} "
+                        f"median={median_loss:.4f} batch_ids={batch_ids}"
+                    )
+
+                if global_step % log_every == 0:
+                    current_lr = float(optim.param_groups[0]["lr"])
+                    print(
+                        f"step={global_step} epoch={epoch} loss={current_loss:.4f} "
+                        f"grad_norm={grad_norm:.4f} lr={current_lr:.6g} "
+                        f"batch_ids={batch_ids}"
+                    )
+
+        summary = {
+            "num_examples": self.num_examples if num_examples is None else num_examples,
+            "final_loss": last_loss,
+            "global_step": global_step,
+            "last_spike": last_spike,
+        }
+        if checkpoint_path is not None:
+            checkpoint_file = _save_training_checkpoint(
+                checkpoint_path=checkpoint_path,
+                model=self.model,
+                summary={},
+                train_config={},
+            )
+            summary["checkpoint_path"] = str(checkpoint_file)
+        return summary
