@@ -149,6 +149,7 @@ def test_train_prod_loss_trend_decreases_on_synthetic_smoke_dataset(
     )
 
 
+@pytest.mark.slow
 def test_train_prod_loss_trend_decreases_on_real_preprocessed_dataset(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
