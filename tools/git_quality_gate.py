@@ -44,7 +44,11 @@ def run_pyright_for_files(env: dict[str, str], files: list[str] | None) -> int:
 
 
 def run_pytest(env: dict[str, str]) -> int:
-    return run([sys.executable, "-m", "pytest", "-q"], env)
+    marker_expr = env.get("TRANSLATOR2_PYTEST_MARK_EXPR", "not slow").strip()
+    cmd = [sys.executable, "-m", "pytest", "-q"]
+    if marker_expr:
+        cmd.extend(["-m", marker_expr])
+    return run(cmd, env)
 
 
 def staged_python_files(env: dict[str, str]) -> list[str]:
