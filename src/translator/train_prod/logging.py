@@ -107,15 +107,22 @@ class TrainingLogger:
     hardware_type: str = field(default_factory=_detect_hardware_type)
     last_log_time: float = field(default_factory=time.time)
     decoder_token_count: int = 0
+    decoder_sequence_count: int = 0
 
-    def add_decoder_tokens(self, count: int) -> None:
+    def add_decoder_tokens(self, count: int, num_sequences: int) -> None:
         self.decoder_token_count += max(0, count)
+        self.decoder_sequence_count += max(0, num_sequences)
 
     def _decoder_tokens_per_second(self) -> float | None:
         elapsed_seconds = time.time() - self.last_log_time
         if elapsed_seconds <= 0:
             return None
         return self.decoder_token_count / elapsed_seconds
+
+    def _average_target_length(self) -> float | None:
+        if self.decoder_sequence_count <= 0:
+            return None
+        return self.decoder_token_count / self.decoder_sequence_count
 
     def _build_message(
         self,
@@ -130,6 +137,7 @@ class TrainingLogger:
         batch_ids: list[int],
     ) -> str:
         dec_tok_s = self._decoder_tokens_per_second()
+        avg_tgt_len = self._average_target_length()
         gpu_util = _get_gpu_util()
         used_cu = _estimate_compute_units_used(self.start_time, self.hardware_type)
         used_eur = _estimate_euro_cost(used_cu, self.euro_per_cu)
@@ -143,7 +151,9 @@ class TrainingLogger:
             f"median_loss={_format_float(median_loss, decimals=4)} "
             f"grad_norm={_format_float(grad_norm, decimals=4)} "
             f"lr={_format_metric(lr) if lr is not None else '-'} "
+            f"dec_tok={self.decoder_token_count} "
             f"dec_tok/s={_format_float(dec_tok_s, decimals=0)} "
+            f"avg_tgt_len={_format_float(avg_tgt_len, decimals=1)} "
             f"gpu={gpu_text} cu={_format_float(used_cu, decimals=2)} "
             f"eur={_format_float(used_eur, decimals=2)} "
             f"hw={_format_metric(self.hardware_type, unknown='(unknown)')} "
@@ -184,4 +194,5 @@ class TrainingLogger:
         self._emit(message)
         self.last_log_time = time.time()
         self.decoder_token_count = 0
+        self.decoder_sequence_count = 0
         return message
