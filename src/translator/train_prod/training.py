@@ -3,21 +3,44 @@ from __future__ import annotations
 import json
 import random
 from collections import deque
+from collections.abc import Iterable, Mapping
+from dataclasses import dataclass
+from functools import partial
+from itertools import islice
 from pathlib import Path
 from statistics import median
 from typing import Any
 
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Dataset, IterableDataset, get_worker_info
 
-from ..data_prod import (
-    ArrowTranslationDataset,
-    collate_fn_prod,
-    load_arrow_records,
-)
+from ..data_prod import collate_fn_prod
 from ..model import Seq2Seq
-from .preflight import check_examples
+
+
+@dataclass(frozen=True)
+class TrainerConfig:
+    src_pad_idx: int
+    tgt_pad_idx: int
+    tgt_sos_idx: int
+    src_vocab_size: int
+    tgt_vocab_size: int
+    num_examples: int
+    id_field: str = "id"
+    src_field: str = "src_ids"
+    tgt_field: str = "tgt_ids"
+    emb_dim: int = 256
+    hidden_dim: int = 1024
+    num_heads: int = 8
+    num_layers: int = 4
+    dropout: float = 0.1
+    attention: str = "torch"
+    batch_size: int = 64
+    shuffle: bool = True
+    max_examples: int | None = None
+    device: str | torch.device | None = None
+    seed: int = 42
 
 
 def _set_seed(seed: int) -> None:
@@ -65,305 +88,154 @@ def _write_summary_json(summary_path: str | Path, summary: dict[str, Any]) -> Pa
     return summary_file
 
 
-def train_prod(
+def _collate_examples(
+    batch: list[Mapping[str, Any]],
     *,
-    dataset_path: str | Path,
-    id_field: str = "id",
-    src_field: str = "src_ids",
-    tgt_field: str = "tgt_ids",
-    src_pad_idx: int,
-    tgt_pad_idx: int,
-    tgt_sos_idx: int | None = None,
-    emb_dim: int = 256,
-    hidden_dim: int = 1024,
-    num_heads: int = 8,
-    num_layers: int = 4,
-    dropout: float = 0.1,
-    lr: float = 3e-4,
-    batch_size: int = 64,
-    epochs: int = 1,
-    seed: int = 42,
-    attention: str = "torch",
-    max_examples: int | None = None,
-    shuffle: bool = True,
-    log_every: int = 50,
-    spike_window: int = 100,
-    spike_factor: float = 3.0,
-    device: str | torch.device | None = None,
-    checkpoint_path: str | Path | None = None,
-    summary_path: str | Path | None = None,
-) -> dict[str, Any]:
-    """Deprecated. Use Trainer instead."""
-    _set_seed(seed)
-    train_device = _resolve_device(device)
-
-    raw_records = load_arrow_records(dataset_path)
-    if max_examples is not None:
-        raw_records = raw_records.select(range(min(max_examples, len(raw_records))))
-
-    stats = check_examples(
-        raw_records,
-        id_field=id_field,
-        src_field=src_field,
-        tgt_field=tgt_field,
-        src_pad_idx=src_pad_idx,
-        tgt_pad_idx=tgt_pad_idx,
-    )
-
-    inferred_tgt_bos_id = int(stats["inferred_tgt_bos_id"])
-    if tgt_sos_idx is None:
-        bos_consistency = float(stats["bos_consistency"])
-        tgt_sos_idx = inferred_tgt_bos_id
-        print(
-            "INFO "
-            f"tgt_sos_idx not provided; using inferred_tgt_bos_id={tgt_sos_idx} "
-            f"(consistency={bos_consistency:.2%})."
+    id_field: str,
+    src_field: str,
+    tgt_field: str,
+    pad_idx_src: int,
+    pad_idx_tgt: int,
+) -> tuple[torch.Tensor, torch.Tensor, list[int]]:
+    normalized = [
+        (
+            int(item[id_field]),
+            [int(x) for x in item[src_field]],
+            [int(x) for x in item[tgt_field]],
         )
-
-    src_vocab_size = max(int(stats["max_src_token_id"]), int(src_pad_idx)) + 1
-    tgt_vocab_size = (
-        max(int(stats["max_tgt_token_id"]), int(tgt_pad_idx), int(tgt_sos_idx)) + 1
+        for item in batch
+    ]
+    return collate_fn_prod(
+        normalized,
+        pad_idx_src=pad_idx_src,
+        pad_idx_tgt=pad_idx_tgt,
     )
 
-    dataset = ArrowTranslationDataset(
-        dataset_path,
-        id_field=id_field,
-        src_field=src_field,
-        tgt_field=tgt_field,
-        max_examples=max_examples,
+
+class _LimitedDataset(Dataset):
+    def __init__(self, records: Any, limit: int | None) -> None:
+        self.records = records
+        self.limit = len(records) if limit is None else min(limit, len(records))
+
+    def __len__(self) -> int:
+        return self.limit
+
+    def __getitem__(self, idx: int) -> Any:
+        return self.records[idx]
+
+
+class _ExampleIterableDataset(IterableDataset):
+    def __init__(
+        self,
+        examples: Iterable[Mapping[str, Any]],
+        limit: int | None,
+    ) -> None:
+        self.examples = examples
+        self.limit = limit
+
+    def __iter__(self):
+        worker = get_worker_info()
+        base = (
+            islice(self.examples, self.limit)
+            if self.limit is not None
+            else self.examples
+        )
+        if worker is None:
+            yield from base
+            return
+
+        for index, example in enumerate(base):
+            if index % worker.num_workers == worker.id:
+                yield example
+
+
+def _create_data_loader(
+    examples: Iterable[Mapping[str, Any]],
+    config: TrainerConfig,
+    *,
+    num_workers: int,
+    prefetch_factor: int | None,
+    persistent_workers: bool | None,
+    pin_memory: bool | None,
+    device: torch.device,
+) -> DataLoader:
+    collate = partial(
+        _collate_examples,
+        id_field=config.id_field,
+        src_field=config.src_field,
+        tgt_field=config.tgt_field,
+        pad_idx_src=config.src_pad_idx,
+        pad_idx_tgt=config.tgt_pad_idx,
     )
-    loader = DataLoader(
-        dataset,
-        batch_size=batch_size,
-        shuffle=shuffle,
-        collate_fn=lambda batch: collate_fn_prod(batch, src_pad_idx, tgt_pad_idx),
-    )
+    if hasattr(examples, "__len__") and hasattr(examples, "__getitem__"):
+        dataset = _LimitedDataset(examples, config.max_examples)
+        shuffle = config.shuffle
+    else:
+        dataset = _ExampleIterableDataset(examples, config.max_examples)
+        shuffle = False
 
-    model = Seq2Seq(
-        src_vocab_size=src_vocab_size,
-        tgt_vocab_size=tgt_vocab_size,
-        d_model=emb_dim,
-        ff_dim=hidden_dim,
-        num_heads=num_heads,
-        num_layers=num_layers,
-        src_pad_idx=src_pad_idx,
-        tgt_pad_idx=tgt_pad_idx,
-        tgt_sos_idx=tgt_sos_idx,
-        dropout=dropout,
-        attention=attention,
-    ).to(train_device)
-
-    criterion = nn.CrossEntropyLoss(ignore_index=tgt_pad_idx)
-    optim = torch.optim.Adam(model.parameters(), lr=lr)
-    model.train()
-
-    loss_history: deque[float] = deque(maxlen=spike_window)
-    global_step = 0
-    last_loss = None
-    last_spike: dict[str, Any] | None = None
-
-    for epoch in range(1, epochs + 1):
-        for src, tgt, batch_ids in loader:
-            src = src.to(train_device)
-            tgt = tgt.to(train_device)
-
-            optim.zero_grad()
-            logits = model(src, tgt)
-            loss = criterion(
-                logits.reshape(-1, logits.size(-1)),
-                tgt[:, 1:].reshape(-1),
-            )
-            loss.backward()
-            grad_norm = float(nn.utils.clip_grad_norm_(model.parameters(), 1.0))
-            optim.step()
-
-            global_step += 1
-            current_loss = float(loss.item())
-            median_loss = median(loss_history) if loss_history else current_loss
-            is_spike = bool(loss_history) and (
-                current_loss > (median_loss * spike_factor)
-            )
-            loss_history.append(current_loss)
-            last_loss = current_loss
-
-            if is_spike:
-                last_spike = {
-                    "step": global_step,
-                    "epoch": epoch,
-                    "loss": current_loss,
-                    "median_window_loss": median_loss,
-                    "batch_ids": list(batch_ids),
-                }
-                print(
-                    "SPIKE "
-                    f"step={global_step} epoch={epoch} loss={current_loss:.4f} "
-                    f"median={median_loss:.4f} batch_ids={batch_ids}"
-                )
-
-            if global_step % log_every == 0:
-                current_lr = float(optim.param_groups[0]["lr"])
-                print(
-                    f"step={global_step} epoch={epoch} loss={current_loss:.4f} "
-                    f"grad_norm={grad_norm:.4f} lr={current_lr:.6g} "
-                    f"batch_ids={batch_ids}"
-                )
-
-    summary = {
-        "num_examples": stats["num_examples"],
-        "final_loss": last_loss,
-        "global_step": global_step,
-        "device": str(train_device),
-        "src_vocab_size": src_vocab_size,
-        "tgt_vocab_size": tgt_vocab_size,
-        "tgt_sos_idx": tgt_sos_idx,
-        "last_spike": last_spike,
-    }
-
-    train_config: dict[str, Any] = {
-        "dataset_path": str(dataset_path),
-        "id_field": id_field,
-        "src_field": src_field,
-        "tgt_field": tgt_field,
-        "src_pad_idx": src_pad_idx,
-        "tgt_pad_idx": tgt_pad_idx,
-        "tgt_sos_idx": tgt_sos_idx,
-        "emb_dim": emb_dim,
-        "hidden_dim": hidden_dim,
-        "num_heads": num_heads,
-        "num_layers": num_layers,
-        "dropout": dropout,
-        "lr": lr,
-        "batch_size": batch_size,
-        "epochs": epochs,
-        "seed": seed,
-        "attention": attention,
-        "max_examples": max_examples,
+    loader_kwargs: dict[str, Any] = {
+        "batch_size": config.batch_size,
         "shuffle": shuffle,
-        "log_every": log_every,
-        "spike_window": spike_window,
-        "spike_factor": spike_factor,
-        "device": str(train_device),
+        "collate_fn": collate,
+        "num_workers": num_workers,
+        "pin_memory": device.type == "cuda" if pin_memory is None else pin_memory,
     }
-
-    if checkpoint_path is not None:
-        checkpoint_file = _save_training_checkpoint(
-            checkpoint_path=checkpoint_path,
-            model=model,
-            summary=summary,
-            train_config=train_config,
+    if num_workers > 0:
+        loader_kwargs["persistent_workers"] = (
+            True if persistent_workers is None else persistent_workers
         )
-        summary["checkpoint_path"] = str(checkpoint_file)
-        print(f"INFO saved checkpoint to {checkpoint_file}")
+        if prefetch_factor is not None:
+            loader_kwargs["prefetch_factor"] = prefetch_factor
 
-    if summary_path is not None:
-        summary_file = _write_summary_json(summary_path, summary)
-        summary["summary_path"] = str(summary_file)
-        print(f"INFO wrote summary to {summary_file}")
-
-    return summary
+    return DataLoader(dataset, **loader_kwargs)
 
 
 class Trainer:
-    def __init__(
-        self,
-        *,
-        dataset_path: str | Path,
-        id_field: str = "id",
-        src_field: str = "src_ids",
-        tgt_field: str = "tgt_ids",
-        src_pad_idx: int,
-        tgt_pad_idx: int,
-        tgt_sos_idx: int | None = None,
-        src_vocab_size: int | None = None,
-        tgt_vocab_size: int | None = None,
-        emb_dim: int = 256,
-        hidden_dim: int = 1024,
-        num_heads: int = 8,
-        num_layers: int = 4,
-        dropout: float = 0.1,
-        attention: str = "torch",
-        batch_size: int = 64,
-        shuffle: bool = True,
-        max_examples: int | None = None,
-        device: str | torch.device | None = None,
-        seed: int = 42,
-    ) -> None:
-        _set_seed(seed)
-        self.tgt_pad_idx = tgt_pad_idx
-        self.device = _resolve_device(device)
-        raw_records = load_arrow_records(dataset_path)
-        if max_examples is not None:
-            raw_records = raw_records.select(range(min(max_examples, len(raw_records))))
-
-        stats = check_examples(
-            raw_records,
-            id_field=id_field,
-            src_field=src_field,
-            tgt_field=tgt_field,
-            src_pad_idx=src_pad_idx,
-            tgt_pad_idx=tgt_pad_idx,
-        )
-        self.num_examples = int(stats["num_examples"])
-
-        inferred_tgt_bos_id = int(stats["inferred_tgt_bos_id"])
-        if tgt_sos_idx is None:
-            bos_consistency = float(stats["bos_consistency"])
-            tgt_sos_idx = inferred_tgt_bos_id
-            print(
-                "INFO "
-                f"tgt_sos_idx not provided; using inferred_tgt_bos_id={tgt_sos_idx} "
-                f"(consistency={bos_consistency:.2%})."
-            )
-
-        if src_vocab_size is None:
-            src_vocab_size = max(int(stats["max_src_token_id"]), int(src_pad_idx)) + 1
-        if tgt_vocab_size is None:
-            tgt_vocab_size = (
-                max(int(stats["max_tgt_token_id"]), int(tgt_pad_idx), int(tgt_sos_idx))
-                + 1
-            )
-
-        self.loader = DataLoader(
-            ArrowTranslationDataset(
-                dataset_path,
-                id_field=id_field,
-                src_field=src_field,
-                tgt_field=tgt_field,
-                max_examples=max_examples,
-            ),
-            batch_size=batch_size,
-            shuffle=shuffle,
-            collate_fn=lambda batch: collate_fn_prod(
-                batch,
-                src_pad_idx,
-                tgt_pad_idx,
-            ),
-        )
+    def __init__(self, config: TrainerConfig) -> None:
+        self.config = config
+        _set_seed(config.seed)
+        self.tgt_pad_idx = config.tgt_pad_idx
+        self.device = _resolve_device(config.device)
         self.model = Seq2Seq(
-            src_vocab_size=src_vocab_size,
-            tgt_vocab_size=tgt_vocab_size,
-            d_model=emb_dim,
-            ff_dim=hidden_dim,
-            num_heads=num_heads,
-            num_layers=num_layers,
-            src_pad_idx=src_pad_idx,
-            tgt_pad_idx=tgt_pad_idx,
-            tgt_sos_idx=tgt_sos_idx,
-            dropout=dropout,
-            attention=attention,
+            src_vocab_size=config.src_vocab_size,
+            tgt_vocab_size=config.tgt_vocab_size,
+            d_model=config.emb_dim,
+            ff_dim=config.hidden_dim,
+            num_heads=config.num_heads,
+            num_layers=config.num_layers,
+            src_pad_idx=config.src_pad_idx,
+            tgt_pad_idx=config.tgt_pad_idx,
+            tgt_sos_idx=config.tgt_sos_idx,
+            dropout=config.dropout,
+            attention=config.attention,
         ).to(self.device)
 
     def train(
         self,
+        examples: Iterable[Mapping[str, Any]],
         *,
         lr: float = 3e-4,
         epochs: int = 1,
         log_every: int = 50,
         spike_window: int = 100,
         spike_factor: float = 3.0,
-        num_examples: int | None = None,
+        num_workers: int = 0,
+        prefetch_factor: int | None = None,
+        persistent_workers: bool | None = None,
+        pin_memory: bool | None = None,
         checkpoint_path: str | Path | None = None,
+        summary_path: str | Path | None = None,
     ) -> dict[str, Any]:
+        loader = _create_data_loader(
+            examples,
+            self.config,
+            num_workers=num_workers,
+            prefetch_factor=prefetch_factor,
+            persistent_workers=persistent_workers,
+            pin_memory=pin_memory,
+            device=self.device,
+        )
         criterion = nn.CrossEntropyLoss(ignore_index=self.tgt_pad_idx)
         optim = torch.optim.Adam(self.model.parameters(), lr=lr)
         self.model.train()
@@ -374,7 +246,7 @@ class Trainer:
         last_spike: dict[str, Any] | None = None
 
         for epoch in range(1, epochs + 1):
-            for src, tgt, batch_ids in self.loader:
+            for src, tgt, batch_ids in loader:
                 src = src.to(self.device)
                 tgt = tgt.to(self.device)
 
@@ -422,7 +294,7 @@ class Trainer:
                     )
 
         summary = {
-            "num_examples": self.num_examples if num_examples is None else num_examples,
+            "num_examples": self.config.num_examples,
             "final_loss": last_loss,
             "global_step": global_step,
             "last_spike": last_spike,
@@ -435,4 +307,7 @@ class Trainer:
                 train_config={},
             )
             summary["checkpoint_path"] = str(checkpoint_file)
+        if summary_path is not None:
+            summary_file = _write_summary_json(summary_path, summary)
+            summary["summary_path"] = str(summary_file)
         return summary

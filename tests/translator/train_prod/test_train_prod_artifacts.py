@@ -2,35 +2,48 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from translator.train_prod import build_train_prod_config, run_train_prod
-
 from tests.translator.train_prod.support import create_valid_mapped_dataset
+from translator.data_prod import load_arrow_records
+from translator.train_prod import Trainer, TrainerConfig, check_dataset
 
 
-def test_train_prod_writes_checkpoint_and_summary(tmp_path: Path) -> None:
+def test_trainer_writes_checkpoint_and_summary(tmp_path: Path) -> None:
     dataset_path = create_valid_mapped_dataset(tmp_path / "valid_train_prod.mapped")
+    ds = load_arrow_records(dataset_path)
     checkpoint_path = tmp_path / "translator_train_prod.pt"
     summary_path = tmp_path / "translator_train_prod.json"
 
-    config = build_train_prod_config(
-        dataset_path=dataset_path,
+    check_result = check_dataset(ds, max_examples=128)
+
+    trainer_config = TrainerConfig(
+        src_pad_idx=check_result["src_pad_idx"],
+        tgt_pad_idx=check_result["tgt_pad_idx"],
+        tgt_sos_idx=check_result["tgt_sos_idx"],
+        src_vocab_size=check_result["src_vocab_size"],
+        tgt_vocab_size=check_result["tgt_vocab_size"],
+        num_examples=check_result["num_examples"],
+        id_field=check_result["id_field"],
+        src_field=check_result["src_field"],
+        tgt_field=check_result["tgt_field"],
         emb_dim=32,
         hidden_dim=64,
         num_heads=4,
         num_layers=2,
         dropout=0.0,
-        lr=1e-3,
         batch_size=32,
-        epochs=1,
         seed=7,
-        max_examples=128,
+        max_examples=check_result["max_examples"],
         shuffle=False,
-        log_every=1000,
         device="cpu",
+    )
+    out = Trainer(trainer_config).train(
+        ds,
+        lr=1e-3,
+        epochs=1,
+        log_every=1000,
         checkpoint_path=checkpoint_path,
         summary_path=summary_path,
     )
-    out = run_train_prod(config)
 
     assert checkpoint_path.is_file()
     assert summary_path.is_file()

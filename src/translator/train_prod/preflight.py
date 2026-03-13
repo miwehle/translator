@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
+from itertools import islice
 from typing import Any
 
 
@@ -10,7 +11,7 @@ def _format_example_ids(example_ids: list[int], limit: int = 5) -> str:
     return f"{shown}{suffix}"
 
 
-def check_examples(
+def check_dataset(
     examples: Iterable[Any],
     *,
     id_field: str = "id",
@@ -18,9 +19,15 @@ def check_examples(
     tgt_field: str = "tgt_ids",
     src_pad_idx: int | None = None,
     tgt_pad_idx: int | None = None,
+    max_examples: int | None = None,
     require_unique_ids: bool = True,
     min_seq_len: int = 2,
 ) -> dict[str, Any]:
+    checked_examples = (
+        list(islice(examples, max_examples))
+        if max_examples is not None
+        else examples
+    )
     seen_ids: set[int] = set()
     total = 0
     min_src_len = None
@@ -36,7 +43,7 @@ def check_examples(
     src_pad_example_ids: list[int] = []
     tgt_pad_example_ids: list[int] = []
 
-    for item in examples:
+    for item in checked_examples:
         total += 1
         if not isinstance(item, Mapping):
             raise ValueError(f"Example #{total} is not a mapping/object.")
@@ -149,7 +156,29 @@ def check_examples(
             f"{_format_example_ids(tgt_pad_example_ids)}."
         )
 
+    resolved_src_pad_idx = (
+        src_pad_idx
+        if src_pad_idx is not None
+        else max_src_token + 1
+    )
+    resolved_tgt_pad_idx = (
+        tgt_pad_idx
+        if tgt_pad_idx is not None
+        else max_tgt_token + 1
+    )
+    tgt_sos_idx = inferred_bos
+    src_vocab_size = max(max_src_token, int(resolved_src_pad_idx)) + 1
+    tgt_vocab_size = max(max_tgt_token, int(resolved_tgt_pad_idx), tgt_sos_idx) + 1
     return {
+        "id_field": id_field,
+        "src_field": src_field,
+        "tgt_field": tgt_field,
+        "src_pad_idx": resolved_src_pad_idx,
+        "tgt_pad_idx": resolved_tgt_pad_idx,
+        "tgt_sos_idx": tgt_sos_idx,
+        "src_vocab_size": src_vocab_size,
+        "tgt_vocab_size": tgt_vocab_size,
+        "max_examples": max_examples,
         "num_examples": total,
         "min_src_len": min_src_len,
         "max_src_len": max_src_len,
