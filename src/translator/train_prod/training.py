@@ -18,6 +18,7 @@ from torch.utils.data import DataLoader, Dataset, IterableDataset, get_worker_in
 from ..data_prod import collate_fn_prod
 from ..model import Seq2Seq
 from ..types import Example
+from .logging import TrainingLogger
 
 
 @dataclass(frozen=True)
@@ -243,8 +244,8 @@ class Trainer:
 
         loss_history: deque[float] = deque(maxlen=spike_window)
         global_step = 0
-        last_loss = None
-        last_spike: dict[str, Any] | None = None
+        loss_value = None
+        training_logger = TrainingLogger()
 
         for epoch in range(1, epochs + 1):
             for src, tgt, batch_ids in loader:
@@ -264,41 +265,38 @@ class Trainer:
                 optim.step()
 
                 global_step += 1
-                current_loss = float(loss.item())
-                median_loss = median(loss_history) if loss_history else current_loss
+                loss_value = float(loss.item())
+                median_loss = median(loss_history) if loss_history else loss_value
                 is_spike = bool(loss_history) and (
-                    current_loss > (median_loss * spike_factor)
+                    loss_value > (median_loss * spike_factor)
                 )
-                loss_history.append(current_loss)
-                last_loss = current_loss
+                loss_history.append(loss_value)
 
                 if is_spike:
-                    last_spike = {
-                        "step": global_step,
-                        "epoch": epoch,
-                        "loss": current_loss,
-                        "median_window_loss": median_loss,
-                        "batch_ids": list(batch_ids),
-                    }
-                    print(
-                        "SPIKE "
-                        f"step={global_step} epoch={epoch} loss={current_loss:.4f} "
-                        f"median={median_loss:.4f} batch_ids={batch_ids}"
+                    training_logger.log(
+                        label="SPIKE",
+                        step=global_step,
+                        epoch=epoch,
+                        loss=loss_value,
+                        median_loss=median_loss,
+                        batch_ids=list(batch_ids),
                     )
 
                 if global_step % log_every == 0:
-                    current_lr = float(optim.param_groups[0]["lr"])
-                    print(
-                        f"step={global_step} epoch={epoch} loss={current_loss:.4f} "
-                        f"grad_norm={grad_norm:.4f} lr={current_lr:.6g} "
-                        f"batch_ids={batch_ids}"
+                    training_logger.log(
+                        step=global_step,
+                        epoch=epoch,
+                        loss=loss_value,
+                        median_loss=median_loss,
+                        grad_norm=grad_norm,
+                        lr=float(optim.param_groups[0]["lr"]),
+                        batch_ids=list(batch_ids),
                     )
 
         summary = {
             "num_examples": self.config.num_examples,
-            "final_loss": last_loss,
-            "global_step": global_step,
-            "last_spike": last_spike,
+            "final_loss": loss_value,
+            "global_step": global_step
         }
         if checkpoint_path is not None:
             checkpoint_file = _save_training_checkpoint(
