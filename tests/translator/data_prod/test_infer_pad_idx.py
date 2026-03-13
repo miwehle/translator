@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from translator.data_prod import infer_pad_idx
+from translator.data_prod.arrow_dataset import infer_pad_idx
 
 
 def _find_preprocessed_dataset() -> Path:
