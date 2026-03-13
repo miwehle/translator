@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import subprocess
+import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -104,6 +105,17 @@ class TrainingLogger:
     euro_per_cu: float = 0.10
     start_time: datetime = field(default_factory=datetime.now)
     hardware_type: str = field(default_factory=_detect_hardware_type)
+    last_log_time: float = field(default_factory=time.time)
+    decoder_token_count: int = 0
+
+    def add_decoder_tokens(self, count: int) -> None:
+        self.decoder_token_count += max(0, count)
+
+    def _decoder_tokens_per_second(self) -> float | None:
+        elapsed_seconds = time.time() - self.last_log_time
+        if elapsed_seconds <= 0:
+            return None
+        return self.decoder_token_count / elapsed_seconds
 
     def _build_message(
         self,
@@ -117,6 +129,7 @@ class TrainingLogger:
         lr: float | None,
         batch_ids: list[int],
     ) -> str:
+        dec_tok_s = self._decoder_tokens_per_second()
         gpu_util = _get_gpu_util()
         used_cu = _estimate_compute_units_used(self.start_time, self.hardware_type)
         used_eur = _estimate_euro_cost(used_cu, self.euro_per_cu)
@@ -130,6 +143,7 @@ class TrainingLogger:
             f"median_loss={_format_float(median_loss, decimals=4)} "
             f"grad_norm={_format_float(grad_norm, decimals=4)} "
             f"lr={_format_metric(lr) if lr is not None else '-'} "
+            f"dec_tok/s={_format_float(dec_tok_s, decimals=0)} "
             f"gpu={gpu_text} cu={_format_float(used_cu, decimals=2)} "
             f"eur={_format_float(used_eur, decimals=2)} "
             f"hw={_format_metric(self.hardware_type, unknown='(unknown)')} "
@@ -168,4 +182,6 @@ class TrainingLogger:
             batch_ids=batch_ids,
         )
         self._emit(message)
+        self.last_log_time = time.time()
+        self.decoder_token_count = 0
         return message

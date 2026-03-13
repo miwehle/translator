@@ -271,6 +271,7 @@ class Trainer:
                     loss_value > (median_loss * spike_factor)
                 )
                 loss_history.append(loss_value)
+                training_logger.add_decoder_tokens(tgt[:, 1:].numel())
 
                 if is_spike:
                     training_logger.log(
