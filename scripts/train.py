@@ -1,19 +1,22 @@
 from __future__ import annotations
 
 import json
+import subprocess
 import sys
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SRC_DIR = REPO_ROOT / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
+import checkpoint_register as cr
+
 from translator.data_prod import load_arrow_records
-from translator.train_prod import Trainer, TrainerConfig, check_dataset
+from translator.train_prod import Example, Trainer, TrainerConfig, check_dataset
 
 
 @dataclass(frozen=True)
@@ -33,8 +36,8 @@ BUILD_CONFIG = TrainBuildConfig(
     max_examples=None,
     trainer_config_overrides={},
     train_kwargs={
-        "epochs": 3,
-        "num_workers": 2,
+        "epochs": 1,
+        "num_workers": 1,
         "log_every": 50,
     },
 )
@@ -47,10 +50,28 @@ def build_run_dir(runs_dir: Path, run_name: str) -> Path:
     return run_dir
 
 
-def write_config_snapshot(run_dir: Path, config: TrainBuildConfig) -> Path:
+def get_build_commit(repo_root: Path) -> str:
+    proc = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return proc.stdout.strip()
+
+
+def write_config_snapshot(
+    run_dir: Path,
+    config: TrainBuildConfig,
+    *,
+    build_commit: str,
+) -> Path:
     config_path = run_dir / "config.json"
+    payload = asdict(config)
+    payload["build_commit"] = build_commit
     config_path.write_text(
-        json.dumps(asdict(config), indent=2, sort_keys=True),
+        json.dumps(payload, indent=2, sort_keys=True),
         encoding="utf-8",
     )
     return config_path
@@ -62,9 +83,14 @@ def main(config: TrainBuildConfig = BUILD_CONFIG) -> dict[str, Any]:
         raise FileNotFoundError(f"Dataset not found: {dataset_path}")
 
     run_dir = build_run_dir(Path(config.runs_dir), config.run_name)
-    config_path = write_config_snapshot(run_dir, config)
+    build_commit = get_build_commit(REPO_ROOT)
+    config_path = write_config_snapshot(
+        run_dir,
+        config,
+        build_commit=build_commit,
+    )
 
-    ds = load_arrow_records(dataset_path)
+    ds = cast(list[Example], load_arrow_records(dataset_path))
     check_result = check_dataset(ds, max_examples=config.max_examples)
 
     trainer_config = TrainerConfig(
@@ -84,7 +110,18 @@ def main(config: TrainBuildConfig = BUILD_CONFIG) -> dict[str, Any]:
         summary_path=run_dir / "summary.json",
         **(config.train_kwargs or {}),
     )
+    register_path = Path(config.runs_dir) / "checkpoint_register.csv"
+    cr.insert(
+        register_path=register_path,
+        timestamp=datetime.now().isoformat(timespec="seconds"),
+        input_ckpt="",
+        dataset_path=str(dataset_path),
+        build_commit=build_commit,
+        output_ckpt=str(run_dir / "model.pt"),
+    )
     summary["config_path"] = str(config_path)
+    summary["build_commit"] = build_commit
+    summary["checkpoint_register_path"] = str(register_path)
     summary["run_dir"] = str(run_dir)
     print(json.dumps(summary, indent=2, sort_keys=True))
     return summary
