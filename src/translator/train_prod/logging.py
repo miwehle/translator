@@ -123,16 +123,17 @@ class TrainingLogger:
         gpu_text = f"{gpu_util}%" if gpu_util is not None else "-"
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         prefix = f"{label} " if label else ""
+        batch_ids_text = f" batch_ids={batch_ids}" if label == "SPIKE" else ""
 
         return (
-            f"{prefix}step={step} epoch={epoch} loss={loss:.4f} "
+            f"{now} {prefix}step={step} epoch={epoch} loss={loss:.4f} "
             f"median_loss={_format_float(median_loss, decimals=4)} "
             f"grad_norm={_format_float(grad_norm, decimals=4)} "
             f"lr={_format_metric(lr) if lr is not None else '-'} "
             f"gpu={gpu_text} cu={_format_float(used_cu, decimals=2)} "
             f"eur={_format_float(used_eur, decimals=2)} "
             f"hw={_format_metric(self.hardware_type, unknown='(unknown)')} "
-            f"batch_ids={batch_ids} time=\"{now}\""
+            f"{batch_ids_text}"
         )
 
     def _emit(self, message: str) -> None:

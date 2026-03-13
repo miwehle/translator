@@ -19,12 +19,17 @@ from translator.data_prod import load_arrow_records
 from translator.train_prod import Example, Trainer, TrainerConfig, check_dataset
 
 LOSS_LINE_RE = re.compile(r"\bloss=(?P<loss>\d+(?:\.\d+)?)\b")
+STEP_LINE_RE = re.compile(
+    r"^(?:\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} )?"
+    r"(?:SPIKE )?step=(?P<step>\d+)\s+epoch=(?P<epoch>\d+)\s+"
+    r"loss=(?P<loss>\d+(?:\.\d+)?)\b"
+)
 
 
 def _parse_losses(stdout_text: str) -> list[float]:
     losses: list[float] = []
     for line in stdout_text.splitlines():
-        if not line.startswith("step="):
+        if STEP_LINE_RE.match(line) is None:
             continue
         match = LOSS_LINE_RE.search(line)
         if match is None:
@@ -40,12 +45,9 @@ def _build_training_log_body(
     summary: Mapping[str, object],
     stdout_text: str,
 ) -> str:
-    step_line_re = re.compile(
-        r"^step=(?P<step>\d+)\s+epoch=(?P<epoch>\d+)\s+loss=(?P<loss>\d+(?:\.\d+)?)\b"
-    )
     step_rows: list[tuple[int, int, float]] = []
     for line in stdout_text.splitlines():
-        match = step_line_re.match(line.strip())
+        match = STEP_LINE_RE.match(line.strip())
         if match is None:
             continue
         step_rows.append(
