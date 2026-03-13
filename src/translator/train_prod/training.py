@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import random
 from collections import deque
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable
 from dataclasses import dataclass
 from functools import partial
 from itertools import islice
@@ -17,6 +17,7 @@ from torch.utils.data import DataLoader, Dataset, IterableDataset, get_worker_in
 
 from ..data_prod import collate_fn_prod
 from ..model import Seq2Seq
+from ..types import Example
 
 
 @dataclass(frozen=True)
@@ -89,7 +90,7 @@ def _write_summary_json(summary_path: str | Path, summary: dict[str, Any]) -> Pa
 
 
 def _collate_examples(
-    batch: list[Mapping[str, Any]],
+    batch: list[Example],
     *,
     id_field: str,
     src_field: str,
@@ -127,7 +128,7 @@ class _LimitedDataset(Dataset):
 class _ExampleIterableDataset(IterableDataset):
     def __init__(
         self,
-        examples: Iterable[Mapping[str, Any]],
+        examples: Iterable[Example],
         limit: int | None,
     ) -> None:
         self.examples = examples
@@ -150,7 +151,7 @@ class _ExampleIterableDataset(IterableDataset):
 
 
 def _create_data_loader(
-    examples: Iterable[Mapping[str, Any]],
+    examples: Iterable[Example],
     config: TrainerConfig,
     *,
     num_workers: int,
@@ -213,7 +214,7 @@ class Trainer:
 
     def train(
         self,
-        examples: Iterable[Mapping[str, Any]],
+        examples: Iterable[Example],
         *,
         lr: float = 3e-4,
         epochs: int = 1,

@@ -1,8 +1,4 @@
-from .api import (
-    Trainer,
-    TrainerConfig,
-    check_dataset,
-)
+from .api import Trainer, TrainerConfig, check_dataset
 
 __all__ = [
     "Trainer",

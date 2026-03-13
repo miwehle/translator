@@ -4,8 +4,9 @@ import os
 import platform
 import re
 import time
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from pathlib import Path
+from typing import cast
 
 import pytest
 
@@ -15,7 +16,7 @@ from tests.translator.train_prod.support import (
     pad_index_from_records,
 )
 from translator.data_prod import load_arrow_records
-from translator.train_prod import Trainer, TrainerConfig, check_dataset
+from translator.train_prod import Example, Trainer, TrainerConfig, check_dataset
 
 LOSS_LINE_RE = re.compile(r"\bloss=(?P<loss>\d+(?:\.\d+)?)\b")
 
@@ -73,7 +74,7 @@ def test_trainer_loss_trend_decreases_on_synthetic_smoke_dataset(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     dataset_path = create_valid_mapped_dataset(tmp_path / "valid_train_prod.mapped")
-    ds = load_arrow_records(dataset_path)
+    ds = cast(Iterable[Example], load_arrow_records(dataset_path))
     src_pad_idx = pad_index_from_records(dataset_path, "src_ids")
     tgt_pad_idx = pad_index_from_records(dataset_path, "tgt_ids")
 
@@ -197,7 +198,7 @@ def test_trainer_loss_trend_decreases_on_real_preprocessed_dataset(
         )
 
     dataset_path = find_preprocessed_dataset()
-    ds = load_arrow_records(dataset_path)
+    ds = cast(Iterable[Example], load_arrow_records(dataset_path))
     src_pad_idx = pad_index_from_records(dataset_path, "src_ids")
     tgt_pad_idx = pad_index_from_records(dataset_path, "tgt_ids")
 

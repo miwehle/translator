@@ -7,8 +7,10 @@ from .train_prod import (
     TrainerConfig,
     check_dataset,
 )
+from .types import Example
 
 __all__ = [
+    "Example",
     "Trainer",
     "TrainerConfig",
     "check_dataset",

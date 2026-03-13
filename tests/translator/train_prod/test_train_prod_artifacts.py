@@ -1,15 +1,17 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from pathlib import Path
+from typing import cast
 
 from tests.translator.train_prod.support import create_valid_mapped_dataset
 from translator.data_prod import load_arrow_records
-from translator.train_prod import Trainer, TrainerConfig, check_dataset
+from translator.train_prod import Example, Trainer, TrainerConfig, check_dataset
 
 
 def test_trainer_writes_checkpoint_and_summary(tmp_path: Path) -> None:
     dataset_path = create_valid_mapped_dataset(tmp_path / "valid_train_prod.mapped")
-    ds = load_arrow_records(dataset_path)
+    ds = cast(Iterable[Example], load_arrow_records(dataset_path))
     checkpoint_path = tmp_path / "translator_train_prod.pt"
     summary_path = tmp_path / "translator_train_prod.json"
 

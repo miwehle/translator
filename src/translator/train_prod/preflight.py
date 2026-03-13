@@ -4,6 +4,8 @@ from collections.abc import Iterable, Mapping
 from itertools import islice
 from typing import Any
 
+from ..types import Example
+
 
 def _format_example_ids(example_ids: list[int], limit: int = 5) -> str:
     shown = example_ids[:limit]
@@ -12,7 +14,7 @@ def _format_example_ids(example_ids: list[int], limit: int = 5) -> str:
 
 
 def check_dataset(
-    examples: Iterable[Any],
+    examples: Iterable[Example],
     *,
     id_field: str = "id",
     src_field: str = "src_ids",
