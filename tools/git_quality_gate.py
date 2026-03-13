@@ -73,6 +73,50 @@ def staged_python_files(env: dict[str, str]) -> list[str]:
     return files
 
 
+def changed_python_files_for_push(env: dict[str, str]) -> list[str]:
+    upstream_proc = subprocess.run(
+        ["git", "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"],
+        cwd=REPO_ROOT,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    if upstream_proc.returncode == 0:
+        diff_cmd = [
+            "git",
+            "diff",
+            "--name-only",
+            "--diff-filter=ACMR",
+            f"{upstream_proc.stdout.strip()}..HEAD",
+        ]
+    else:
+        diff_cmd = ["git", "diff-tree", "--no-commit-id", "--name-only", "-r", "HEAD"]
+
+    proc = subprocess.run(
+        diff_cmd,
+        cwd=REPO_ROOT,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if proc.returncode != 0:
+        return []
+
+    files: list[str] = []
+    for line in proc.stdout.splitlines():
+        rel_path = line.strip()
+        if not rel_path or not rel_path.endswith(".py"):
+            continue
+        if not rel_path.startswith(("src/", "tests/", "tools/")):
+            continue
+        if (REPO_ROOT / rel_path).exists():
+            files.append(rel_path)
+    return files
+
+
 def main() -> int:
     stage = sys.argv[1] if len(sys.argv) > 1 else "pre-push"
     env = os.environ.copy()
@@ -90,6 +134,13 @@ def main() -> int:
         return 0
 
     if stage == "pre-push":
+        files = changed_python_files_for_push(env)
+        if not files:
+            print(
+                "[quality-gate] pre-push: no changed Python files, "
+                "skipping pyright and pytest."
+            )
+            return 0
         if run_pyright(env) != 0:
             return 1
         if run_pytest(env) != 0:
