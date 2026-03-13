@@ -62,42 +62,6 @@ def _detect_hardware_type() -> str:
     return gpu_name
 
 
-def _estimate_compute_units_used(
-    start_time: datetime,
-    hardware_type: str,
-) -> float | None:
-    if hardware_type not in _CU_RATES:
-        return None
-
-    elapsed_seconds = (datetime.now() - start_time).total_seconds()
-    if elapsed_seconds < 0:
-        return None
-
-    elapsed_hours = elapsed_seconds / 3600.0
-    return elapsed_hours * _CU_RATES[hardware_type]
-
-
-def _estimate_euro_cost(
-    used_cu: float | None,
-    euro_per_cu: float,
-) -> float | None:
-    if used_cu is None or euro_per_cu < 0:
-        return None
-    return used_cu * euro_per_cu
-
-
-def _format_float(value: float | None, decimals: int = 2) -> str:
-    if value is None:
-        return "-"
-    return f"{value:.{decimals}f}"
-
-
-def _format_metric(value: object, unknown: str = "-") -> str:
-    if value is None:
-        return unknown
-    return str(value)
-
-
 @dataclass
 class TrainingLogger:
     print_enabled: bool = True
@@ -124,6 +88,34 @@ class TrainingLogger:
             return None
         return self.decoder_token_count / self.decoder_sequence_count
 
+    def _estimate_compute_units_used(self) -> float | None:
+        if self.hardware_type not in _CU_RATES:
+            return None
+
+        elapsed_seconds = (datetime.now() - self.start_time).total_seconds()
+        if elapsed_seconds < 0:
+            return None
+
+        elapsed_hours = elapsed_seconds / 3600.0
+        return elapsed_hours * _CU_RATES[self.hardware_type]
+
+    def _estimate_euro_cost(self, used_cu: float | None) -> float | None:
+        if used_cu is None or self.euro_per_cu < 0:
+            return None
+        return used_cu * self.euro_per_cu
+
+    @staticmethod
+    def _format_float(value: float | None, decimals: int = 2) -> str:
+        if value is None:
+            return "-"
+        return f"{value:.{decimals}f}"
+
+    @staticmethod
+    def _format_metric(value: object, unknown: str = "-") -> str:
+        if value is None:
+            return unknown
+        return str(value)
+
     def _build_message(
         self,
         *,
@@ -139,8 +131,8 @@ class TrainingLogger:
         dec_tok_s = self._decoder_tokens_per_second()
         avg_tgt_len = self._average_target_length()
         gpu_util = _get_gpu_util()
-        used_cu = _estimate_compute_units_used(self.start_time, self.hardware_type)
-        used_eur = _estimate_euro_cost(used_cu, self.euro_per_cu)
+        used_cu = self._estimate_compute_units_used()
+        used_eur = self._estimate_euro_cost(used_cu)
         gpu_text = f"{gpu_util}%" if gpu_util is not None else "-"
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         prefix = f"{label} " if label else ""
@@ -148,15 +140,15 @@ class TrainingLogger:
 
         return (
             f"{now} {prefix}step={step} ep={epoch} loss={loss:.4f} "
-            f"med={_format_float(median_loss, decimals=4)} "
-            f"grad={_format_float(grad_norm, decimals=4)} "
-            f"lr={_format_metric(lr) if lr is not None else '-'} "
+            f"med={self._format_float(median_loss, decimals=4)} "
+            f"grad={self._format_float(grad_norm, decimals=4)} "
+            f"lr={self._format_metric(lr) if lr is not None else '-'} "
             f"tok={self.decoder_token_count} "
-            f"tok/s={_format_float(dec_tok_s, decimals=0)} "
-            f"len={_format_float(avg_tgt_len, decimals=1)} "
-            f"gpu={gpu_text} cu={_format_float(used_cu, decimals=2)} "
-            f"eur={_format_float(used_eur, decimals=2)} "
-            f"hw={_format_metric(self.hardware_type, unknown='(unknown)')} "
+            f"tok/s={self._format_float(dec_tok_s, decimals=0)} "
+            f"len={self._format_float(avg_tgt_len, decimals=1)} "
+            f"gpu={gpu_text} cu={self._format_float(used_cu, decimals=2)} "
+            f"eur={self._format_float(used_eur, decimals=2)} "
+            f"hw={self._format_metric(self.hardware_type, unknown='(unknown)')} "
             f"{batch_ids_text}"
         )
 
