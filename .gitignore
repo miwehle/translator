@@ -3,8 +3,10 @@ __pycache__/
 .venv/
 .pytest_cache/
 .pytest_tmp/
+.pytest_tmp_run/
 pytest-cache-files-*/
 tests/.pytest_tmp_local/
+tests/.pytest_tmp_sub/
 tests/.test_artifacts/
 tests/**/.log/
 tests/**/train_prod_loss_progress.log
