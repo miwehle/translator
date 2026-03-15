@@ -20,7 +20,7 @@ from translator.train_prod import Example, Trainer, TrainerConfig, check_dataset
 
 
 @dataclass(frozen=True)
-class TrainBuildConfig:
+class TrainingRunConfig:
     dataset_path: str
     runs_dir: str
     run_name: str
@@ -29,7 +29,7 @@ class TrainBuildConfig:
     train_kwargs: dict[str, Any] | None = None
 
 
-BUILD_CONFIG = TrainBuildConfig(
+CONFIG = TrainingRunConfig(
     dataset_path="/content/drive/MyDrive/translator_data/europarl.preprocessed",
     runs_dir="/content/drive/MyDrive/translator_runs",
     run_name="run1",
@@ -43,14 +43,14 @@ BUILD_CONFIG = TrainBuildConfig(
 )
 
 
-def build_run_dir(runs_dir: Path, run_name: str) -> Path:
+def create_run_dir(runs_dir: Path, run_name: str) -> Path:
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     run_dir = runs_dir / f"{timestamp}_{run_name}"
     run_dir.mkdir(parents=True, exist_ok=False)
     return run_dir
 
 
-def get_build_commit(repo_root: Path) -> str:
+def get_git_commit_hash(repo_root: Path) -> str:
     proc = subprocess.run(
         ["git", "rev-parse", "HEAD"],
         cwd=repo_root,
@@ -61,9 +61,9 @@ def get_build_commit(repo_root: Path) -> str:
     return proc.stdout.strip()
 
 
-def write_config_snapshot(
+def write_training_run_config(
     run_dir: Path,
-    config: TrainBuildConfig,
+    config: TrainingRunConfig,
     *,
     build_commit: str,
 ) -> Path:
@@ -77,17 +77,17 @@ def write_config_snapshot(
     return config_path
 
 
-def main(config: TrainBuildConfig = BUILD_CONFIG) -> dict[str, Any]:
+def main(config: TrainingRunConfig = CONFIG) -> dict[str, Any]:
     dataset_path = Path(config.dataset_path)
     if not dataset_path.exists():
         raise FileNotFoundError(f"Dataset not found: {dataset_path}")
 
-    run_dir = build_run_dir(Path(config.runs_dir), config.run_name)
-    build_commit = get_build_commit(REPO_ROOT)
-    config_path = write_config_snapshot(
+    run_dir = create_run_dir(Path(config.runs_dir), config.run_name)
+    git_commit = get_git_commit_hash(REPO_ROOT)
+    config_path = write_training_run_config(
         run_dir,
         config,
-        build_commit=build_commit,
+        build_commit=git_commit,
     )
 
     ds = cast(list[Example], load_arrow_records(dataset_path))
@@ -116,11 +116,11 @@ def main(config: TrainBuildConfig = BUILD_CONFIG) -> dict[str, Any]:
         timestamp=datetime.now().isoformat(timespec="seconds"),
         input_ckpt="",
         dataset_path=str(dataset_path),
-        build_commit=build_commit,
+        git_commit=git_commit,
         output_ckpt=str(run_dir / "model.pt"),
     )
     summary["config_path"] = str(config_path)
-    summary["build_commit"] = build_commit
+    summary["build_commit"] = git_commit
     summary["checkpoint_register_path"] = str(register_path)
     summary["run_dir"] = str(run_dir)
     print(json.dumps(summary, indent=2, sort_keys=True))

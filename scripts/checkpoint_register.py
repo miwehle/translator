@@ -7,7 +7,7 @@ FIELDNAMES = [
     "timestamp",
     "input_ckpt",
     "dataset_path",
-    "build_commit",
+    "git_commit",
     "output_ckpt",
 ]
 
@@ -18,7 +18,7 @@ def insert(
     timestamp: str,
     input_ckpt: str,
     dataset_path: str,
-    build_commit: str,
+    git_commit: str,
     output_ckpt: str,
 ) -> Path:
     register_file = Path(register_path)
@@ -34,7 +34,7 @@ def insert(
                 "timestamp": timestamp,
                 "input_ckpt": input_ckpt,
                 "dataset_path": dataset_path,
-                "build_commit": build_commit,
+                "git_commit": git_commit,
                 "output_ckpt": output_ckpt,
             }
         )
