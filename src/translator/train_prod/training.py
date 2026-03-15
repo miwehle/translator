@@ -23,9 +23,6 @@ from .logging import TrainingLogger
 
 @dataclass(frozen=True)
 class TrainerConfig:
-    src_pad_idx: int
-    tgt_pad_idx: int
-    num_examples: int
     id_field: str = "id"
     src_field: str = "src_ids"
     tgt_field: str = "tgt_ids"
@@ -178,6 +175,7 @@ class _ExampleIterableDataset(IterableDataset):
 
 def _create_data_loader(
     examples: Iterable[Example],
+    model: Seq2Seq,
     config: TrainerConfig,
     *,
     num_workers: int,
@@ -191,8 +189,8 @@ def _create_data_loader(
         id_field=config.id_field,
         src_field=config.src_field,
         tgt_field=config.tgt_field,
-        pad_idx_src=config.src_pad_idx,
-        pad_idx_tgt=config.tgt_pad_idx,
+        pad_idx_src=model.src_pad_idx,
+        pad_idx_tgt=model.tgt_pad_idx,
     )
     if hasattr(examples, "__len__") and hasattr(examples, "__getitem__"):
         dataset = _LimitedDataset(examples, config.max_examples)
@@ -222,7 +220,6 @@ class Trainer:
     def __init__(self, model: Seq2Seq, config: TrainerConfig) -> None:
         self.config = config
         _set_seed(config.seed)
-        self.tgt_pad_idx = config.tgt_pad_idx
         self.device = _resolve_device(config.device)
         self.model = model.to(self.device)
 
@@ -244,6 +241,7 @@ class Trainer:
     ) -> dict[str, Any]:
         loader = _create_data_loader(
             examples,
+            self.model,
             self.config,
             num_workers=num_workers,
             prefetch_factor=prefetch_factor,
@@ -251,12 +249,13 @@ class Trainer:
             pin_memory=pin_memory,
             device=self.device,
         )
-        criterion = nn.CrossEntropyLoss(ignore_index=self.tgt_pad_idx)
+        criterion = nn.CrossEntropyLoss(ignore_index=self.model.tgt_pad_idx)
         optim = torch.optim.Adam(self.model.parameters(), lr=lr)
         self.model.train()
 
         loss_history: deque[float] = deque(maxlen=spike_window)
         global_step = 0
+        processed_examples = 0
         loss_value = None
         training_logger = TrainingLogger()
 
@@ -278,6 +277,7 @@ class Trainer:
                 optim.step()
 
                 global_step += 1
+                processed_examples += tgt.size(0)
                 loss_value = float(loss.item())
                 median_loss = median(loss_history) if loss_history else loss_value
                 is_spike = bool(loss_history) and (
@@ -311,7 +311,7 @@ class Trainer:
                     )
 
         summary = {
-            "num_examples": self.config.num_examples,
+            "num_examples": processed_examples,
             "final_loss": loss_value,
             "global_step": global_step
         }

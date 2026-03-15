@@ -106,9 +106,6 @@ def test_trainer_loss_trend_decreases_on_synthetic_smoke_dataset(
         seed=7,
     )
     trainer_config = TrainerConfig(
-        src_pad_idx=check_result["src_pad_idx"],
-        tgt_pad_idx=check_result["tgt_pad_idx"],
-        num_examples=check_result["num_examples"],
         id_field=check_result["id_field"],
         src_field=check_result["src_field"],
         tgt_field=check_result["tgt_field"],
@@ -236,9 +233,6 @@ def test_trainer_loss_trend_decreases_on_real_preprocessed_dataset(
         seed=7,
     )
     trainer_config = TrainerConfig(
-        src_pad_idx=check_result["src_pad_idx"],
-        tgt_pad_idx=check_result["tgt_pad_idx"],
-        num_examples=check_result["num_examples"],
         id_field=check_result["id_field"],
         src_field=check_result["src_field"],
         tgt_field=check_result["tgt_field"],

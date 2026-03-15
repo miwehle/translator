@@ -32,9 +32,6 @@ def test_trainer_writes_checkpoint_and_summary(tmp_path: Path) -> None:
     )
 
     trainer_config = TrainerConfig(
-        src_pad_idx=check_result["src_pad_idx"],
-        tgt_pad_idx=check_result["tgt_pad_idx"],
-        num_examples=check_result["num_examples"],
         id_field=check_result["id_field"],
         src_field=check_result["src_field"],
         tgt_field=check_result["tgt_field"],
