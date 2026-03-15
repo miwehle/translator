@@ -25,19 +25,10 @@ from .logging import TrainingLogger
 class TrainerConfig:
     src_pad_idx: int
     tgt_pad_idx: int
-    tgt_sos_idx: int
-    src_vocab_size: int
-    tgt_vocab_size: int
     num_examples: int
     id_field: str = "id"
     src_field: str = "src_ids"
     tgt_field: str = "tgt_ids"
-    emb_dim: int = 256
-    hidden_dim: int = 1024
-    num_heads: int = 8
-    num_layers: int = 4
-    dropout: float = 0.1
-    attention: str = "torch"
     batch_size: int = 64
     shuffle: bool = True
     max_examples: int | None = None
@@ -58,6 +49,40 @@ def _resolve_device(device: str | torch.device | None) -> torch.device:
     if isinstance(device, torch.device):
         return device
     return torch.device(device)
+
+
+def build_model(
+    *,
+    src_vocab_size: int,
+    tgt_vocab_size: int,
+    src_pad_idx: int,
+    tgt_pad_idx: int,
+    tgt_sos_idx: int,
+    emb_dim: int = 256,
+    hidden_dim: int = 1024,
+    num_heads: int = 8,
+    num_layers: int = 4,
+    dropout: float = 0.1,
+    attention: str = "torch",
+    device: str | torch.device | None = None,
+    seed: int | None = None,
+) -> Seq2Seq:
+    if seed is not None:
+        _set_seed(seed)
+    resolved_device = _resolve_device(device)
+    return Seq2Seq(
+        src_vocab_size=src_vocab_size,
+        tgt_vocab_size=tgt_vocab_size,
+        d_model=emb_dim,
+        ff_dim=hidden_dim,
+        num_heads=num_heads,
+        num_layers=num_layers,
+        src_pad_idx=src_pad_idx,
+        tgt_pad_idx=tgt_pad_idx,
+        tgt_sos_idx=tgt_sos_idx,
+        dropout=dropout,
+        attention=attention,
+    ).to(resolved_device)
 
 
 def _save_training_checkpoint(
@@ -194,24 +219,12 @@ def _create_data_loader(
 
 
 class Trainer:
-    def __init__(self, config: TrainerConfig) -> None:
+    def __init__(self, model: Seq2Seq, config: TrainerConfig) -> None:
         self.config = config
         _set_seed(config.seed)
         self.tgt_pad_idx = config.tgt_pad_idx
         self.device = _resolve_device(config.device)
-        self.model = Seq2Seq(
-            src_vocab_size=config.src_vocab_size,
-            tgt_vocab_size=config.tgt_vocab_size,
-            d_model=config.emb_dim,
-            ff_dim=config.hidden_dim,
-            num_heads=config.num_heads,
-            num_layers=config.num_layers,
-            src_pad_idx=config.src_pad_idx,
-            tgt_pad_idx=config.tgt_pad_idx,
-            tgt_sos_idx=config.tgt_sos_idx,
-            dropout=config.dropout,
-            attention=config.attention,
-        ).to(self.device)
+        self.model = model.to(self.device)
 
     def train(
         self,

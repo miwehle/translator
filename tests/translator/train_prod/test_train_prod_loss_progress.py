@@ -16,7 +16,7 @@ from tests.translator.train_prod.support import (
     pad_index_from_records,
 )
 from translator.data_prod import load_arrow_records
-from translator.train_prod import Example, Trainer, TrainerConfig, check_dataset
+from translator.train_prod import Example, Trainer, TrainerConfig, build_model, check_dataset
 
 LOSS_LINE_RE = re.compile(r"\bloss=(?P<loss>\d+(?:\.\d+)?)\b")
 STEP_LINE_RE = re.compile(
@@ -91,21 +91,27 @@ def test_trainer_loss_trend_decreases_on_synthetic_smoke_dataset(
         tgt_pad_idx=tgt_pad_idx,
         max_examples=512,
     )
-    trainer_config = TrainerConfig(
+    model = build_model(
+        src_vocab_size=check_result["src_vocab_size"],
+        tgt_vocab_size=check_result["tgt_vocab_size"],
         src_pad_idx=check_result["src_pad_idx"],
         tgt_pad_idx=check_result["tgt_pad_idx"],
         tgt_sos_idx=check_result["tgt_sos_idx"],
-        src_vocab_size=check_result["src_vocab_size"],
-        tgt_vocab_size=check_result["tgt_vocab_size"],
-        num_examples=check_result["num_examples"],
-        id_field=check_result["id_field"],
-        src_field=check_result["src_field"],
-        tgt_field=check_result["tgt_field"],
         emb_dim=64,
         hidden_dim=128,
         num_heads=4,
         num_layers=2,
         dropout=0.0,
+        device="cpu",
+        seed=7,
+    )
+    trainer_config = TrainerConfig(
+        src_pad_idx=check_result["src_pad_idx"],
+        tgt_pad_idx=check_result["tgt_pad_idx"],
+        num_examples=check_result["num_examples"],
+        id_field=check_result["id_field"],
+        src_field=check_result["src_field"],
+        tgt_field=check_result["tgt_field"],
         batch_size=32,
         shuffle=False,
         max_examples=check_result["max_examples"],
@@ -113,7 +119,7 @@ def test_trainer_loss_trend_decreases_on_synthetic_smoke_dataset(
         seed=7,
     )
     t0 = time.perf_counter()
-    out = Trainer(trainer_config).train(
+    out = Trainer(model, trainer_config).train(
         ds,
         lr=1e-3,
         epochs=2,
@@ -215,21 +221,27 @@ def test_trainer_loss_trend_decreases_on_real_preprocessed_dataset(
         tgt_pad_idx=tgt_pad_idx,
         max_examples=256,
     )
-    trainer_config = TrainerConfig(
+    model = build_model(
+        src_vocab_size=check_result["src_vocab_size"],
+        tgt_vocab_size=check_result["tgt_vocab_size"],
         src_pad_idx=check_result["src_pad_idx"],
         tgt_pad_idx=check_result["tgt_pad_idx"],
         tgt_sos_idx=check_result["tgt_sos_idx"],
-        src_vocab_size=check_result["src_vocab_size"],
-        tgt_vocab_size=check_result["tgt_vocab_size"],
-        num_examples=check_result["num_examples"],
-        id_field=check_result["id_field"],
-        src_field=check_result["src_field"],
-        tgt_field=check_result["tgt_field"],
         emb_dim=64,
         hidden_dim=128,
         num_heads=4,
         num_layers=2,
         dropout=0.0,
+        device="cpu",
+        seed=7,
+    )
+    trainer_config = TrainerConfig(
+        src_pad_idx=check_result["src_pad_idx"],
+        tgt_pad_idx=check_result["tgt_pad_idx"],
+        num_examples=check_result["num_examples"],
+        id_field=check_result["id_field"],
+        src_field=check_result["src_field"],
+        tgt_field=check_result["tgt_field"],
         batch_size=32,
         shuffle=False,
         max_examples=check_result["max_examples"],
@@ -237,7 +249,7 @@ def test_trainer_loss_trend_decreases_on_real_preprocessed_dataset(
         seed=7,
     )
     t0 = time.perf_counter()
-    out = Trainer(trainer_config).train(
+    out = Trainer(model, trainer_config).train(
         ds,
         lr=1e-3,
         epochs=4,

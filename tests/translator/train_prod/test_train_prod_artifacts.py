@@ -6,7 +6,7 @@ from typing import cast
 
 from tests.translator.train_prod.support import create_valid_mapped_dataset
 from translator.data_prod import load_arrow_records
-from translator.train_prod import Example, Trainer, TrainerConfig, check_dataset
+from translator.train_prod import Example, Trainer, TrainerConfig, build_model, check_dataset
 
 
 def test_trainer_writes_checkpoint_and_summary(tmp_path: Path) -> None:
@@ -16,29 +16,35 @@ def test_trainer_writes_checkpoint_and_summary(tmp_path: Path) -> None:
     summary_path = tmp_path / "translator_train_prod.json"
 
     check_result = check_dataset(ds, max_examples=128)
-
-    trainer_config = TrainerConfig(
+    model = build_model(
+        src_vocab_size=check_result["src_vocab_size"],
+        tgt_vocab_size=check_result["tgt_vocab_size"],
         src_pad_idx=check_result["src_pad_idx"],
         tgt_pad_idx=check_result["tgt_pad_idx"],
         tgt_sos_idx=check_result["tgt_sos_idx"],
-        src_vocab_size=check_result["src_vocab_size"],
-        tgt_vocab_size=check_result["tgt_vocab_size"],
-        num_examples=check_result["num_examples"],
-        id_field=check_result["id_field"],
-        src_field=check_result["src_field"],
-        tgt_field=check_result["tgt_field"],
         emb_dim=32,
         hidden_dim=64,
         num_heads=4,
         num_layers=2,
         dropout=0.0,
+        device="cpu",
+        seed=7,
+    )
+
+    trainer_config = TrainerConfig(
+        src_pad_idx=check_result["src_pad_idx"],
+        tgt_pad_idx=check_result["tgt_pad_idx"],
+        num_examples=check_result["num_examples"],
+        id_field=check_result["id_field"],
+        src_field=check_result["src_field"],
+        tgt_field=check_result["tgt_field"],
         batch_size=32,
         seed=7,
         max_examples=check_result["max_examples"],
         shuffle=False,
         device="cpu",
     )
-    out = Trainer(trainer_config).train(
+    out = Trainer(model, trainer_config).train(
         ds,
         lr=1e-3,
         epochs=1,

@@ -6,7 +6,7 @@ import sys
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, cast
+from typing import cast
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SRC_DIR = REPO_ROOT / "src"
@@ -16,7 +16,7 @@ if str(SRC_DIR) not in sys.path:
 import checkpoint_register as cr
 
 from translator.data_prod import load_arrow_records
-from translator.train_prod import Example, Trainer, TrainerConfig, check_dataset
+from translator.train_prod import Example, Trainer, TrainerConfig, build_model, check_dataset
 
 
 @dataclass(frozen=True)
@@ -25,8 +25,6 @@ class TrainingRunConfig:
     runs_dir: str
     run_name: str
     max_examples: int | None = None
-    trainer_config_overrides: dict[str, Any] | None = None
-    train_kwargs: dict[str, Any] | None = None
 
 
 CONFIG = TrainingRunConfig(
@@ -34,12 +32,6 @@ CONFIG = TrainingRunConfig(
     runs_dir="/content/drive/MyDrive/translator_runs",
     run_name="run1",
     max_examples=None,
-    trainer_config_overrides={},
-    train_kwargs={
-        "epochs": 1,
-        "num_workers": 1,
-        "log_every": 50,
-    },
 )
 
 
@@ -77,7 +69,7 @@ def write_training_run_config(
     return config_path
 
 
-def main(config: TrainingRunConfig = CONFIG) -> dict[str, Any]:
+def main(config: TrainingRunConfig = CONFIG) -> dict[str, object]:
     dataset_path = Path(config.dataset_path)
     if not dataset_path.exists():
         raise FileNotFoundError(f"Dataset not found: {dataset_path}")
@@ -92,23 +84,38 @@ def main(config: TrainingRunConfig = CONFIG) -> dict[str, Any]:
 
     ds = cast(list[Example], load_arrow_records(dataset_path))
     check_result = check_dataset(ds, max_examples=config.max_examples)
+    seed = 42
+    device = None
+
+    model = build_model(
+        src_vocab_size=check_result["src_vocab_size"],
+        tgt_vocab_size=check_result["tgt_vocab_size"],
+        src_pad_idx=check_result["src_pad_idx"],
+        tgt_pad_idx=check_result["tgt_pad_idx"],
+        tgt_sos_idx=check_result["tgt_sos_idx"],
+        device=device,
+        seed=seed,
+    )
 
     trainer_config = TrainerConfig(
         src_pad_idx=check_result["src_pad_idx"],
         tgt_pad_idx=check_result["tgt_pad_idx"],
-        tgt_sos_idx=check_result["tgt_sos_idx"],
-        src_vocab_size=check_result["src_vocab_size"],
-        tgt_vocab_size=check_result["tgt_vocab_size"],
         num_examples=check_result["num_examples"],
+        id_field=check_result["id_field"],
+        src_field=check_result["src_field"],
+        tgt_field=check_result["tgt_field"],
         max_examples=config.max_examples,
-        **(config.trainer_config_overrides or {}),
+        device=device,
+        seed=seed,
     )
 
-    summary = Trainer(trainer_config).train(
+    summary = Trainer(model, trainer_config).train(
         ds,
+        epochs=1,
+        num_workers=1,
+        log_every=50,
         checkpoint_path=run_dir / "model.pt",
         summary_path=run_dir / "summary.json",
-        **(config.train_kwargs or {}),
     )
     register_path = Path(config.runs_dir) / "checkpoint_register.csv"
     cr.insert(
