@@ -1,10 +1,11 @@
 {
   "python.testing.pytestEnabled": true,
   "python.testing.unittestEnabled": false,
+  "python.testing.cwd": "${workspaceFolder}",
   "python.testing.pytestArgs": [
+    "tests",
     "-m",
-    "not slow",
-    "tests"
+    "not slow"
   ],
   "python.analysis.extraPaths": [
     "${workspaceFolder}/src"
