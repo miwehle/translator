@@ -175,9 +175,15 @@ class _ExampleIterableDataset(IterableDataset):
 
 def _create_data_loader(
     examples: Iterable[Example],
-    model: Seq2Seq,
-    config: TrainerConfig,
     *,
+    id_field: str,
+    src_field: str,
+    tgt_field: str,
+    pad_idx_src: int,
+    pad_idx_tgt: int,
+    max_examples: int | None,
+    shuffle: bool,
+    batch_size: int,
     num_workers: int,
     prefetch_factor: int | None,
     persistent_workers: bool | None,
@@ -186,22 +192,22 @@ def _create_data_loader(
 ) -> DataLoader:
     collate = partial(
         _collate_examples,
-        id_field=config.id_field,
-        src_field=config.src_field,
-        tgt_field=config.tgt_field,
-        pad_idx_src=model.src_pad_idx,
-        pad_idx_tgt=model.tgt_pad_idx,
+        id_field=id_field,
+        src_field=src_field,
+        tgt_field=tgt_field,
+        pad_idx_src=pad_idx_src,
+        pad_idx_tgt=pad_idx_tgt,
     )
     if hasattr(examples, "__len__") and hasattr(examples, "__getitem__"):
-        dataset = _LimitedDataset(examples, config.max_examples)
-        shuffle = config.shuffle
+        dataset = _LimitedDataset(examples, max_examples)
+        loader_shuffle = shuffle
     else:
-        dataset = _ExampleIterableDataset(examples, config.max_examples)
-        shuffle = False
+        dataset = _ExampleIterableDataset(examples, max_examples)
+        loader_shuffle = False
 
     loader_kwargs: dict[str, Any] = {
-        "batch_size": config.batch_size,
-        "shuffle": shuffle,
+        "batch_size": batch_size,
+        "shuffle": loader_shuffle,
         "collate_fn": collate,
         "num_workers": num_workers,
         "pin_memory": device.type == "cuda" if pin_memory is None else pin_memory,
@@ -241,8 +247,14 @@ class Trainer:
     ) -> dict[str, Any]:
         loader = _create_data_loader(
             examples,
-            self.model,
-            self.config,
+            id_field=self.config.id_field,
+            src_field=self.config.src_field,
+            tgt_field=self.config.tgt_field,
+            pad_idx_src=self.model.src_pad_idx,
+            pad_idx_tgt=self.model.tgt_pad_idx,
+            max_examples=self.config.max_examples,
+            shuffle=self.config.shuffle,
+            batch_size=self.config.batch_size,
             num_workers=num_workers,
             prefetch_factor=prefetch_factor,
             persistent_workers=persistent_workers,
