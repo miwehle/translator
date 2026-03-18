@@ -16,7 +16,13 @@ if str(SRC_DIR) not in sys.path:
 import checkpoint_register as cr
 
 from translator.data_prod import load_arrow_records
-from translator.train_prod import Example, Trainer, TrainerConfig, build_model, check_dataset
+from translator.train_prod import (
+    Example,
+    Trainer,
+    TrainerConfig,
+    build_model,
+    check_dataset,
+)
 
 
 @dataclass(frozen=True)
@@ -70,6 +76,13 @@ def write_training_run_config(
 
 
 def main(config: TrainingRunConfig = CONFIG) -> dict[str, object]:
+    """
+    load dataset
+    create model
+    create trainer
+    trainer, train model on dataset
+    save model
+    """
     dataset_path = Path(config.dataset_path)
     if not dataset_path.exists():
         raise FileNotFoundError(f"Dataset not found: {dataset_path}")
