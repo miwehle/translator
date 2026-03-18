@@ -23,6 +23,7 @@
   "files.exclude": {
       // __pycache__ im Explorer ausblenden
     ".githooks": true,
+    ".tmp_pytest": true,
     "**/__pycache__": true,
     "**/.pytest_cache": true,
     "**/.pytest_tmp": true,
