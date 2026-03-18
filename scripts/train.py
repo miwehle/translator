@@ -34,8 +34,8 @@ class TrainingRunConfig:
 
 
 CONFIG = TrainingRunConfig(
-    dataset_path="/content/drive/MyDrive/translator_data/europarl.preprocessed",
-    runs_dir="/content/drive/MyDrive/translator_runs",
+    dataset_path="/content/drive/MyDrive/nmt_lab/artifacts/datasets/europarl_de-en_train_10000",
+    runs_dir="/content/drive/MyDrive/nmt_lab/artifacts/training_runs",
     run_name="run1",
     max_examples=None,
 )

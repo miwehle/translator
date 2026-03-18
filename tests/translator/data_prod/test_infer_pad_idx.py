@@ -23,11 +23,13 @@ def _find_preprocessed_dataset() -> Path:
     if not testdata_dir.exists():
         pytest.skip(f"Missing test data directory: {testdata_dir}")
 
-    candidates = sorted(p for p in testdata_dir.rglob("europarl.preprocessed") if p.is_dir())
+    candidates = sorted(
+        p for p in testdata_dir.rglob("europarl_de-en_train_10000") if p.is_dir()
+    )
     if not candidates:
         pytest.skip(
             "No preprocessed Arrow dataset found under tests/testdata. "
-            "Expected a directory like '.../europarl.preprocessed'."
+            "Expected a directory like '.../europarl_de-en_train_10000'."
         )
     return candidates[0]
 

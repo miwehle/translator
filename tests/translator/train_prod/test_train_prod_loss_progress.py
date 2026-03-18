@@ -16,7 +16,13 @@ from tests.translator.train_prod.support import (
     pad_index_from_records,
 )
 from translator.data_prod import load_arrow_records
-from translator.train_prod import Example, Trainer, TrainerConfig, build_model, check_dataset
+from translator.train_prod import (
+    Example,
+    Trainer,
+    TrainerConfig,
+    build_model,
+    check_dataset,
+)
 
 LOSS_LINE_RE = re.compile(r"\bloss=(?P<loss>\d+(?:\.\d+)?)\b")
 STEP_LINE_RE = re.compile(
@@ -198,7 +204,7 @@ def test_trainer_loss_trend_decreases_on_real_preprocessed_dataset(
     def find_preprocessed_dataset() -> Path:
         return find_arrow_dataset(
             env_var="TRANSLATOR2_TESTDATA_PREPROCESSED",
-            default_dir_name="europarl.preprocessed",
+            default_dir_name="europarl_de-en_train_10000",
             expected_label="preprocessed",
         )
 

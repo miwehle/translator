@@ -1,0 +1,15 @@
+schema_version: 1
+tokenizer_model_name: Helsinki-NLP/opus-mt-de-en
+src_lang: de
+tgt_lang: en
+id_field: id
+src_field: src_ids
+tgt_field: tgt_ids
+base_vocab_size: 58101
+src_vocab_size: 58101
+tgt_vocab_size: 58102
+src_pad_id: 58100
+tgt_pad_id: 58100
+tgt_bos_id: 58101
+tgt_eos_id: 0
+num_examples: 8741
