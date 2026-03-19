@@ -6,7 +6,9 @@ from typing import cast
 
 from tests.translator.train_prod.support import create_valid_mapped_dataset
 from translator.data_prod import load_arrow_records
-from translator.train_prod import Example, Trainer, TrainerConfig, build_model, check_dataset
+from translator.train_prod import Example, Trainer, check_dataset
+from translator.train_prod.factory import Factory
+from translator.train_prod.training import DataLoaderConfig, ModelConfig, TrainConfig
 
 
 def test_trainer_writes_checkpoint_and_summary(tmp_path: Path) -> None:
@@ -16,37 +18,44 @@ def test_trainer_writes_checkpoint_and_summary(tmp_path: Path) -> None:
     summary_path = tmp_path / "translator_train_prod.json"
 
     check_result = check_dataset(ds)
-    model = build_model(
-        src_vocab_size=check_result["src_vocab_size"],
-        tgt_vocab_size=check_result["tgt_vocab_size"],
-        src_pad_idx=check_result["src_pad_idx"],
-        tgt_pad_idx=check_result["tgt_pad_idx"],
-        tgt_sos_idx=check_result["tgt_sos_idx"],
-        emb_dim=32,
-        hidden_dim=64,
-        num_heads=4,
-        num_layers=2,
-        dropout=0.0,
-        device="cpu",
-        seed=7,
+    factory = Factory(
+        dataset_metadata=type(
+            "_DatasetMetadata",
+            (),
+            {
+                "src_vocab_size": check_result["src_vocab_size"],
+                "tgt_vocab_size": check_result["tgt_vocab_size"],
+                "src_pad_id": check_result["src_pad_idx"],
+                "tgt_pad_id": check_result["tgt_pad_idx"],
+                "tgt_bos_id": check_result["tgt_sos_idx"],
+                "id_field": check_result["id_field"],
+                "src_field": check_result["src_field"],
+                "tgt_field": check_result["tgt_field"],
+            },
+        )()
     )
-
-    trainer_config = TrainerConfig(
-        id_field=check_result["id_field"],
-        src_field=check_result["src_field"],
-        tgt_field=check_result["tgt_field"],
-        batch_size=32,
-        seed=7,
-        shuffle=False,
-        device="cpu",
-    )
-    out = Trainer(model, trainer_config).train(
+    out = Trainer(factory).train(
         ds,
-        lr=1e-3,
-        epochs=1,
-        log_every=1000,
-        checkpoint_path=checkpoint_path,
-        summary_path=summary_path,
+        train_config=TrainConfig(
+            seed=7,
+            device="cpu",
+            lr=1e-3,
+            epochs=1,
+            log_every=1000,
+            checkpoint_path=checkpoint_path,
+            summary_path=summary_path,
+        ),
+        model_config=ModelConfig(
+            emb_dim=32,
+            hidden_dim=64,
+            num_heads=4,
+            num_layers=2,
+            dropout=0.0,
+        ),
+        data_loader_config=DataLoaderConfig(
+            batch_size=32,
+            shuffle=False,
+        ),
     )
 
     assert checkpoint_path.is_file()

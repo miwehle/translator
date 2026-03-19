@@ -3,15 +3,15 @@
 from __future__ import annotations
 
 from .train_prod import (
+    Factory,
     Trainer,
-    TrainerConfig,
     check_dataset,
 )
 from .types import Example
 
 __all__ = [
     "Example",
+    "Factory",
     "Trainer",
-    "TrainerConfig",
     "check_dataset",
 ]

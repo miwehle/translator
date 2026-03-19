@@ -18,9 +18,13 @@ from translator.data_prod import load_arrow_records
 from translator.train_prod import (
     Example,
     Trainer,
-    TrainerConfig,
-    build_model,
     check_dataset,
+)
+from translator.train_prod.factory import Factory
+from translator.train_prod.training import (
+    DataLoaderConfig,
+    ModelConfig,
+    TrainConfig,
 )
 
 LOSS_LINE_RE = re.compile(r"\bloss=(?P<loss>\d+(?:\.\d+)?)\b")
@@ -94,35 +98,43 @@ def test_trainer_loss_trend_decreases_on_synthetic_smoke_dataset(
         src_pad_idx=src_pad_idx,
         tgt_pad_idx=tgt_pad_idx,
     )
-    model = build_model(
-        src_vocab_size=check_result["src_vocab_size"],
-        tgt_vocab_size=check_result["tgt_vocab_size"],
-        src_pad_idx=check_result["src_pad_idx"],
-        tgt_pad_idx=check_result["tgt_pad_idx"],
-        tgt_sos_idx=check_result["tgt_sos_idx"],
-        emb_dim=64,
-        hidden_dim=128,
-        num_heads=4,
-        num_layers=2,
-        dropout=0.0,
-        device="cpu",
-        seed=7,
-    )
-    trainer_config = TrainerConfig(
-        id_field=check_result["id_field"],
-        src_field=check_result["src_field"],
-        tgt_field=check_result["tgt_field"],
-        batch_size=32,
-        shuffle=False,
-        device="cpu",
-        seed=7,
+    factory = Factory(
+        dataset_metadata=type(
+            "_DatasetMetadata",
+            (),
+            {
+                "src_vocab_size": check_result["src_vocab_size"],
+                "tgt_vocab_size": check_result["tgt_vocab_size"],
+                "src_pad_id": check_result["src_pad_idx"],
+                "tgt_pad_id": check_result["tgt_pad_idx"],
+                "tgt_bos_id": check_result["tgt_sos_idx"],
+                "id_field": check_result["id_field"],
+                "src_field": check_result["src_field"],
+                "tgt_field": check_result["tgt_field"],
+            },
+        )()
     )
     t0 = time.perf_counter()
-    out = Trainer(model, trainer_config).train(
+    out = Trainer(factory).train(
         ds,
-        lr=1e-3,
-        epochs=2,
-        log_every=1,
+        train_config=TrainConfig(
+            device="cpu",
+            seed=7,
+            lr=1e-3,
+            epochs=2,
+            log_every=1,
+        ),
+        model_config=ModelConfig(
+            emb_dim=64,
+            hidden_dim=128,
+            num_heads=4,
+            num_layers=2,
+            dropout=0.0,
+        ),
+        data_loader_config=DataLoaderConfig(
+            batch_size=32,
+            shuffle=False,
+        ),
     )
     training_duration_seconds = time.perf_counter() - t0
 
@@ -163,7 +175,7 @@ def test_trainer_loss_trend_decreases_on_synthetic_smoke_dataset(
     )
 
 
-@pytest.mark.slow
+#@pytest.mark.slow
 def test_trainer_loss_trend_decreases_on_real_preprocessed_dataset(
     capsys: pytest.CaptureFixture[str],
 ) -> None:    
@@ -188,35 +200,43 @@ def test_trainer_loss_trend_decreases_on_real_preprocessed_dataset(
         src_pad_idx=src_pad_idx,
         tgt_pad_idx=tgt_pad_idx,
     )
-    model = build_model(
-        src_vocab_size=check_result["src_vocab_size"],
-        tgt_vocab_size=check_result["tgt_vocab_size"],
-        src_pad_idx=check_result["src_pad_idx"],
-        tgt_pad_idx=check_result["tgt_pad_idx"],
-        tgt_sos_idx=check_result["tgt_sos_idx"],
-        emb_dim=64,
-        hidden_dim=128,
-        num_heads=4,
-        num_layers=2,
-        dropout=0.0,
-        device="cpu",
-        seed=7,
-    )
-    trainer_config = TrainerConfig(
-        id_field=check_result["id_field"],
-        src_field=check_result["src_field"],
-        tgt_field=check_result["tgt_field"],
-        batch_size=32,
-        shuffle=False,
-        device="cpu",
-        seed=7,
+    factory = Factory(
+        dataset_metadata=type(
+            "_DatasetMetadata",
+            (),
+            {
+                "src_vocab_size": check_result["src_vocab_size"],
+                "tgt_vocab_size": check_result["tgt_vocab_size"],
+                "src_pad_id": check_result["src_pad_idx"],
+                "tgt_pad_id": check_result["tgt_pad_idx"],
+                "tgt_bos_id": check_result["tgt_sos_idx"],
+                "id_field": check_result["id_field"],
+                "src_field": check_result["src_field"],
+                "tgt_field": check_result["tgt_field"],
+            },
+        )()
     )
     t0 = time.perf_counter()
-    out = Trainer(model, trainer_config).train(
+    out = Trainer(factory).train(
         ds,
-        lr=1e-3,
-        epochs=4,
-        log_every=1,
+        train_config=TrainConfig(
+            device="cpu",
+            seed=7,
+            lr=1e-3,
+            epochs=4,
+            log_every=1,
+        ),
+        model_config=ModelConfig(
+            emb_dim=64,
+            hidden_dim=128,
+            num_heads=4,
+            num_layers=2,
+            dropout=0.0,
+        ),
+        data_loader_config=DataLoaderConfig(
+            batch_size=32,
+            shuffle=False,
+        ),
     )
     training_duration_seconds = time.perf_counter() - t0
 

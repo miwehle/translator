@@ -1,7 +1,7 @@
-from .api import Trainer, TrainerConfig, check_dataset
+from .api import Factory, Trainer, check_dataset
 
 __all__ = [
+    "Factory",
     "Trainer",
-    "TrainerConfig",
     "check_dataset",
 ]

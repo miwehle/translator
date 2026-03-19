@@ -16,13 +16,9 @@ if str(SRC_DIR) not in sys.path:
 import checkpoint_register as cr
 
 from translator.data_prod import DatasetMetadata, load_arrow_records
-from translator.train_prod import (
-    Example,
-    Trainer,
-    TrainerConfig,
-    build_model,
-    check_dataset,
-)
+from translator.train_prod import Example, Trainer, check_dataset
+from translator.train_prod.factory import Factory
+from translator.train_prod.training import DataLoaderConfig, ModelConfig, TrainConfig
 
 
 @dataclass(frozen=True)
@@ -30,7 +26,7 @@ class TrainingRunConfig:
     dataset_path: str
     runs_dir: str
     run_name: str
-    run_preflight_check: bool = True
+    run_preflight_check: bool = False
 
 
 CONFIG = TrainingRunConfig(
@@ -95,48 +91,28 @@ def main(config: TrainingRunConfig = CONFIG) -> dict[str, object]:
     )
 
     ds = cast(list[Example], load_arrow_records(dataset_path))
-    if config.run_preflight_check:
-        dataset_info = check_dataset(ds)
-    else:
-        metadata = DatasetMetadata.from_file(dataset_path / "dataset_manifest.yaml")
-        dataset_info = {
-            "id_field": metadata.id_field,
-            "src_field": metadata.src_field,
-            "tgt_field": metadata.tgt_field,
-            "src_pad_idx": metadata.src_pad_id,
-            "tgt_pad_idx": metadata.tgt_pad_id,
-            "tgt_sos_idx": metadata.tgt_bos_id,
-            "src_vocab_size": metadata.src_vocab_size,
-            "tgt_vocab_size": metadata.tgt_vocab_size,
-        }
+
+    metadata = DatasetMetadata.from_file(dataset_path / "dataset_manifest.yaml")
     seed = 42
     device = None
 
-    model = build_model(
-        src_vocab_size=dataset_info["src_vocab_size"],
-        tgt_vocab_size=dataset_info["tgt_vocab_size"],
-        src_pad_idx=dataset_info["src_pad_idx"],
-        tgt_pad_idx=dataset_info["tgt_pad_idx"],
-        tgt_sos_idx=dataset_info["tgt_sos_idx"],
+    factory = Factory(metadata)
+    model_config = ModelConfig()
+    train_config = TrainConfig(
         device=device,
         seed=seed,
-    )
-
-    trainer_config = TrainerConfig(
-        id_field=dataset_info["id_field"],
-        src_field=dataset_info["src_field"],
-        tgt_field=dataset_info["tgt_field"],
-        device=device,
-        seed=seed,
-    )
-
-    summary = Trainer(model, trainer_config).train(
-        ds,
         epochs=1,
-        num_workers=1,
         log_every=50,
         checkpoint_path=run_dir / "model.pt",
         summary_path=run_dir / "summary.json",
+    )
+    data_loader_config = DataLoaderConfig(num_workers=1)
+
+    summary = Trainer(factory).train(
+        ds,
+        train_config=train_config,
+        model_config=model_config,
+        data_loader_config=data_loader_config,
     )
     register_path = Path(config.runs_dir) / "checkpoint_register.csv"
     cr.insert(
