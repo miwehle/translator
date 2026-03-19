@@ -118,6 +118,8 @@ def test_trainer_loss_trend_decreases_on_synthetic_smoke_dataset(
     out = Trainer(factory).train(
         ds,
         train_config=TrainConfig(
+            checkpoint_path=tmp_path / "synthetic_model.pt",
+            summary_path=tmp_path / "synthetic_summary.json",
             device="cpu",
             seed=7,
             lr=1e-3,
@@ -177,6 +179,7 @@ def test_trainer_loss_trend_decreases_on_synthetic_smoke_dataset(
 
 #@pytest.mark.slow
 def test_trainer_loss_trend_decreases_on_real_preprocessed_dataset(
+    tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:    
     dataset_path = (
@@ -220,6 +223,8 @@ def test_trainer_loss_trend_decreases_on_real_preprocessed_dataset(
     out = Trainer(factory).train(
         ds,
         train_config=TrainConfig(
+            checkpoint_path=tmp_path / "real_model.pt",
+            summary_path=tmp_path / "real_summary.json",
             device="cpu",
             seed=7,
             lr=1e-3,

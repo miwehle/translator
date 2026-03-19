@@ -28,8 +28,10 @@ class ModelConfig:
     attention: str = "torch"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class TrainConfig:
+    checkpoint_path: str | Path
+    summary_path: str | Path
     device: str | torch.device | None = None
     seed: int = 42
     lr: float = 3e-4
@@ -37,8 +39,6 @@ class TrainConfig:
     log_every: int = 50
     spike_window: int = 100
     spike_factor: float = 3.0
-    checkpoint_path: str | Path | None = None
-    summary_path: str | Path | None = None
 
 
 @dataclass(frozen=True)
@@ -102,7 +102,7 @@ class Trainer:
         self,
         examples: Iterable[Example],
         *,
-        train_config: TrainConfig = TrainConfig(),
+        train_config: TrainConfig,
         model_config: ModelConfig = ModelConfig(),
         data_loader_config: DataLoaderConfig = DataLoaderConfig(),
     ) -> dict[str, Any]:
@@ -184,19 +184,17 @@ class Trainer:
             "final_loss": loss_value,
             "global_step": global_step
         }
-        if train_config.checkpoint_path is not None:
-            checkpoint_file = _save_training_checkpoint(
-                checkpoint_path=train_config.checkpoint_path,
-                model=model,
-                summary={},
-                train_config={
-                    "model_config": asdict(model_config),
-                    "train_config": asdict(train_config),
-                    "data_loader_config": asdict(data_loader_config),
-                },
-            )
-            summary["checkpoint_path"] = str(checkpoint_file)
-        if train_config.summary_path is not None:
-            summary_file = _write_summary_json(train_config.summary_path, summary)
-            summary["summary_path"] = str(summary_file)
+        checkpoint_file = _save_training_checkpoint(
+            checkpoint_path=train_config.checkpoint_path,
+            model=model,
+            summary={},
+            train_config={
+                "model_config": asdict(model_config),
+                "train_config": asdict(train_config),
+                "data_loader_config": asdict(data_loader_config),
+            },
+        )
+        summary["checkpoint_path"] = str(checkpoint_file)
+        summary_file = _write_summary_json(train_config.summary_path, summary)
+        summary["summary_path"] = str(summary_file)
         return summary

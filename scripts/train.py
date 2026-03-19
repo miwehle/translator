@@ -8,6 +8,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import cast
 
+import yaml
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SRC_DIR = REPO_ROOT / "src"
 if str(SRC_DIR) not in sys.path:
@@ -27,13 +29,6 @@ class TrainingRunConfig:
     runs_dir: str
     run_name: str
     run_preflight_check: bool = False
-
-
-CONFIG = TrainingRunConfig(
-    dataset_path="/content/drive/MyDrive/nmt_lab/artifacts/datasets/europarl_de-en_train_10000",
-    runs_dir="/content/drive/MyDrive/nmt_lab/artifacts/training_runs",
-    run_name="run1",
-)
 
 
 def create_run_dir(runs_dir: Path, run_name: str) -> Path:
@@ -56,12 +51,12 @@ def get_git_commit_hash(repo_root: Path) -> str:
 
 def write_training_run_config(
     run_dir: Path,
-    config: TrainingRunConfig,
+    config: dict[str, object],
     *,
     build_commit: str,
 ) -> Path:
     config_path = run_dir / "config.json"
-    payload = asdict(config)
+    payload = dict(config)
     payload["build_commit"] = build_commit
     config_path.write_text(
         json.dumps(payload, indent=2, sort_keys=True),
@@ -70,66 +65,76 @@ def write_training_run_config(
     return config_path
 
 
-def main(config: TrainingRunConfig = CONFIG) -> dict[str, object]:
-    """
-    load dataset
-    create model
-    create trainer
-    trainer, train model on dataset
-    save model
-    """
-    dataset_path = Path(config.dataset_path)
-    if not dataset_path.exists():
-        raise FileNotFoundError(f"Dataset not found: {dataset_path}")
+def main() -> int:
+    if len(sys.argv) != 2:
+        print("Usage: python scripts/train.py <config-path>")
+        return 1
 
-    run_dir = create_run_dir(Path(config.runs_dir), config.run_name)
-    git_commit = get_git_commit_hash(REPO_ROOT)
-    config_path = write_training_run_config(
-        run_dir,
-        config,
-        build_commit=git_commit,
-    )
+    config_path = Path(sys.argv[1])
+    try:
+        with config_path.open("r", encoding="utf-8") as f:
+            cfg = yaml.safe_load(f) or {}
+    except Exception as exc:
+        print(f"Failed to load config: {exc}")
+        return 1
 
-    ds = cast(list[Example], load_arrow_records(dataset_path))
+    try:
+        config = TrainingRunConfig(
+            dataset_path=cfg["dataset_path"],
+            runs_dir=cfg["runs_dir"],
+            run_name=cfg["run_name"],
+            run_preflight_check=cfg.get("run_preflight_check", False),
+        )
+        dataset_path = Path(config.dataset_path)
+        if not dataset_path.exists():
+            raise FileNotFoundError(f"Dataset not found: {dataset_path}")
 
-    metadata = DatasetMetadata.from_file(dataset_path / "dataset_manifest.yaml")
-    seed = 42
-    device = None
+        run_dir = create_run_dir(Path(config.runs_dir), config.run_name)
+        model_config = ModelConfig(**(cfg.get("model_config") or {}))
+        train_config = TrainConfig(**(cfg.get("train_config") or {}))
+        data_loader_config = DataLoaderConfig(**(cfg.get("data_loader_config") or {}))
 
-    factory = Factory(metadata)
-    model_config = ModelConfig()
-    train_config = TrainConfig(
-        device=device,
-        seed=seed,
-        epochs=1,
-        log_every=50,
-        checkpoint_path=run_dir / "model.pt",
-        summary_path=run_dir / "summary.json",
-    )
-    data_loader_config = DataLoaderConfig(num_workers=1)
+        git_commit = get_git_commit_hash(REPO_ROOT)
+        config_path = write_training_run_config(
+            run_dir,
+            {
+                "dataset_path": config.dataset_path,
+                "runs_dir": config.runs_dir,
+                "run_name": config.run_name,
+                "run_preflight_check": config.run_preflight_check,
+                "model_config": asdict(model_config),
+                "train_config": asdict(train_config),
+                "data_loader_config": asdict(data_loader_config),
+            },
+            build_commit=git_commit,
+        )
 
-    summary = Trainer(factory).train(
-        ds,
-        train_config=train_config,
-        model_config=model_config,
-        data_loader_config=data_loader_config,
-    )
-    register_path = Path(config.runs_dir) / "checkpoint_register.csv"
-    cr.insert(
-        register_path=register_path,
-        timestamp=datetime.now().isoformat(timespec="seconds"),
-        input_ckpt="",
-        dataset_path=str(dataset_path),
-        git_commit=git_commit,
-        output_ckpt=str(run_dir / "model.pt"),
-    )
-    summary["config_path"] = str(config_path)
-    summary["build_commit"] = git_commit
-    summary["checkpoint_register_path"] = str(register_path)
-    summary["run_dir"] = str(run_dir)
-    print(json.dumps(summary, indent=2, sort_keys=True))
-    return summary
+        ds = cast(list[Example], load_arrow_records(dataset_path))
+        metadata = DatasetMetadata.from_file(dataset_path / "dataset_manifest.yaml")
+        if config.run_preflight_check:
+            check_dataset(dataset_path)
+
+        Trainer(Factory(metadata)).train(
+            ds,
+            train_config=train_config,
+            model_config=model_config,
+            data_loader_config=data_loader_config,
+        )
+        register_path = Path(config.runs_dir) / "checkpoint_register.csv"
+        cr.insert(
+            register_path=register_path,
+            timestamp=datetime.now().isoformat(timespec="seconds"),
+            input_ckpt="",
+            dataset_path=str(dataset_path),
+            git_commit=git_commit,
+            output_ckpt=str(train_config.checkpoint_path),
+        )
+    except Exception as exc:
+        print(f"Training failed: {exc}")
+        return 1
+
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
