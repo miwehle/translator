@@ -1,6 +1,4 @@
 dataset_path: /content/drive/MyDrive/nmt_lab/artifacts/datasets/europarl_de-en_train_10000
-runs_dir: /content/drive/MyDrive/nmt_lab/artifacts/training_runs
-run_name: run1
 
 model_config:
   emb_dim: 256
@@ -11,8 +9,8 @@ model_config:
   attention: torch
 
 train_config:
-  checkpoint_path: model.pt
-  summary_path: summary.json
+  runs_dir: /content/drive/MyDrive/nmt_lab/artifacts/training_runs
+  run_name: run1
   seed: 42
   lr: 0.0003
   epochs: 1
