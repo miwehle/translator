@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 import platform
 import re
 import time
@@ -170,45 +169,15 @@ def test_trainer_loss_trend_decreases_on_synthetic_smoke_dataset(
 @pytest.mark.slow
 def test_trainer_loss_trend_decreases_on_real_preprocessed_dataset(
     capsys: pytest.CaptureFixture[str],
-) -> None:
-    def find_arrow_dataset(
-        *,
-        env_var: str,
-        default_dir_name: str,
-        expected_label: str,
-    ) -> Path:
-        configured = os.getenv(env_var)
-        if configured:
-            candidate = Path(configured).expanduser().resolve()
-            if candidate.is_dir():
-                return candidate
-            pytest.skip(
-                f"{env_var} is set but does not point to a directory: "
-                f"{candidate}"
-            )
+) -> None:    
+    dataset_path = (
+        Path(__file__).resolve().parents[2]
+        / "testdata"
+        / "europarl_de-en_train_10000"
+    )
+    if not dataset_path.is_dir():
+        pytest.skip(f"Missing test dataset directory: {dataset_path}")
 
-        testdata_dir = Path(__file__).resolve().parents[2] / "testdata"
-        if not testdata_dir.exists():
-            pytest.skip(f"Missing test data directory: {testdata_dir}")
-
-        candidates = sorted(
-            p for p in testdata_dir.rglob(default_dir_name) if p.is_dir()
-        )
-        if not candidates:
-            pytest.skip(
-                f"No {expected_label} Arrow dataset found under tests/testdata. "
-                f"Expected a directory like '.../{default_dir_name}'."
-            )
-        return candidates[0]
-
-    def find_preprocessed_dataset() -> Path:
-        return find_arrow_dataset(
-            env_var="TRANSLATOR2_TESTDATA_PREPROCESSED",
-            default_dir_name="europarl_de-en_train_10000",
-            expected_label="preprocessed",
-        )
-
-    dataset_path = find_preprocessed_dataset()
     ds = cast(Iterable[Example], load_arrow_records(dataset_path))
     src_pad_idx = pad_index_from_records(dataset_path, "src_ids")
     tgt_pad_idx = pad_index_from_records(dataset_path, "tgt_ids")
