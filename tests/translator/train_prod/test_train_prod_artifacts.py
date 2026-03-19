@@ -4,18 +4,22 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import cast
 
-from tests.translator.train_prod.support import create_valid_mapped_dataset
+from tests.translator.train_prod.support import (
+    create_valid_mapped_dataset,
+    train_config_for_test,
+)
 from translator.data_prod import load_arrow_records
 from translator.train_prod import Example, Trainer, check_dataset
 from translator.train_prod.factory import Factory
-from translator.train_prod.training import DataLoaderConfig, ModelConfig, TrainConfig
+from translator.train_prod.training import DataLoaderConfig, ModelConfig
 
 
 def test_trainer_writes_checkpoint_and_summary(tmp_path: Path) -> None:
     dataset_path = create_valid_mapped_dataset(tmp_path / "valid_train_prod.mapped")
     ds = cast(Iterable[Example], load_arrow_records(dataset_path))
-    checkpoint_path = tmp_path / "translator_train_prod.pt"
-    summary_path = tmp_path / "translator_train_prod.json"
+    run_dir = tmp_path / "test_run_root" / "artifacts_run"
+    checkpoint_path = run_dir / "checkpoint.pt"
+    summary_path = run_dir / "summary.json"
 
     check_result = check_dataset(ds)
     factory = Factory(
@@ -36,14 +40,14 @@ def test_trainer_writes_checkpoint_and_summary(tmp_path: Path) -> None:
     )
     out = Trainer(factory).train(
         ds,
-        train_config=TrainConfig(
+        train_config=train_config_for_test(
+            tmp_path / "test_run_root",
             seed=7,
             device="cpu",
             lr=1e-3,
             epochs=1,
             log_every=1000,
-            checkpoint_path=checkpoint_path,
-            summary_path=summary_path,
+            run_name="artifacts_run",
         ),
         model_config=ModelConfig(
             emb_dim=32,

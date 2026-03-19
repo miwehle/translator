@@ -30,8 +30,8 @@ class ModelConfig:
 
 @dataclass(frozen=True, kw_only=True)
 class TrainConfig:
-    checkpoint_path: str | Path
-    summary_path: str | Path
+    runs_dir: str | Path
+    run_name: str = "run1"
     device: str | torch.device | None = None
     seed: int = 42
     lr: float = 3e-4
@@ -65,6 +65,7 @@ def _resolve_device(device: str | torch.device | None) -> torch.device:
         return device
     return torch.device(device)
 
+
 def _save_training_checkpoint(
     *,
     checkpoint_path: str | Path,
@@ -94,6 +95,7 @@ def _write_summary_json(summary_path: str | Path, summary: dict[str, Any]) -> Pa
     )
     return summary_file
 
+
 class Trainer:
     def __init__(self, factory: Factory) -> None:
         self.factory = factory
@@ -108,6 +110,9 @@ class Trainer:
     ) -> dict[str, Any]:
         _set_seed(train_config.seed)
         resolved_device = _resolve_device(train_config.device)
+        run_dir = Path(train_config.runs_dir) / train_config.run_name
+        checkpoint_path = run_dir / "checkpoint.pt"
+        summary_path = run_dir / "summary.json"
         model = self.factory.create_model(
             model_config=model_config,
             device=resolved_device,
@@ -182,10 +187,10 @@ class Trainer:
         summary = {
             "num_examples": processed_examples,
             "final_loss": loss_value,
-            "global_step": global_step
+            "global_step": global_step,
         }
         checkpoint_file = _save_training_checkpoint(
-            checkpoint_path=train_config.checkpoint_path,
+            checkpoint_path=checkpoint_path,
             model=model,
             summary={},
             train_config={
@@ -195,6 +200,6 @@ class Trainer:
             },
         )
         summary["checkpoint_path"] = str(checkpoint_file)
-        summary_file = _write_summary_json(train_config.summary_path, summary)
+        summary_file = _write_summary_json(summary_path, summary)
         summary["summary_path"] = str(summary_file)
         return summary

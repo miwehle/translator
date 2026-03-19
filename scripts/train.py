@@ -26,16 +26,7 @@ from translator.train_prod.training import DataLoaderConfig, ModelConfig, TrainC
 @dataclass(frozen=True)
 class TrainingRunConfig:
     dataset_path: str
-    runs_dir: str
-    run_name: str
     run_preflight_check: bool = False
-
-
-def create_run_dir(runs_dir: Path, run_name: str) -> Path:
-    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    run_dir = runs_dir / f"{timestamp}_{run_name}"
-    run_dir.mkdir(parents=True, exist_ok=False)
-    return run_dir
 
 
 def get_git_commit_hash(repo_root: Path) -> str:
@@ -81,26 +72,23 @@ def main() -> int:
     try:
         config = TrainingRunConfig(
             dataset_path=cfg["dataset_path"],
-            runs_dir=cfg["runs_dir"],
-            run_name=cfg["run_name"],
             run_preflight_check=cfg.get("run_preflight_check", False),
         )
         dataset_path = Path(config.dataset_path)
         if not dataset_path.exists():
             raise FileNotFoundError(f"Dataset not found: {dataset_path}")
 
-        run_dir = create_run_dir(Path(config.runs_dir), config.run_name)
         model_config = ModelConfig(**(cfg.get("model_config") or {}))
         train_config = TrainConfig(**(cfg.get("train_config") or {}))
         data_loader_config = DataLoaderConfig(**(cfg.get("data_loader_config") or {}))
+        run_dir = Path(train_config.runs_dir) / train_config.run_name
+        run_dir.mkdir(parents=True, exist_ok=True)
 
         git_commit = get_git_commit_hash(REPO_ROOT)
-        config_path = write_training_run_config(
+        write_training_run_config(
             run_dir,
             {
                 "dataset_path": config.dataset_path,
-                "runs_dir": config.runs_dir,
-                "run_name": config.run_name,
                 "run_preflight_check": config.run_preflight_check,
                 "model_config": asdict(model_config),
                 "train_config": asdict(train_config),
@@ -114,20 +102,20 @@ def main() -> int:
         if config.run_preflight_check:
             check_dataset(dataset_path)
 
-        Trainer(Factory(metadata)).train(
+        summary = Trainer(Factory(metadata)).train(
             ds,
             train_config=train_config,
             model_config=model_config,
             data_loader_config=data_loader_config,
         )
-        register_path = Path(config.runs_dir) / "checkpoint_register.csv"
+        register_path = Path(train_config.runs_dir) / "checkpoint_register.csv"
         cr.insert(
             register_path=register_path,
             timestamp=datetime.now().isoformat(timespec="seconds"),
             input_ckpt="",
             dataset_path=str(dataset_path),
             git_commit=git_commit,
-            output_ckpt=str(train_config.checkpoint_path),
+            output_ckpt=summary["checkpoint_path"],
         )
     except Exception as exc:
         print(f"Training failed: {exc}")

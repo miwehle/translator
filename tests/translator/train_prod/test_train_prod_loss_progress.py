@@ -13,6 +13,7 @@ from tests.translator.train_prod.support import (
     create_valid_mapped_dataset,
     log,
     pad_index_from_records,
+    train_config_for_test,
 )
 from translator.data_prod import load_arrow_records
 from translator.train_prod import (
@@ -24,7 +25,6 @@ from translator.train_prod.factory import Factory
 from translator.train_prod.training import (
     DataLoaderConfig,
     ModelConfig,
-    TrainConfig,
 )
 
 LOSS_LINE_RE = re.compile(r"\bloss=(?P<loss>\d+(?:\.\d+)?)\b")
@@ -117,9 +117,9 @@ def test_trainer_loss_trend_decreases_on_synthetic_smoke_dataset(
     t0 = time.perf_counter()
     out = Trainer(factory).train(
         ds,
-        train_config=TrainConfig(
-            checkpoint_path=tmp_path / "synthetic_model.pt",
-            summary_path=tmp_path / "synthetic_summary.json",
+        train_config=train_config_for_test(
+            tmp_path,
+            run_name="synthetic_run",
             device="cpu",
             seed=7,
             lr=1e-3,
@@ -222,9 +222,9 @@ def test_trainer_loss_trend_decreases_on_real_preprocessed_dataset(
     t0 = time.perf_counter()
     out = Trainer(factory).train(
         ds,
-        train_config=TrainConfig(
-            checkpoint_path=tmp_path / "real_model.pt",
-            summary_path=tmp_path / "real_summary.json",
+        train_config=train_config_for_test(
+            tmp_path,
+            run_name="real_run",
             device="cpu",
             seed=7,
             lr=1e-3,

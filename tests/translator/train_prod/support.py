@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Mapping, cast
 
 from datasets import Dataset
+from translator.train_prod.training import TrainConfig
 
 _INITIALIZED_LOG_PATHS: set[Path] = set()
 
@@ -32,6 +33,15 @@ def pad_index_from_records(dataset_path: Path, field: str) -> int:
         values = [int(x) for x in values_obj]
         max_token = max(max_token, max(values))
     return max_token + 1
+
+
+def train_config_for_test(run_root: Path, **overrides: object) -> TrainConfig:
+    config = {
+        "runs_dir": run_root,
+        "run_name": "run1",
+        **overrides,
+    }
+    return TrainConfig(**config)
 
 
 def log(
