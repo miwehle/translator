@@ -30,7 +30,6 @@ class TrainingRunConfig:
     dataset_path: str
     runs_dir: str
     run_name: str
-    max_examples: int | None = None
     run_preflight_check: bool = True
 
 
@@ -38,7 +37,6 @@ CONFIG = TrainingRunConfig(
     dataset_path="/content/drive/MyDrive/nmt_lab/artifacts/datasets/europarl_de-en_train_10000",
     runs_dir="/content/drive/MyDrive/nmt_lab/artifacts/training_runs",
     run_name="run1",
-    max_examples=None,
 )
 
 
@@ -98,7 +96,7 @@ def main(config: TrainingRunConfig = CONFIG) -> dict[str, object]:
 
     ds = cast(list[Example], load_arrow_records(dataset_path))
     if config.run_preflight_check:
-        dataset_info = check_dataset(ds, max_examples=config.max_examples)
+        dataset_info = check_dataset(ds)
     else:
         metadata = DatasetMetadata.from_file(dataset_path / "dataset_manifest.yaml")
         dataset_info = {
@@ -128,7 +126,6 @@ def main(config: TrainingRunConfig = CONFIG) -> dict[str, object]:
         id_field=dataset_info["id_field"],
         src_field=dataset_info["src_field"],
         tgt_field=dataset_info["tgt_field"],
-        max_examples=config.max_examples,
         device=device,
         seed=seed,
     )

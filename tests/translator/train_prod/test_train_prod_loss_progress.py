@@ -87,14 +87,12 @@ def test_trainer_loss_trend_decreases_on_synthetic_smoke_dataset(
 
     train_kwargs: dict[str, object] = {
         "dataset_path": dataset_path,
-        "max_examples": 512,
         "device": "cpu",
     }
     check_result = check_dataset(
         ds,
         src_pad_idx=src_pad_idx,
         tgt_pad_idx=tgt_pad_idx,
-        max_examples=512,
     )
     model = build_model(
         src_vocab_size=check_result["src_vocab_size"],
@@ -116,7 +114,6 @@ def test_trainer_loss_trend_decreases_on_synthetic_smoke_dataset(
         tgt_field=check_result["tgt_field"],
         batch_size=32,
         shuffle=False,
-        max_examples=check_result["max_examples"],
         device="cpu",
         seed=7,
     )
@@ -173,7 +170,7 @@ def test_trainer_loss_trend_decreases_on_real_preprocessed_dataset(
     dataset_path = (
         Path(__file__).resolve().parents[2]
         / "testdata"
-        / "europarl_de-en_train_10000"
+        / "europarl_de-en_train_300"
     )
     if not dataset_path.is_dir():
         pytest.skip(f"Missing test dataset directory: {dataset_path}")
@@ -184,14 +181,12 @@ def test_trainer_loss_trend_decreases_on_real_preprocessed_dataset(
 
     train_kwargs: dict[str, object] = {
         "dataset_path": dataset_path,
-        "max_examples": 256,
         "device": "cpu",
     }
     check_result = check_dataset(
         ds,
         src_pad_idx=src_pad_idx,
         tgt_pad_idx=tgt_pad_idx,
-        max_examples=256,
     )
     model = build_model(
         src_vocab_size=check_result["src_vocab_size"],
@@ -213,7 +208,6 @@ def test_trainer_loss_trend_decreases_on_real_preprocessed_dataset(
         tgt_field=check_result["tgt_field"],
         batch_size=32,
         shuffle=False,
-        max_examples=check_result["max_examples"],
         device="cpu",
         seed=7,
     )

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
-from itertools import islice
 from typing import Any
 
 from ..types import Example
@@ -21,15 +20,9 @@ def check_dataset(
     tgt_field: str = "tgt_ids",
     src_pad_idx: int | None = None,
     tgt_pad_idx: int | None = None,
-    max_examples: int | None = None,
     require_unique_ids: bool = True,
     min_seq_len: int = 2,
 ) -> dict[str, Any]:
-    checked_examples = (
-        list(islice(examples, max_examples))
-        if max_examples is not None
-        else examples
-    )
     seen_ids: set[int] = set()
     total = 0
     min_src_len = None
@@ -45,7 +38,7 @@ def check_dataset(
     src_pad_example_ids: list[int] = []
     tgt_pad_example_ids: list[int] = []
 
-    for item in checked_examples:
+    for item in examples:
         total += 1
         if not isinstance(item, Mapping):
             raise ValueError(f"Example #{total} is not a mapping/object.")
@@ -180,7 +173,6 @@ def check_dataset(
         "tgt_sos_idx": tgt_sos_idx,
         "src_vocab_size": src_vocab_size,
         "tgt_vocab_size": tgt_vocab_size,
-        "max_examples": max_examples,
         "num_examples": total,
         "min_src_len": min_src_len,
         "max_src_len": max_src_len,

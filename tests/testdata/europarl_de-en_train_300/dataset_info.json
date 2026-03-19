@@ -1,0 +1,52 @@
+{
+  "builder_name": "json",
+  "citation": "",
+  "config_name": "default",
+  "dataset_name": "json",
+  "dataset_size": 138256,
+  "description": "",
+  "download_checksums": {
+    "C:/Users/mwehle/Documents/_P/KI/nmt_lab/artifacts/datasets/europarl_de-en_train_300_staging/europarl_mapped.jsonl": {
+      "num_bytes": 91172,
+      "checksum": null
+    }
+  },
+  "download_size": 91172,
+  "features": {
+    "id": {
+      "dtype": "int64",
+      "_type": "Value"
+    },
+    "src_ids": {
+      "feature": {
+        "dtype": "int64",
+        "_type": "Value"
+      },
+      "_type": "List"
+    },
+    "tgt_ids": {
+      "feature": {
+        "dtype": "int64",
+        "_type": "Value"
+      },
+      "_type": "List"
+    }
+  },
+  "homepage": "",
+  "license": "",
+  "size_in_bytes": 229428,
+  "splits": {
+    "train": {
+      "name": "train",
+      "num_bytes": 138256,
+      "num_examples": 262,
+      "dataset_name": "json"
+    }
+  },
+  "version": {
+    "version_str": "0.0.0",
+    "major": 0,
+    "minor": 0,
+    "patch": 0
+  }
+}

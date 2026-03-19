@@ -6,14 +6,13 @@ from collections import deque
 from collections.abc import Iterable
 from dataclasses import dataclass
 from functools import partial
-from itertools import islice
 from pathlib import Path
 from statistics import median
 from typing import Any
 
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader, Dataset, IterableDataset, get_worker_info
+from torch.utils.data import DataLoader, IterableDataset, get_worker_info
 
 from ..data_prod import collate_fn_prod
 from ..model import Seq2Seq
@@ -28,7 +27,6 @@ class TrainerConfig:
     tgt_field: str = "tgt_ids"
     batch_size: int = 64
     shuffle: bool = True
-    max_examples: int | None = None
     device: str | torch.device | None = None
     seed: int = 42
 
@@ -136,39 +134,17 @@ def _collate_examples(
     )
 
 
-class _LimitedDataset(Dataset):
-    def __init__(self, records: Any, limit: int | None) -> None:
-        self.records = records
-        self.limit = len(records) if limit is None else min(limit, len(records))
-
-    def __len__(self) -> int:
-        return self.limit
-
-    def __getitem__(self, idx: int) -> Any:
-        return self.records[idx]
-
-
 class _ExampleIterableDataset(IterableDataset):
-    def __init__(
-        self,
-        examples: Iterable[Example],
-        limit: int | None,
-    ) -> None:
+    def __init__(self, examples: Iterable[Example]) -> None:
         self.examples = examples
-        self.limit = limit
 
     def __iter__(self):
         worker = get_worker_info()
-        base = (
-            islice(self.examples, self.limit)
-            if self.limit is not None
-            else self.examples
-        )
         if worker is None:
-            yield from base
+            yield from self.examples
             return
 
-        for index, example in enumerate(base):
+        for index, example in enumerate(self.examples):
             if index % worker.num_workers == worker.id:
                 yield example
 
@@ -181,7 +157,6 @@ def _create_data_loader(
     tgt_field: str,
     pad_idx_src: int,
     pad_idx_tgt: int,
-    max_examples: int | None,
     shuffle: bool,
     batch_size: int,
     num_workers: int,
@@ -199,10 +174,10 @@ def _create_data_loader(
         pad_idx_tgt=pad_idx_tgt,
     )
     if hasattr(examples, "__len__") and hasattr(examples, "__getitem__"):
-        dataset = _LimitedDataset(examples, max_examples)
+        dataset = examples
         loader_shuffle = shuffle
     else:
-        dataset = _ExampleIterableDataset(examples, max_examples)
+        dataset = _ExampleIterableDataset(examples)
         loader_shuffle = False
 
     loader_kwargs: dict[str, Any] = {
@@ -252,7 +227,6 @@ class Trainer:
             tgt_field=self.config.tgt_field,
             pad_idx_src=self.model.src_pad_idx,
             pad_idx_tgt=self.model.tgt_pad_idx,
-            max_examples=self.config.max_examples,
             shuffle=self.config.shuffle,
             batch_size=self.config.batch_size,
             num_workers=num_workers,

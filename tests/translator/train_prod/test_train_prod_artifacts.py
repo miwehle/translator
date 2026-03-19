@@ -15,7 +15,7 @@ def test_trainer_writes_checkpoint_and_summary(tmp_path: Path) -> None:
     checkpoint_path = tmp_path / "translator_train_prod.pt"
     summary_path = tmp_path / "translator_train_prod.json"
 
-    check_result = check_dataset(ds, max_examples=128)
+    check_result = check_dataset(ds)
     model = build_model(
         src_vocab_size=check_result["src_vocab_size"],
         tgt_vocab_size=check_result["tgt_vocab_size"],
@@ -37,7 +37,6 @@ def test_trainer_writes_checkpoint_and_summary(tmp_path: Path) -> None:
         tgt_field=check_result["tgt_field"],
         batch_size=32,
         seed=7,
-        max_examples=check_result["max_examples"],
         shuffle=False,
         device="cpu",
     )

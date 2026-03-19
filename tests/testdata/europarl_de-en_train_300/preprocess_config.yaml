@@ -1,0 +1,29 @@
+schema_version: '1'
+created_at_utc: '2026-03-19T01:29:47.313758Z'
+data_preprocessor_git_commit: f84397203d031541b44c776b42ae0dc0fca6eb04
+data_preprocessor_git_status: local changes exist
+dataset_schema_version: '1'
+write_jsonl: true
+download_cfg:
+  max_examples: 300
+  include_ids: true
+  id_field: id
+  start_id: 0
+  overwrite_ids: false
+  dataset: Helsinki-NLP/europarl
+  config: de-en
+  split: train
+norm_cfg: {}
+filter_cfg: {}
+tokenize_cfg:
+  tokenizer_kwargs: null
+  tokenize_debug: false
+  tokenizer_model_name: Helsinki-NLP/opus-mt-de-en
+map_cfg:
+  id_key: id
+  tokenized_key: tokenized_translation
+  tgt_bos_id: 58101
+  tgt_eos_id: 0
+  include_text: false
+  src_lang: de
+  tgt_lang: en
