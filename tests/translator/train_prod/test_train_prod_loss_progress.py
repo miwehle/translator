@@ -118,7 +118,7 @@ def test_trainer_loss_trend_decreases_on_synthetic_smoke_dataset(
     out = Trainer(factory).train(
         ds,
         train_config=train_config_for_test(
-            tmp_path,
+            str(tmp_path),
             run_name="synthetic_run",
             device="cpu",
             seed=7,
@@ -223,7 +223,7 @@ def test_trainer_loss_trend_decreases_on_real_preprocessed_dataset(
     out = Trainer(factory).train(
         ds,
         train_config=train_config_for_test(
-            tmp_path,
+            str(tmp_path),
             run_name="real_run",
             device="cpu",
             seed=7,

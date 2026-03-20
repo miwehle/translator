@@ -6,7 +6,7 @@ import csv
 import json
 import subprocess
 from collections.abc import Sequence
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from datetime import datetime
 from pathlib import Path
 from typing import Any, cast
@@ -47,6 +47,18 @@ def _write_run_config(
         ),
         encoding="utf-8",
     )
+
+
+def _next_available_run_dir(base_dir: Path) -> Path:
+    if not base_dir.exists():
+        return base_dir
+
+    i = 1
+    while True:
+        candidate = base_dir.with_name(f"{base_dir.name} ({i})")
+        if not candidate.exists():
+            return candidate
+        i += 1
 
 
 def _append_checkpoint_register(
@@ -90,14 +102,15 @@ def train(
     data_loader_config: DataLoaderConfig = DataLoaderConfig(),
     repo_root: str | Path | None = None,
 ) -> dict[str, Any]:
-    
-    def prepare_training() -> tuple[Sequence[Example], DatasetMetadata, str]:
+    def prepare_training() -> tuple[Sequence[Example], DatasetMetadata, str, TrainConfig]:
         dataset_dir = Path(dataset_path)
         if not dataset_dir.exists():
             raise FileNotFoundError(f"Dataset not found: {dataset_dir}")
 
-        run_dir = Path(train_config.runs_dir) / train_config.run_name
-        run_dir.mkdir(parents=True, exist_ok=True)
+        # Avoid overwriting earlier runs by picking the next free run directory.
+        run_dir = _next_available_run_dir(Path(train_config.runs_dir) / train_config.run_name)
+        run_dir.mkdir(parents=True, exist_ok=False)
+        resolved_train_config = replace(train_config, run_name=run_dir.name)
         resolved_repo_root = (
             Path(repo_root) if repo_root is not None else Path(__file__).resolve().parents[2]
         )
@@ -107,7 +120,7 @@ def train(
             {
                 "dataset_path": str(dataset_dir),
                 "model_config": asdict(model_config),
-                "train_config": asdict(train_config),
+                "train_config": asdict(resolved_train_config),
                 "data_loader_config": asdict(data_loader_config),
             },
             build_commit=git_commit,
@@ -116,14 +129,13 @@ def train(
         examples = cast(Sequence[Example], load_arrow_records(dataset_dir))
         metadata = DatasetMetadata.from_file(dataset_dir / "dataset_manifest.yaml")
 
-        return examples, metadata, git_commit
+        return examples, metadata, git_commit, resolved_train_config
 
-
-    examples, metadata, git_commit = prepare_training()
+    examples, metadata, git_commit, resolved_train_config = prepare_training()
 
     summary = Trainer(Factory(metadata)).train(
         examples,
-        train_config=train_config,
+        train_config=resolved_train_config,
         model_config=model_config,
         data_loader_config=data_loader_config,
     )

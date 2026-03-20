@@ -41,7 +41,7 @@ def test_trainer_writes_checkpoint_and_summary(tmp_path: Path) -> None:
     out = Trainer(factory).train(
         ds,
         train_config=train_config_for_test(
-            tmp_path / "test_run_root",
+            str(tmp_path / "test_run_root"),
             seed=7,
             device="cpu",
             lr=1e-3,

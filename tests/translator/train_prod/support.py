@@ -35,7 +35,7 @@ def pad_index_from_records(dataset_path: Path, field: str) -> int:
     return max_token + 1
 
 
-def train_config_for_test(run_root: Path, **overrides: object) -> TrainConfig:
+def train_config_for_test(run_root: str, **overrides: object) -> TrainConfig:
     config = {
         "runs_dir": run_root,
         "run_name": "run1",

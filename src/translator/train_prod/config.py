@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path
 
 import torch
 
@@ -18,7 +17,7 @@ class ModelConfig:
 
 @dataclass(frozen=True, kw_only=True)
 class TrainConfig:
-    runs_dir: str | Path
+    runs_dir: str
     run_name: str = "run1"
     device: str | torch.device | None = None
     seed: int = 42
