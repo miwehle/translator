@@ -24,8 +24,10 @@
       // __pycache__ im Explorer ausblenden
     ".githooks": true,
     ".tmp_pytest": true,
+    ".pytest_tmp_base": true,
     "**/__pycache__": true,
     "**/.pytest_cache": true,
+    "**/.pytest_tmp_base": true,
     "**/.pytest_tmp": true,
     "**/.ruff_cache": true,
     "**/pytest-cache-files-*": true,
