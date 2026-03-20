@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import csv
-import json
 import logging
 import subprocess
 from collections.abc import Sequence
@@ -11,6 +10,8 @@ from dataclasses import asdict, replace
 from datetime import datetime
 from pathlib import Path
 from typing import Any, cast
+
+import yaml
 
 from .data_prod import DatasetMetadata, load_arrow_records
 from .logging_utils import configure_translator_logging
@@ -43,10 +44,9 @@ def _write_run_config(
     *,
     build_commit: str,
 ) -> None:
-    (run_dir / "config.json").write_text(
-        json.dumps(
+    (run_dir / "train_config.yaml").write_text(
+        yaml.safe_dump(
             {**payload, "build_commit": build_commit},
-            indent=2,
             sort_keys=True,
         ),
         encoding="utf-8",
@@ -106,6 +106,13 @@ def train(
     data_loader_config: DataLoaderConfig = DataLoaderConfig(),
     repo_root: str | Path | None = None,
 ) -> dict[str, Any]:
+    def write_summary_yaml(summary_path: Path, summary: dict[str, Any]) -> None:
+        summary_path.parent.mkdir(parents=True, exist_ok=True)
+        summary_path.write_text(
+            yaml.safe_dump(summary, sort_keys=True),
+            encoding="utf-8",
+        )
+
     def prepare_training() -> tuple[Sequence[Example], DatasetMetadata, str, TrainConfig]:
         logger.info("Prepare training")
         dataset_dir = Path(dataset_path)
@@ -151,13 +158,13 @@ def train(
             resolved_device,
         )
 
-    def log_training_finish(summary: dict[str, object]) -> None:
+    def log_training_finish(summary: dict[str, object], summary_path: Path) -> None:
         logger.info(
             "Finished training global_step=%s final_loss=%s checkpoint_path=%s summary_path=%s",
             summary["global_step"],
             summary["final_loss"],
             summary["checkpoint_path"],
-            summary["summary_path"],
+            summary_path,
         )
         logger.info("Registered checkpoint output_ckpt=%s", summary["checkpoint_path"])
 
@@ -172,6 +179,9 @@ def train(
         data_loader_config=data_loader_config,
     )
 
+    summary_path = Path(resolved_train_config.runs_dir) / resolved_train_config.run_name / "summary.yaml"
+    write_summary_yaml(summary_path, summary)
+
     _append_checkpoint_register(
         Path(train_config.runs_dir) / "checkpoint_register.csv",
         timestamp=datetime.now().isoformat(timespec="seconds"),
@@ -180,6 +190,6 @@ def train(
         output_ckpt=summary["checkpoint_path"],
     )
 
-    log_training_finish(summary)
+    log_training_finish(summary, summary_path)
 
     return summary

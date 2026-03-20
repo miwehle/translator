@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import random
 from collections import deque
 from collections.abc import Iterable, Sequence
@@ -54,16 +53,6 @@ def _save_training_checkpoint(
     return checkpoint_file
 
 
-def _write_summary_json(summary_path: str | Path, summary: dict[str, Any]) -> Path:
-    summary_file = Path(summary_path)
-    summary_file.parent.mkdir(parents=True, exist_ok=True)
-    summary_file.write_text(
-        json.dumps(summary, indent=2, sort_keys=True),
-        encoding="utf-8",
-    )
-    return summary_file
-
-
 class Trainer:
     def __init__(self, factory: Factory) -> None:
         self.factory = factory
@@ -80,7 +69,6 @@ class Trainer:
         resolved_device = _resolve_device(train_config.device)
         run_dir = Path(train_config.runs_dir) / train_config.run_name
         checkpoint_path = run_dir / "checkpoint.pt"
-        summary_path = run_dir / "summary.json"
         model = self.factory.create_model(
             model_config=model_config,
             device=resolved_device,
@@ -168,6 +156,4 @@ class Trainer:
             },
         )
         summary["checkpoint_path"] = str(checkpoint_file)
-        summary_file = _write_summary_json(summary_path, summary)
-        summary["summary_path"] = str(summary_file)
         return summary
