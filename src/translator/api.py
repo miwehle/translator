@@ -107,6 +107,7 @@ def train(
     repo_root: str | Path | None = None,
 ) -> dict[str, Any]:
     def prepare_training() -> tuple[Sequence[Example], DatasetMetadata, str, TrainConfig]:
+        logger.info("Prepare training")
         dataset_dir = Path(dataset_path)
         if not dataset_dir.exists():
             raise FileNotFoundError(f"Dataset not found: {dataset_dir}")
@@ -120,7 +121,6 @@ def train(
             Path(repo_root) if repo_root is not None else Path(__file__).resolve().parents[2]
         )
         git_commit = _git_head(resolved_repo_root)
-        logger.info("Prepare training dataset_path=%s run_dir=%s", dataset_dir, run_dir)
         _write_run_config(
             run_dir,
             {
@@ -132,23 +132,38 @@ def train(
             build_commit=git_commit,
         )
 
+        logger.info("Load arrow dataset from %s", dataset_dir)
         examples = cast(Sequence[Example], load_arrow_records(dataset_dir))
         metadata = DatasetMetadata.from_file(dataset_dir / "dataset_manifest.yaml")
 
         return examples, metadata, git_commit, resolved_train_config
 
+    def log_training_start(resolved_train_config: TrainConfig) -> None:
+        resolved_device = (
+            resolved_train_config.device if resolved_train_config.device is not None else "auto"
+        )
+        logger.info(
+            "Start training dataset_path=%s run_dir=%s epochs=%s batch_size=%s device=%s",
+            Path(dataset_path),
+            Path(resolved_train_config.runs_dir) / resolved_train_config.run_name,
+            resolved_train_config.epochs,
+            data_loader_config.batch_size,
+            resolved_device,
+        )
+
+    def log_training_finish(summary: dict[str, object]) -> None:
+        logger.info(
+            "Finished training global_step=%s final_loss=%s checkpoint_path=%s summary_path=%s",
+            summary["global_step"],
+            summary["final_loss"],
+            summary["checkpoint_path"],
+            summary["summary_path"],
+        )
+        logger.info("Registered checkpoint output_ckpt=%s", summary["checkpoint_path"])
+
     examples, metadata, git_commit, resolved_train_config = prepare_training()
-    resolved_device = (
-        resolved_train_config.device if resolved_train_config.device is not None else "auto"
-    )
-    logger.info(
-        "Start training dataset_path=%s run_dir=%s epochs=%s batch_size=%s device=%s",
-        Path(dataset_path),
-        Path(resolved_train_config.runs_dir) / resolved_train_config.run_name,
-        resolved_train_config.epochs,
-        data_loader_config.batch_size,
-        resolved_device,
-    )
+
+    log_training_start(resolved_train_config)
 
     summary = Trainer(Factory(metadata)).train(
         examples,
@@ -164,12 +179,7 @@ def train(
         git_commit=git_commit,
         output_ckpt=summary["checkpoint_path"],
     )
-    logger.info(
-        "Finished training global_step=%s final_loss=%s checkpoint_path=%s summary_path=%s",
-        summary["global_step"],
-        summary["final_loss"],
-        summary["checkpoint_path"],
-        summary["summary_path"],
-    )
-    logger.info("Registered checkpoint output_ckpt=%s", summary["checkpoint_path"])
+
+    log_training_finish(summary)
+
     return summary
