@@ -99,7 +99,7 @@ class Trainer:
         global_step = 0
         processed_examples = 0
         loss_value = None
-        training_logger = TrainingLogger()
+        training_logger = TrainingLogger(log_path=run_dir / "training.log")
 
         for epoch in range(1, train_config.epochs + 1):
             for src, tgt, batch_ids in loader:
@@ -134,6 +134,7 @@ class Trainer:
                 if is_spike:
                     training_logger.log(
                         label="SPIKE",
+                        level=30,
                         step=global_step,
                         epoch=epoch,
                         loss=loss_value,
@@ -149,7 +150,6 @@ class Trainer:
                         median_loss=median_loss,
                         grad_norm=grad_norm,
                         lr=float(optim.param_groups[0]["lr"]),
-                        batch_ids=list(batch_ids),
                     )
 
         summary = {

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import csv
 import json
+import logging
 import subprocess
 from collections.abc import Sequence
 from dataclasses import asdict, replace
@@ -12,6 +13,7 @@ from pathlib import Path
 from typing import Any, cast
 
 from .data_prod import DatasetMetadata, load_arrow_records
+from .logging_utils import configure_translator_logging
 from .train_prod import (
     DataLoaderConfig,
     ModelConfig,
@@ -21,6 +23,8 @@ from .train_prod import (
 from .train_prod.factory import Factory
 from .train_prod.training import Trainer
 from .types import Example
+
+logger = logging.getLogger(__name__)
 
 
 def _git_head(repo_root: Path) -> str:
@@ -111,10 +115,12 @@ def train(
         run_dir = _next_available_run_dir(Path(train_config.runs_dir) / train_config.run_name)
         run_dir.mkdir(parents=True, exist_ok=False)
         resolved_train_config = replace(train_config, run_name=run_dir.name)
+        configure_translator_logging(log_path=run_dir / "training.log")
         resolved_repo_root = (
             Path(repo_root) if repo_root is not None else Path(__file__).resolve().parents[2]
         )
         git_commit = _git_head(resolved_repo_root)
+        logger.info("Prepare training dataset_path=%s run_dir=%s", dataset_dir, run_dir)
         _write_run_config(
             run_dir,
             {
@@ -132,6 +138,17 @@ def train(
         return examples, metadata, git_commit, resolved_train_config
 
     examples, metadata, git_commit, resolved_train_config = prepare_training()
+    resolved_device = (
+        resolved_train_config.device if resolved_train_config.device is not None else "auto"
+    )
+    logger.info(
+        "Start training dataset_path=%s run_dir=%s epochs=%s batch_size=%s device=%s",
+        Path(dataset_path),
+        Path(resolved_train_config.runs_dir) / resolved_train_config.run_name,
+        resolved_train_config.epochs,
+        data_loader_config.batch_size,
+        resolved_device,
+    )
 
     summary = Trainer(Factory(metadata)).train(
         examples,
@@ -147,4 +164,12 @@ def train(
         git_commit=git_commit,
         output_ckpt=summary["checkpoint_path"],
     )
+    logger.info(
+        "Finished training global_step=%s final_loss=%s checkpoint_path=%s summary_path=%s",
+        summary["global_step"],
+        summary["final_loss"],
+        summary["checkpoint_path"],
+        summary["summary_path"],
+    )
+    logger.info("Registered checkpoint output_ckpt=%s", summary["checkpoint_path"])
     return summary

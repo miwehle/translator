@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import logging
 import subprocess
 import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
+
+from ..logging_utils import configure_translator_logging
 
 _CU_RATES = {
     "T4": 1.8,
@@ -64,7 +67,6 @@ def _detect_hardware_type() -> str:
 
 @dataclass
 class TrainingLogger:
-    print_enabled: bool = True
     log_path: str | Path | None = None
     euro_per_cu: float = 0.10
     start_time: datetime = field(default_factory=datetime.now)
@@ -72,6 +74,12 @@ class TrainingLogger:
     last_log_time: float = field(default_factory=time.time)
     decoder_token_count: int = 0
     decoder_sequence_count: int = 0
+    logger_name: str = "translator.train_prod.training"
+    logger: logging.Logger = field(init=False)
+
+    def __post_init__(self) -> None:
+        configure_translator_logging(log_path=self.log_path)
+        self.logger = logging.getLogger(self.logger_name)
 
     def add_decoder_tokens(self, count: int, num_sequences: int) -> None:
         self.decoder_token_count += max(0, count)
@@ -126,7 +134,7 @@ class TrainingLogger:
         median_loss: float | None,
         grad_norm: float | None,
         lr: float | None,
-        batch_ids: list[int],
+        batch_ids: list[int] | None,
     ) -> str:
         dec_tok_s = self._decoder_tokens_per_second()
         avg_tgt_len = self._average_target_length()
@@ -134,12 +142,11 @@ class TrainingLogger:
         used_cu = self._estimate_compute_units_used()
         used_eur = self._estimate_euro_cost(used_cu)
         gpu_text = f"{gpu_util}%" if gpu_util is not None else "-"
-        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         prefix = f"{label} " if label else ""
-        batch_ids_text = f" batch_ids={batch_ids}" if label == "SPIKE" else ""
+        batch_ids_text = f" batch_ids={batch_ids}" if batch_ids is not None else ""
 
         return (
-            f"{now} {prefix}step={step} ep={epoch} loss={loss:.4f} "
+            f"{prefix}step={step} ep={epoch} loss={loss:.4f} "
             f"med={self._format_float(median_loss, decimals=4)} "
             f"grad={self._format_float(grad_norm, decimals=4)} "
             f"lr={self._format_metric(lr) if lr is not None else '-'} "
@@ -152,26 +159,21 @@ class TrainingLogger:
             f"{batch_ids_text}"
         )
 
-    def _emit(self, message: str) -> None:
-        if self.print_enabled:
-            print(message)
-        if self.log_path is not None:
-            log_file = Path(self.log_path)
-            log_file.parent.mkdir(parents=True, exist_ok=True)
-            with log_file.open("a", encoding="utf-8") as handle:
-                handle.write(message + "\n")
+    def _emit(self, *, message: str, level: int) -> None:
+        self.logger.log(level, message)
 
     def log(
         self,
         *,
         label: str | None = None,
+        level: int = logging.INFO,
         step: int,
         epoch: int,
         loss: float,
         median_loss: float | None,
         grad_norm: float | None = None,
         lr: float | None = None,
-        batch_ids: list[int],
+        batch_ids: list[int] | None = None,
     ) -> str:
         message = self._build_message(
             label=label,
@@ -183,7 +185,7 @@ class TrainingLogger:
             lr=lr,
             batch_ids=batch_ids,
         )
-        self._emit(message)
+        self._emit(message=message, level=level)
         self.last_log_time = time.time()
         self.decoder_token_count = 0
         self.decoder_sequence_count = 0

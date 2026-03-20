@@ -20,6 +20,7 @@ def test_trainer_writes_checkpoint_and_summary(tmp_path: Path) -> None:
     run_dir = tmp_path / "test_run_root" / "artifacts_run"
     checkpoint_path = run_dir / "checkpoint.pt"
     summary_path = run_dir / "summary.json"
+    log_path = run_dir / "training.log"
 
     check_result = check_dataset(ds)
     factory = Factory(
@@ -64,5 +65,6 @@ def test_trainer_writes_checkpoint_and_summary(tmp_path: Path) -> None:
 
     assert checkpoint_path.is_file()
     assert summary_path.is_file()
+    assert log_path.is_file()
     assert out["checkpoint_path"] == str(checkpoint_path)
     assert out["summary_path"] == str(summary_path)

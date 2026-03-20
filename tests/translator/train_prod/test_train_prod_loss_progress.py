@@ -29,7 +29,8 @@ from translator.train_prod.training import (
 
 LOSS_LINE_RE = re.compile(r"\bloss=(?P<loss>\d+(?:\.\d+)?)\b")
 STEP_LINE_RE = re.compile(
-    r"^(?:\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} )?"
+    r"^(?:\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3} "
+    r"(?:INFO|WARNING|ERROR) \[[^\]]+\] )?"
     r"(?:SPIKE )?step=(?P<step>\d+)\s+ep=(?P<epoch>\d+)\s+"
     r"loss=(?P<loss>\d+(?:\.\d+)?)\b"
 )
