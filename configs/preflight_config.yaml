@@ -1,0 +1,14 @@
+dataset_path: /content/drive/MyDrive/nmt_lab/artifacts/datasets/europarl_de-en_train_10000
+
+# `preflight_config` is optional.
+# scripts/preflight.py always reads these values from dataset_manifest.yaml
+# next to the Arrow dataset:
+#   id_field
+#   src_field
+#   tgt_field
+#   src_pad_idx
+#   tgt_pad_idx
+# Use `preflight_config` only for additional non-manifest options.
+preflight_config:
+  require_unique_ids: true
+  min_seq_len: 2

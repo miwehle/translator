@@ -23,6 +23,13 @@ def check_dataset(
     require_unique_ids: bool = True,
     min_seq_len: int = 2,
 ) -> dict[str, Any]:
+    """Validate a tokenized dataset and infer basic training metadata.
+
+    If ``src_pad_idx`` or ``tgt_pad_idx`` are provided, they are treated as the
+    expected pad-token IDs. In that case, the check verifies that these pad
+    tokens do not already appear in the raw stored sequences, and the returned
+    metadata uses the provided values instead of inferring them.
+    """
     seen_ids: set[int] = set()
     total = 0
     min_src_len = None

@@ -5,6 +5,7 @@ from __future__ import annotations
 import csv
 import json
 import subprocess
+from collections.abc import Sequence
 from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
@@ -20,12 +21,6 @@ from .train_prod import (
 from .train_prod.factory import Factory
 from .train_prod.training import Trainer
 from .types import Example
-
-__all__ = [
-    "Example",
-    "check_dataset",
-    "train",
-]
 
 
 def _git_head(repo_root: Path) -> str:
@@ -93,33 +88,38 @@ def train(
     train_config: TrainConfig,
     model_config: ModelConfig = ModelConfig(),
     data_loader_config: DataLoaderConfig = DataLoaderConfig(),
-    run_preflight_check: bool = False,
     repo_root: str | Path | None = None,
 ) -> dict[str, Any]:
-    dataset_dir = Path(dataset_path)
-    if not dataset_dir.exists():
-        raise FileNotFoundError(f"Dataset not found: {dataset_dir}")
+    
+    def prepare_training() -> tuple[Sequence[Example], DatasetMetadata, str]:
+        dataset_dir = Path(dataset_path)
+        if not dataset_dir.exists():
+            raise FileNotFoundError(f"Dataset not found: {dataset_dir}")
 
-    run_dir = Path(train_config.runs_dir) / train_config.run_name
-    run_dir.mkdir(parents=True, exist_ok=True)
-    resolved_repo_root = Path(repo_root) if repo_root is not None else Path(__file__).resolve().parents[2]
-    git_commit = _git_head(resolved_repo_root)
-    _write_run_config(
-        run_dir,
-        {
-            "dataset_path": str(dataset_dir),
-            "run_preflight_check": run_preflight_check,
-            "model_config": asdict(model_config),
-            "train_config": asdict(train_config),
-            "data_loader_config": asdict(data_loader_config),
-        },
-        build_commit=git_commit,
-    )
+        run_dir = Path(train_config.runs_dir) / train_config.run_name
+        run_dir.mkdir(parents=True, exist_ok=True)
+        resolved_repo_root = (
+            Path(repo_root) if repo_root is not None else Path(__file__).resolve().parents[2]
+        )
+        git_commit = _git_head(resolved_repo_root)
+        _write_run_config(
+            run_dir,
+            {
+                "dataset_path": str(dataset_dir),
+                "model_config": asdict(model_config),
+                "train_config": asdict(train_config),
+                "data_loader_config": asdict(data_loader_config),
+            },
+            build_commit=git_commit,
+        )
 
-    examples = cast(list[Example], load_arrow_records(dataset_dir))
-    metadata = DatasetMetadata.from_file(dataset_dir / "dataset_manifest.yaml")
-    if run_preflight_check:
-        check_dataset(dataset_dir)
+        examples = cast(Sequence[Example], load_arrow_records(dataset_dir))
+        metadata = DatasetMetadata.from_file(dataset_dir / "dataset_manifest.yaml")
+
+        return examples, metadata, git_commit
+
+
+    examples, metadata, git_commit = prepare_training()
 
     summary = Trainer(Factory(metadata)).train(
         examples,
@@ -127,10 +127,11 @@ def train(
         model_config=model_config,
         data_loader_config=data_loader_config,
     )
+
     _append_checkpoint_register(
         Path(train_config.runs_dir) / "checkpoint_register.csv",
         timestamp=datetime.now().isoformat(timespec="seconds"),
-        dataset_path=str(dataset_dir),
+        dataset_path=str(Path(dataset_path)),
         git_commit=git_commit,
         output_ckpt=summary["checkpoint_path"],
     )

@@ -1,7 +1,8 @@
 from ..types import Example
+from .config import DataLoaderConfig, ModelConfig, TrainConfig
 from .factory import Factory
 from .preflight import check_dataset
-from .training import DataLoaderConfig, ModelConfig, TrainConfig, Trainer
+from .training import Trainer
 
 __all__ = [
     "Example",

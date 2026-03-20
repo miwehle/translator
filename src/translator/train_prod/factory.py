@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from typing import TYPE_CHECKING, Any
 
 import torch
@@ -9,9 +9,10 @@ from torch.utils.data import DataLoader, IterableDataset, get_worker_info
 from ..data_prod import DatasetMetadata, collate_fn_prod
 from ..model import Seq2Seq
 from ..types import Example
+from .config import DataLoaderConfig
 
 if TYPE_CHECKING:
-    from .training import ModelConfig
+    from .config import ModelConfig
 
 
 class _ExampleIterableDataset(IterableDataset):
@@ -73,9 +74,9 @@ class Factory:
 
     def create_data_loader(
         self,
-        examples: Iterable[Example],
+        examples: Iterable[Example] | Sequence[Example],
         *,
-        data_loader_config: Any,
+        data_loader_config: DataLoaderConfig,
         device: torch.device,
     ) -> DataLoader:
         if hasattr(examples, "__len__") and hasattr(examples, "__getitem__"):

@@ -3,8 +3,8 @@ from __future__ import annotations
 import json
 import random
 from collections import deque
-from collections.abc import Iterable
-from dataclasses import asdict, dataclass
+from collections.abc import Iterable, Sequence
+from dataclasses import asdict
 from pathlib import Path
 from statistics import median
 from typing import Any
@@ -14,41 +14,9 @@ import torch.nn as nn
 
 from ..model import Seq2Seq
 from ..types import Example
+from .config import DataLoaderConfig, ModelConfig, TrainConfig
 from .factory import Factory
 from .logging import TrainingLogger
-
-
-@dataclass(frozen=True)
-class ModelConfig:
-    emb_dim: int = 256
-    hidden_dim: int = 1024
-    num_heads: int = 8
-    num_layers: int = 4
-    dropout: float = 0.1
-    attention: str = "torch"
-
-
-@dataclass(frozen=True, kw_only=True)
-class TrainConfig:
-    runs_dir: str | Path
-    run_name: str = "run1"
-    device: str | torch.device | None = None
-    seed: int = 42
-    lr: float = 3e-4
-    epochs: int = 1
-    log_every: int = 50
-    spike_window: int = 100
-    spike_factor: float = 3.0
-
-
-@dataclass(frozen=True)
-class DataLoaderConfig:
-    batch_size: int = 64
-    shuffle: bool = True
-    num_workers: int = 0
-    prefetch_factor: int | None = None
-    persistent_workers: bool | None = None
-    pin_memory: bool | None = None
 
 
 def _set_seed(seed: int) -> None:
@@ -102,7 +70,7 @@ class Trainer:
 
     def train(
         self,
-        examples: Iterable[Example],
+        examples: Iterable[Example] | Sequence[Example],
         *,
         train_config: TrainConfig,
         model_config: ModelConfig = ModelConfig(),

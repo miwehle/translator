@@ -37,7 +37,6 @@ def main() -> int:
         data_loader_config = DataLoaderConfig(**(cfg.get("data_loader_config") or {}))
         train(
             dataset_path=dataset_path,
-            run_preflight_check=cfg.get("run_preflight_check", False),
             train_config=train_config,
             model_config=model_config,
             data_loader_config=data_loader_config,
