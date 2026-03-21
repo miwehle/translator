@@ -23,20 +23,20 @@
   "files.exclude": {
       // __pycache__ im Explorer ausblenden
     ".githooks": true,
+    ".local_tmp": true,
     ".tmp_pytest": true,
     ".tmp_pytest_verify": true,
     ".tmp_pytest_run_*": true,
     ".pytest_tmp_base": true,
     ".pytest_tmp_verify": true,
-    ".codex_tmp*": true,
     "**/__pycache__": true,
+    "**/.local_tmp": true,
     "**/.pytest_cache": true,
     "**/.pytest_tmp_base": true,
     "**/.pytest_tmp": true,
     "**/.tmp_pytest_verify": true,
     "**/.tmp_pytest_run_*": true,
     "**/.pytest_tmp_verify": true,
-    "**/.codex_tmp*": true,
     "**/.ruff_cache": true,
     "**/pytest-cache-files-*": true,
 
