@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 
 LOG_FORMAT = "%(asctime)s %(levelname)s [%(name)s] %(message)s"
+LOG_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 
 def configure_translator_logging(*, log_path: str | Path | None = None) -> logging.Logger:
@@ -16,8 +17,7 @@ def configure_translator_logging(*, log_path: str | Path | None = None) -> loggi
         logger.removeHandler(handler)
         handler.close()
 
-    formatter = logging.Formatter(LOG_FORMAT)
-    formatter.default_msec_format = "%s,%03d"
+    formatter = logging.Formatter(LOG_FORMAT, datefmt=LOG_DATE_FORMAT)
 
     stream_handler = logging.StreamHandler(sys.stdout)
     stream_handler.setFormatter(formatter)

@@ -150,7 +150,7 @@ def train(
             resolved_train_config.device if resolved_train_config.device is not None else "auto"
         )
         logger.info(
-            "Start training dataset_path=%s run_dir=%s epochs=%s batch_size=%s device=%s",
+            "Start training run_dir=%s epochs=%s batch_size=%s device=%s",
             Path(dataset_path),
             Path(resolved_train_config.runs_dir) / resolved_train_config.run_name,
             resolved_train_config.epochs,
