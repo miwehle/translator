@@ -50,8 +50,8 @@ def test_trainer_writes_checkpoint_and_summary(tmp_path: Path) -> None:
             run_name="artifacts_run",
         ),
         model_config=ModelConfig(
-            emb_dim=32,
-            hidden_dim=64,
+            d_model=32,
+            ff_dim=64,
             num_heads=4,
             num_layers=2,
             dropout=0.0,

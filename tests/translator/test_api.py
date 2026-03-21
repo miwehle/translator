@@ -56,8 +56,8 @@ def test_train_avoids_run_dir_name_collisions(tmp_path: Path, monkeypatch) -> No
             seed=7,
         ),
         model_config=ModelConfig(
-            emb_dim=32,
-            hidden_dim=64,
+            d_model=32,
+            ff_dim=64,
             num_heads=4,
             num_layers=2,
             dropout=0.0,

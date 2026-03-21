@@ -29,7 +29,7 @@ from translator.train_prod.training import (
 
 LOSS_LINE_RE = re.compile(r"\bloss=(?P<loss>\d+(?:\.\d+)?)\b")
 STEP_LINE_RE = re.compile(
-    r"^(?:\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3} "
+    r"^(?:\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(?:,\d{3})? "
     r"(?:INFO|WARNING|ERROR) \[[^\]]+\] )?"
     r"(?:SPIKE )?step=(?P<step>\d+)\s+ep=(?P<epoch>\d+)\s+"
     r"loss=(?P<loss>\d+(?:\.\d+)?)\b"
@@ -128,8 +128,8 @@ def test_trainer_loss_trend_decreases_on_synthetic_smoke_dataset(
             log_every=1,
         ),
         model_config=ModelConfig(
-            emb_dim=64,
-            hidden_dim=128,
+            d_model=64,
+            ff_dim=128,
             num_heads=4,
             num_layers=2,
             dropout=0.0,
@@ -233,8 +233,8 @@ def test_trainer_loss_trend_decreases_on_real_preprocessed_dataset(
             log_every=1,
         ),
         model_config=ModelConfig(
-            emb_dim=64,
-            hidden_dim=128,
+            d_model=64,
+            ff_dim=128,
             num_heads=4,
             num_layers=2,
             dropout=0.0,

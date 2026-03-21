@@ -6,7 +6,11 @@ __pycache__/
 .pytest_tmp_run/
 .tmp_pytest/
 .tmp_pytest_local/
+.tmp_pytest_verify/
+.tmp_pytest_run_*/
+.codex_tmp*/
 .pytest_tmp_base/
+.pytest_tmp_verify/
 pytest-cache-files-*/
 tests/.pytest_tmp_local/
 tests/.pytest_tmp_sub/

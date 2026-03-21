@@ -7,12 +7,12 @@ import torch
 
 @dataclass(frozen=True)
 class ModelConfig:
-    emb_dim: int = 256
-    hidden_dim: int = 1024
+    d_model: int = 256
+    ff_dim: int = 1024
     num_heads: int = 8
     num_layers: int = 4
     dropout: float = 0.1
-    max_len: int = 1024
+    max_seq_len: int = 1024
     attention: str = "torch"
 
 

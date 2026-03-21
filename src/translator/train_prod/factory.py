@@ -61,15 +61,15 @@ class Factory:
         return Seq2Seq(
             src_vocab_size=self.dataset_metadata.src_vocab_size,
             tgt_vocab_size=self.dataset_metadata.tgt_vocab_size,
-            d_model=model_config.emb_dim,
-            ff_dim=model_config.hidden_dim,
+            d_model=model_config.d_model,
+            ff_dim=model_config.ff_dim,
             num_heads=model_config.num_heads,
             num_layers=model_config.num_layers,
             src_pad_idx=self.dataset_metadata.src_pad_id,
             tgt_pad_idx=self.dataset_metadata.tgt_pad_id,
             tgt_sos_idx=self.dataset_metadata.tgt_bos_id,
             dropout=model_config.dropout,
-            max_len=model_config.max_len,
+            max_len=model_config.max_seq_len,
             attention=model_config.attention,
         ).to(device)
 

@@ -1,12 +1,12 @@
 dataset_path: /content/drive/MyDrive/nmt_lab/artifacts/datasets/europarl_de-en_train_10000
 
 model_config:
-  emb_dim: 256
-  hidden_dim: 1024
+  d_model: 256
+  ff_dim: 1024
   num_heads: 8
   num_layers: 4
   dropout: 0.1
-  max_len: 1024
+  max_seq_len: 1024
   attention: torch
 
 train_config:
