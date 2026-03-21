@@ -150,12 +150,12 @@ def train(
             resolved_train_config.device if resolved_train_config.device is not None else "auto"
         )
         logger.info(
-            "Start training run_dir=%s epochs=%s batch_size=%s device=%s hardware=%s",
+            "Start training hardware=%s run_dir=%s epochs=%s batch_size=%s device=%s",
+            detect_hardware_type(),
             Path(resolved_train_config.runs_dir) / resolved_train_config.run_name,
             resolved_train_config.epochs,
             data_loader_config.batch_size,
             resolved_device,
-            detect_hardware_type(),
         )
 
     def log_training_finish(summary: dict[str, object], summary_path: Path) -> None:
