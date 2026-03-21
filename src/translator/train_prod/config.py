@@ -12,6 +12,7 @@ class ModelConfig:
     num_heads: int = 8
     num_layers: int = 4
     dropout: float = 0.1
+    max_len: int = 1024
     attention: str = "torch"
 
 
