@@ -65,9 +65,11 @@ class Trainer:
         model_config: ModelConfig = ModelConfig(),
         data_loader_config: DataLoaderConfig = DataLoaderConfig(),
     ) -> dict[str, Any]:
+        run_dir = Path(train_config.runs_dir) / train_config.run_name
+        training_logger = TrainingLogger(log_path=run_dir / "training.log")
+
         _set_seed(train_config.seed)
         resolved_device = _resolve_device(train_config.device)
-        run_dir = Path(train_config.runs_dir) / train_config.run_name
         checkpoint_path = run_dir / "checkpoint.pt"
         model = self.factory.create_model(
             model_config=model_config,
@@ -87,7 +89,6 @@ class Trainer:
         global_step = 0
         processed_examples = 0
         loss_value = None
-        training_logger = TrainingLogger(log_path=run_dir / "training.log")
 
         for epoch in range(1, train_config.epochs + 1):
             for src, tgt, batch_ids in loader:

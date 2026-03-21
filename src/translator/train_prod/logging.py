@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
-from ..logging_utils import configure_translator_logging
+from ..logging_utils import configure_translator_logging, detect_hardware_type
 
 _CU_RATES = {
     "T4": 1.8,
@@ -35,42 +35,12 @@ def _get_gpu_util() -> int | None:
         return int(out.strip())
     except ValueError:
         return None
-
-
-def _detect_hardware_type() -> str:
-    try:
-        result = subprocess.run(
-            ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-    except (FileNotFoundError, subprocess.CalledProcessError):
-        return "CPU"
-
-    gpu_name = result.stdout.strip()
-    if not gpu_name:
-        return "(unknown)"
-
-    if "H100" in gpu_name:
-        return "H100"
-    if "A100" in gpu_name:
-        return "A100"
-    if "V100" in gpu_name:
-        return "V100"
-    if "T4" in gpu_name:
-        return "T4"
-    if "RTX PRO 6000" in gpu_name:
-        return "RTXPRO6000"
-    return gpu_name
-
-
 @dataclass
 class TrainingLogger:
     log_path: str | Path | None = None
     euro_per_cu: float = 0.10
     start_time: datetime = field(default_factory=datetime.now)
-    hardware_type: str = field(default_factory=_detect_hardware_type)
+    hardware_type: str = field(default_factory=detect_hardware_type)
     last_log_time: float = field(default_factory=time.time)
     decoder_token_count: int = 0
     decoder_sequence_count: int = 0
@@ -150,12 +120,10 @@ class TrainingLogger:
             f"med={self._format_float(median_loss, decimals=4)} "
             f"grad={self._format_float(grad_norm, decimals=4)} "
             f"lr={self._format_metric(lr) if lr is not None else '-'} "
-            f"tok={self.decoder_token_count} "
             f"tok/s={self._format_float(dec_tok_s, decimals=0)} "
             f"len={self._format_float(avg_tgt_len, decimals=1)} "
             f"gpu={gpu_text} cu={self._format_float(used_cu, decimals=2)} "
-            f"eur={self._format_float(used_eur, decimals=2)} "
-            f"hw={self._format_metric(self.hardware_type, unknown='(unknown)')} "
+            f"~eur={self._format_float(used_eur, decimals=2)} "
             f"{batch_ids_text}"
         )
 
