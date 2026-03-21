@@ -9,3 +9,9 @@ Wenn in Anfragen `data_preprocessor` erwaehnt wird, ist damit in diesem Workspac
 ## Refactorings
 
 Keine stillschweigende Code-Duplizierung bei Refactorings; Duplikationen muessen ausdruecklich benannt werden.
+
+## Temp-Artefakte
+
+Temporäre Verzeichnisse und Dateien für Tests, Verifikation und ad-hoc Läufe sind im Repo-Root ausschließlich unter `.local_tmp/` anzulegen.
+
+Keine neuen temporären Root-Ordner wie `.tmp_pytest*`, `.pytest_tmp*` oder ähnliche Namen anlegen.
