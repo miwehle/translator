@@ -54,7 +54,6 @@ class Factory:
 
     def create_model(
         self,
-        *,
         model_config: ModelConfig,
         device: torch.device,
     ) -> Seq2Seq:
@@ -76,7 +75,6 @@ class Factory:
     def create_data_loader(
         self,
         examples: Iterable[Example] | Sequence[Example],
-        *,
         data_loader_config: DataLoaderConfig,
         device: torch.device,
     ) -> DataLoader:

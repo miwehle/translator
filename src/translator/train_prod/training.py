@@ -52,6 +52,67 @@ def _save_training_checkpoint(
     )
     return checkpoint_file
 
+class TrainingObserver:
+    def __init__(
+        self,
+        train_config: TrainConfig,
+        log_path: str | Path,
+    ) -> None:
+        self.train_config = train_config
+        self.training_logger = TrainingLogger(log_path=log_path)
+        self.loss_history: deque[float] = deque(
+            maxlen=train_config.spike_window
+        )
+        self.global_step = 0
+        self.processed_examples = 0
+        self.loss_value: float | None = None
+
+    def on_batch_end(
+        self,
+        epoch: int,
+        loss_item: float,
+        grad_norm: float,
+        batch_ids: Sequence[int],
+        tgt_size: int,
+        tgt_numel: int,
+    ) -> None:
+        self.global_step += 1
+        self.processed_examples += tgt_size
+        self.loss_value = loss_item
+        median_loss = (
+            median(self.loss_history)
+            if self.loss_history
+            else loss_item
+        )
+        is_spike = bool(self.loss_history) and (
+            loss_item > (median_loss * self.train_config.spike_factor)
+        )
+        self.loss_history.append(loss_item)
+        self.training_logger.add_decoder_tokens(
+            tgt_numel,
+            tgt_size,
+        )
+
+        if is_spike:
+            self.training_logger.log(
+                label="SPIKE",
+                level=30,
+                step=self.global_step,
+                epoch=epoch,
+                loss=loss_item,
+                median_loss=median_loss,
+                batch_ids=batch_ids,
+            )
+
+        if self.global_step % self.train_config.log_every == 0:
+            self.training_logger.log(
+                step=self.global_step,
+                epoch=epoch,
+                loss=loss_item,
+                median_loss=median_loss,
+                grad_norm=grad_norm,
+                lr=self.train_config.lr,
+            )
 
 class Trainer:
     def __init__(self, factory: Factory) -> None:
@@ -66,34 +127,22 @@ class Trainer:
         data_loader_config: DataLoaderConfig = DataLoaderConfig(),
     ) -> dict[str, Any]:
         run_dir = Path(train_config.runs_dir) / train_config.run_name
-        training_logger = TrainingLogger(log_path=run_dir / "training.log")
+        observer = TrainingObserver(train_config, run_dir / "training.log")
+        checkpoint_path = run_dir / "checkpoint.pt"
 
         _set_seed(train_config.seed)
-        resolved_device = _resolve_device(train_config.device)
-        checkpoint_path = run_dir / "checkpoint.pt"
-        model = self.factory.create_model(
-            model_config=model_config,
-            device=resolved_device,
-        )
-
-        loader = self.factory.create_data_loader(
-            examples,
-            data_loader_config=data_loader_config,
-            device=resolved_device,
-        )
+        device = _resolve_device(train_config.device)
+        model = self.factory.create_model(model_config, device)
+        loader = self.factory.create_data_loader(examples, data_loader_config,
+                                                 device)
         criterion = nn.CrossEntropyLoss(ignore_index=model.tgt_pad_idx)
         optim = torch.optim.Adam(model.parameters(), lr=train_config.lr)
         model.train()
 
-        loss_history: deque[float] = deque(maxlen=train_config.spike_window)
-        global_step = 0
-        processed_examples = 0
-        loss_value = None
-
         for epoch in range(1, train_config.epochs + 1):
             for src, tgt, batch_ids in loader:
-                src = src.to(resolved_device)
-                tgt = tgt.to(resolved_device)
+                src = src.to(device)
+                tgt = tgt.to(device)
 
                 optim.zero_grad()
                 logits = model(src, tgt)
@@ -107,44 +156,14 @@ class Trainer:
                 )
                 optim.step()
 
-                global_step += 1
-                processed_examples += tgt.size(0)
-                loss_value = float(loss.item())
-                median_loss = median(loss_history) if loss_history else loss_value
-                is_spike = bool(loss_history) and (
-                    loss_value > (median_loss * train_config.spike_factor)
-                )
-                loss_history.append(loss_value)
-                training_logger.add_decoder_tokens(
+                observer.on_batch_end(
+                    epoch, loss.item(), grad_norm, batch_ids, tgt.size(0),
                     tgt[:, 1:].numel(),
-                    tgt.size(0),
                 )
-
-                if is_spike:
-                    training_logger.log(
-                        label="SPIKE",
-                        level=30,
-                        step=global_step,
-                        epoch=epoch,
-                        loss=loss_value,
-                        median_loss=median_loss,
-                        batch_ids=list(batch_ids),
-                    )
-
-                if global_step % train_config.log_every == 0:
-                    training_logger.log(
-                        step=global_step,
-                        epoch=epoch,
-                        loss=loss_value,
-                        median_loss=median_loss,
-                        grad_norm=grad_norm,
-                        lr=float(optim.param_groups[0]["lr"]),
-                    )
 
         summary = {
-            "num_examples": processed_examples,
-            "final_loss": loss_value,
-            "global_step": global_step,
+            "num_examples": observer.processed_examples,
+            "final_loss": loss.item(),
         }
         checkpoint_file = _save_training_checkpoint(
             checkpoint_path=checkpoint_path,

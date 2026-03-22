@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import subprocess
 import time
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -104,7 +105,7 @@ class TrainingLogger:
         median_loss: float | None,
         grad_norm: float | None,
         lr: float | None,
-        batch_ids: list[int] | None,
+        batch_ids: Sequence[int] | None,
     ) -> str:
         dec_tok_s = self._decoder_tokens_per_second()
         avg_tgt_len = self._average_target_length()
@@ -141,7 +142,7 @@ class TrainingLogger:
         median_loss: float | None,
         grad_norm: float | None = None,
         lr: float | None = None,
-        batch_ids: list[int] | None = None,
+        batch_ids: Sequence[int] | None = None,
     ) -> str:
         message = self._build_message(
             label=label,
