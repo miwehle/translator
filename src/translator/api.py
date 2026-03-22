@@ -9,7 +9,7 @@ from collections.abc import Sequence
 from dataclasses import asdict, replace
 from datetime import datetime
 from pathlib import Path
-from typing import Any, cast
+from typing import cast
 
 import yaml
 
@@ -19,6 +19,7 @@ from .train_prod import (
     DataLoaderConfig,
     ModelConfig,
     TrainConfig,
+    TrainingSummary,
     check_dataset,
 )
 from .train_prod.factory import Factory
@@ -105,11 +106,11 @@ def train(
     model_config: ModelConfig = ModelConfig(),
     data_loader_config: DataLoaderConfig = DataLoaderConfig(),
     repo_root: str | Path | None = None,
-) -> dict[str, Any]:
-    def write_summary_yaml(summary_path: Path, summary: dict[str, Any]) -> None:
+) -> TrainingSummary:
+    def write_summary_yaml(summary_path: Path, summary: TrainingSummary) -> None:
         summary_path.parent.mkdir(parents=True, exist_ok=True)
         summary_path.write_text(
-            yaml.safe_dump(summary, sort_keys=True),
+            yaml.safe_dump(asdict(summary), sort_keys=True),
             encoding="utf-8",
         )
 
@@ -158,14 +159,14 @@ def train(
             resolved_device,
         )
 
-    def log_training_finish(summary: dict[str, object], summary_path: Path) -> None:
+    def log_training_finish(summary: TrainingSummary, summary_path: Path) -> None:
         logger.info(
             "Finished training final_loss=%s checkpoint_path=%s summary_path=%s",
-            summary["final_loss"],
-            summary["checkpoint_path"],
+            summary.final_loss,
+            summary.checkpoint_path,
             summary_path,
         )
-        logger.info("Registered checkpoint output_ckpt=%s", summary["checkpoint_path"])
+        logger.info("Registered checkpoint output_ckpt=%s", summary.checkpoint_path)
 
     examples, metadata, git_commit, resolved_train_config = prepare_training()
 
@@ -186,7 +187,7 @@ def train(
         timestamp=datetime.now().isoformat(timespec="seconds"),
         dataset_path=str(Path(dataset_path)),
         git_commit=git_commit,
-        output_ckpt=summary["checkpoint_path"],
+        output_ckpt=summary.checkpoint_path,
     )
 
     log_training_finish(summary, summary_path)

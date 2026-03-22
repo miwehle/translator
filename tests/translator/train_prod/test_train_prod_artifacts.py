@@ -64,4 +64,4 @@ def test_trainer_writes_checkpoint_and_summary(tmp_path: Path) -> None:
 
     assert checkpoint_path.is_file()
     assert log_path.is_file()
-    assert out["checkpoint_path"] == str(checkpoint_path)
+    assert out.checkpoint_path == str(checkpoint_path)

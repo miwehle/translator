@@ -1,12 +1,12 @@
 from __future__ import annotations
 
+import logging
 import random
 from collections import deque
 from collections.abc import Iterable, Sequence
-from dataclasses import asdict
+from dataclasses import dataclass
 from pathlib import Path
 from statistics import median
-from typing import Any
 
 import torch
 import torch.nn as nn
@@ -37,20 +37,23 @@ def _save_training_checkpoint(
     *,
     checkpoint_path: str | Path,
     model: Seq2Seq,
-    summary: dict[str, Any],
-    train_config: dict[str, Any],
 ) -> Path:
     checkpoint_file = Path(checkpoint_path)
     checkpoint_file.parent.mkdir(parents=True, exist_ok=True)
     torch.save(
         {
             "model_state_dict": model.state_dict(),
-            "summary": summary,
-            "train_config": train_config,
         },
         checkpoint_file,
     )
     return checkpoint_file
+
+
+@dataclass(frozen=True)
+class TrainingSummary:
+    num_examples: int
+    final_loss: float | None
+    checkpoint_path: str
 
 class TrainingObserver:
     def __init__(
@@ -70,48 +73,36 @@ class TrainingObserver:
     def on_batch_end(
         self,
         epoch: int,
-        loss_item: float,
+        loss_value: float,
         grad_norm: float,
         batch_ids: Sequence[int],
         tgt_size: int,
-        tgt_numel: int,
+        tgt_token_count: int,
     ) -> None:
         self.global_step += 1
         self.processed_examples += tgt_size
-        self.loss_value = loss_item
+        self.loss_value = loss_value
         median_loss = (
             median(self.loss_history)
             if self.loss_history
-            else loss_item
+            else loss_value
         )
         is_spike = bool(self.loss_history) and (
-            loss_item > (median_loss * self.train_config.spike_factor)
+            loss_value > (median_loss * self.train_config.spike_factor)
         )
-        self.loss_history.append(loss_item)
-        self.training_logger.add_decoder_tokens(
-            tgt_numel,
-            tgt_size,
-        )
+        self.loss_history.append(loss_value)
+        self.training_logger.add_decoder_tokens(tgt_token_count, tgt_size)
 
         if is_spike:
             self.training_logger.log(
-                label="SPIKE",
-                level=30,
-                step=self.global_step,
-                epoch=epoch,
-                loss=loss_item,
-                median_loss=median_loss,
-                batch_ids=batch_ids,
+                self.global_step, epoch, loss_value, median_loss,
+                label="SPIKE", level=logging.WARNING, batch_ids=batch_ids,
             )
 
         if self.global_step % self.train_config.log_every == 0:
             self.training_logger.log(
-                step=self.global_step,
-                epoch=epoch,
-                loss=loss_item,
-                median_loss=median_loss,
-                grad_norm=grad_norm,
-                lr=self.train_config.lr,
+                self.global_step, epoch, loss_value, median_loss,
+                grad_norm=grad_norm, lr=self.train_config.lr,
             )
 
 class Trainer:
@@ -125,7 +116,7 @@ class Trainer:
         train_config: TrainConfig,
         model_config: ModelConfig = ModelConfig(),
         data_loader_config: DataLoaderConfig = DataLoaderConfig(),
-    ) -> dict[str, Any]:
+    ) -> TrainingSummary:
         run_dir = Path(train_config.runs_dir) / train_config.run_name
         observer = TrainingObserver(train_config, run_dir / "training.log")
         checkpoint_path = run_dir / "checkpoint.pt"
@@ -157,23 +148,15 @@ class Trainer:
                 optim.step()
 
                 observer.on_batch_end(
-                    epoch, loss.item(), grad_norm, batch_ids, tgt.size(0),
-                    tgt[:, 1:].numel(),
+                    epoch, loss.item(), grad_norm, batch_ids,
+                    tgt.size(0), tgt[:, 1:].numel()
                 )
 
-        summary = {
-            "num_examples": observer.processed_examples,
-            "final_loss": loss.item(),
-        }
         checkpoint_file = _save_training_checkpoint(
             checkpoint_path=checkpoint_path,
             model=model,
-            summary={},
-            train_config={
-                "model_config": asdict(model_config),
-                "train_config": asdict(train_config),
-                "data_loader_config": asdict(data_loader_config),
-            },
         )
-        summary["checkpoint_path"] = str(checkpoint_file)
-        return summary
+
+        return TrainingSummary(observer.processed_examples, observer.loss_value,
+                            str(checkpoint_file)
+        )

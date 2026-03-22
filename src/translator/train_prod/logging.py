@@ -133,13 +133,13 @@ class TrainingLogger:
 
     def log(
         self,
-        *,
-        label: str | None = None,
-        level: int = logging.INFO,
         step: int,
         epoch: int,
         loss: float,
         median_loss: float | None,
+        *,
+        label: str | None = None,
+        level: int = logging.INFO,
         grad_norm: float | None = None,
         lr: float | None = None,
         batch_ids: Sequence[int] | None = None,

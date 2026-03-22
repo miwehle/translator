@@ -141,7 +141,7 @@ def test_trainer_loss_trend_decreases_on_synthetic_smoke_dataset(
     )
     training_duration_seconds = time.perf_counter() - t0
 
-    assert out["num_examples"] > 0
+    assert out.num_examples > 0
 
     captured = capsys.readouterr()
     losses = _parse_losses(captured.out)
@@ -158,8 +158,8 @@ def test_trainer_loss_trend_decreases_on_synthetic_smoke_dataset(
             dataset_path=dataset_path,
             train_kwargs=train_kwargs,
             summary={
-                "num_examples": out["num_examples"],
-                "final_loss": out["final_loss"],
+                "num_examples": out.num_examples,
+                "final_loss": out.final_loss,
                 "first_avg": first_avg,
                 "last_avg": last_avg,
                 "num_logged_steps": len(losses),
@@ -246,7 +246,7 @@ def test_trainer_loss_trend_decreases_on_real_preprocessed_dataset(
     )
     training_duration_seconds = time.perf_counter() - t0
 
-    assert out["num_examples"] > 0
+    assert out.num_examples > 0
 
     captured = capsys.readouterr()
     losses = _parse_losses(captured.out)
@@ -263,8 +263,8 @@ def test_trainer_loss_trend_decreases_on_real_preprocessed_dataset(
             dataset_path=dataset_path,
             train_kwargs=train_kwargs,
             summary={
-                "num_examples": out["num_examples"],
-                "final_loss": out["final_loss"],
+                "num_examples": out.num_examples,
+                "final_loss": out.final_loss,
                 "first_avg": first_avg,
                 "last_avg": last_avg,
                 "num_logged_steps": len(losses),

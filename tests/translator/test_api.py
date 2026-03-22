@@ -79,4 +79,4 @@ def test_train_avoids_run_dir_name_collisions(tmp_path: Path, monkeypatch) -> No
     assert new_run_dir.joinpath("checkpoint.pt").is_file()
     assert new_run_dir.joinpath("summary.yaml").is_file()
     assert new_run_dir.joinpath("training.log").is_file()
-    assert Path(summary["checkpoint_path"]) == new_run_dir / "checkpoint.pt"
+    assert Path(summary.checkpoint_path) == new_run_dir / "checkpoint.pt"

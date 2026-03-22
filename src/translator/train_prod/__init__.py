@@ -2,7 +2,7 @@ from ..types import Example
 from .config import DataLoaderConfig, ModelConfig, TrainConfig
 from .factory import Factory
 from .preflight import check_dataset
-from .training import Trainer
+from .training import Trainer, TrainingSummary
 
 __all__ = [
     "Example",
@@ -10,6 +10,7 @@ __all__ = [
     "DataLoaderConfig",
     "Factory",
     "ModelConfig",
+    "TrainingSummary",
     "TrainConfig",
     "Trainer",
 ]
