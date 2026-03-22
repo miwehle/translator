@@ -42,9 +42,7 @@ def configure_translator_logging(*, log_path: str | Path | None = None) -> loggi
     logger.setLevel(logging.INFO)
     logger.propagate = False
 
-    for handler in logger.handlers[:]:
-        logger.removeHandler(handler)
-        handler.close()
+    close_translator_logging()
 
     formatter = logging.Formatter(LOG_FORMAT, datefmt=LOG_DATE_FORMAT)
 
@@ -60,3 +58,10 @@ def configure_translator_logging(*, log_path: str | Path | None = None) -> loggi
         logger.addHandler(file_handler)
 
     return logger
+
+
+def close_translator_logging() -> None:
+    logger = logging.getLogger("translator")
+    for handler in logger.handlers[:]:
+        logger.removeHandler(handler)
+        handler.close()

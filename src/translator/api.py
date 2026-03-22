@@ -160,8 +160,7 @@ def train(
 
     def log_training_finish(summary: dict[str, object], summary_path: Path) -> None:
         logger.info(
-            "Finished training global_step=%s final_loss=%s checkpoint_path=%s summary_path=%s",
-            summary["global_step"],
+            "Finished training final_loss=%s checkpoint_path=%s summary_path=%s",
             summary["final_loss"],
             summary["checkpoint_path"],
             summary_path,
