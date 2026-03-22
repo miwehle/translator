@@ -146,7 +146,7 @@ class Trainer:
                 )
                 optim.step()
 
-                # log batch metrics via observer (to keep logging out of this method)
+                # log batch metrics via observer (to keep logging details out of here)
                 observer.on_batch_end(
                     epoch, loss.item(), grad_norm, batch_ids,
                     tgt.size(0), tgt_token_count = tgt[:, 1:].numel()
