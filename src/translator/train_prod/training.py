@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import random
 from collections import deque
-from collections.abc import Iterable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from statistics import median
@@ -15,6 +15,7 @@ from ..model import Seq2Seq
 from ..types import Example
 from .config import DataLoaderConfig, ModelConfig, TrainConfig
 from .factory import Factory
+from .inference import create_translation_preview_fn
 from .logging import TrainingLogger
 
 
@@ -53,15 +54,16 @@ class TrainingSummary:
     num_examples: int
     final_loss: float | None
     checkpoint_path: str
-
 class TrainingObserver:
     def __init__(
         self,
         train_config: TrainConfig,
         log_path: str | Path,
+        translation_preview_fn: Callable[[], list[tuple[str, str]]] | None = None,
     ) -> None:
         self.train_config = train_config
         self.training_logger = TrainingLogger(log_path=log_path)
+        self.translation_preview_fn = translation_preview_fn
         self.loss_history: deque[float] = deque(
             maxlen=train_config.spike_window
         )
@@ -98,10 +100,23 @@ class TrainingObserver:
                 label="SPIKE", level=logging.WARNING, batch_ids=batch_ids,
             )
 
-        if self.global_step % self.train_config.log_every == 0:
+        if self.global_step == 1 or self.global_step % self.train_config.log_every == 0:
             self.training_logger.log(
                 self.global_step, epoch, loss_value, median_loss,
                 grad_norm=grad_norm, lr=self.train_config.lr,
+            )
+        if (
+            self.train_config.translate_every is not None
+            and self.translation_preview_fn is not None
+            and (
+                self.global_step == 1
+                or self.global_step % self.train_config.translate_every == 0
+            )
+        ):
+            self.training_logger.log_translations(
+                self.global_step,
+                epoch,
+                self.translation_preview_fn(),
             )
 
 class Trainer:
@@ -117,12 +132,22 @@ class Trainer:
         data_loader_config: DataLoaderConfig = DataLoaderConfig(),
     ) -> TrainingSummary:
         run_dir = Path(train_config.runs_dir) / train_config.run_name
-        observer = TrainingObserver(train_config, run_dir / "training.log")
         checkpoint_path = run_dir / "checkpoint.pt"
 
         _set_seed(train_config.seed)
         device = _resolve_device(train_config.device)
         model = self.factory.create_model(model_config, device)
+        observer = TrainingObserver(
+            train_config,
+            run_dir / "training.log",
+            translation_preview_fn=create_translation_preview_fn(
+                train_config,
+                model_config,
+                getattr(self.factory.dataset_metadata, "tokenizer_model_name", None),
+                model,
+                device,
+            ),
+        )
         loader = self.factory.create_data_loader(examples, data_loader_config,
                                                  device)
         criterion = nn.CrossEntropyLoss(ignore_index=model.tgt_pad_idx)

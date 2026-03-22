@@ -25,6 +25,8 @@ class TrainConfig:
     lr: float = 3e-4
     epochs: int = 1
     log_every: int = 50
+    translate_every: int | None = None
+    translate_examples: tuple[str, ...] = ()
     spike_window: int = 100
     spike_factor: float = 3.0
 

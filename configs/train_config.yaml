@@ -16,6 +16,13 @@ train_config:
   lr: 0.0003
   epochs: 1
   log_every: 50
+  translate_every: 500
+  translate_examples:
+    - We need a clear plan for the next step.
+    - The committee approved the proposal yesterday.
+    - This agreement will strengthen cooperation between our countries.
+    - The morning light fell softly across the flower meadow.
+    - She smiled as the first notes of the song filled the room.
   spike_window: 100
   spike_factor: 3.0
 
