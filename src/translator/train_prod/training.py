@@ -34,7 +34,6 @@ def _resolve_device(device: str | torch.device | None) -> torch.device:
 
 
 def _save_training_checkpoint(
-    *,
     checkpoint_path: str | Path,
     model: Seq2Seq,
 ) -> Path:
@@ -147,16 +146,14 @@ class Trainer:
                 )
                 optim.step()
 
+                # log batch metrics via observer (to keep logging out of this method)
                 observer.on_batch_end(
                     epoch, loss.item(), grad_norm, batch_ids,
-                    tgt.size(0), tgt[:, 1:].numel()
+                    tgt.size(0), tgt_token_count = tgt[:, 1:].numel()
                 )
 
-        checkpoint_file = _save_training_checkpoint(
-            checkpoint_path=checkpoint_path,
-            model=model,
-        )
+        checkpoint_file = _save_training_checkpoint(checkpoint_path, model)
 
         return TrainingSummary(observer.processed_examples, observer.loss_value,
-                            str(checkpoint_file)
-        )
+                               str(checkpoint_file))
+    
