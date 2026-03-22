@@ -143,6 +143,21 @@ class TrainingLogger:
             lines.append(f"pred={translated_text}")
         self._emit(message="\n".join(lines), level=logging.INFO)
 
+    def log_translation_failure(
+        self,
+        step: int,
+        epoch: int,
+        exc: Exception,
+    ) -> None:
+        self._emit(
+            message=(
+                f"TRANSLATE_FAILED step={step} ep={epoch} "
+                f"preview translation failed; training continues. "
+                f"exception={exc!r}"
+            ),
+            level=logging.WARNING,
+        )
+
     def log(
         self,
         step: int,

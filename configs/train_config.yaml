@@ -18,11 +18,11 @@ train_config:
   log_every: 50
   translate_every: 500
   translate_examples:
-    - We need a clear plan for the next step.
-    - The committee approved the proposal yesterday.
-    - This agreement will strengthen cooperation between our countries.
-    - The morning light fell softly across the flower meadow.
-    - She smiled as the first notes of the song filled the room.
+    - Wir brauchen einen klaren Plan für den nächsten Schritt.
+    - Der Ausschuss hat den Vorschlag gestern gebilligt.
+    - Dieses Abkommen wird die Zusammenarbeit zwischen unseren Ländern stärken.
+    - Das Morgenlicht fiel sanft über die Blumenwiese.
+    - Sie lächelte, als die ersten Noten des Liedes den Raum füllten.
   spike_window: 100
   spike_factor: 3.0
 

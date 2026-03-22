@@ -113,11 +113,18 @@ class TrainingObserver:
                 or self.global_step % self.train_config.translate_every == 0
             )
         ):
-            self.training_logger.log_translations(
-                self.global_step,
-                epoch,
-                self.translation_preview_fn(),
-            )
+            try:
+                self.training_logger.log_translations(
+                    self.global_step,
+                    epoch,
+                    self.translation_preview_fn(),
+                )
+            except Exception as exc:
+                self.training_logger.log_translation_failure(
+                    self.global_step,
+                    epoch,
+                    exc,
+                )
 
 class Trainer:
     def __init__(self, factory: Factory) -> None:
