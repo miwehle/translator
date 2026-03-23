@@ -14,9 +14,9 @@ train_config:
   run_name: run1
   seed: 42
   lr: 0.0003
-  epochs: 1
-  log_every: 50
-  translate_every: 500
+  epochs: 10
+  log_every: 100
+  translate_every: 2000
   translate_examples:
     - Wir brauchen einen klaren Plan für den nächsten Schritt.
     - Der Ausschuss hat den Vorschlag gestern gebilligt.
