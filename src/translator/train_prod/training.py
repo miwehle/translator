@@ -150,7 +150,7 @@ class Trainer:
             translation_preview_fn=create_translation_preview_fn(
                 train_config,
                 model_config,
-                getattr(self.factory.dataset_metadata, "tokenizer_model_name", None),
+                self.factory.dataset_metadata,
                 model,
                 device,
             ),

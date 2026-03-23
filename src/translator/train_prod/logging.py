@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import subprocess
 import time
+import traceback
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -149,11 +150,19 @@ class TrainingLogger:
         epoch: int,
         exc: Exception,
     ) -> None:
+        cause = exc.__cause__
+        traceback_text = "".join(
+            traceback.format_exception(type(exc), exc, exc.__traceback__)
+        ).strip()
         self._emit(
             message=(
                 f"TRANSLATE_FAILED step={step} ep={epoch} "
                 f"preview translation failed; training continues. "
-                f"exception={exc!r}"
+                f"exception_type={type(exc).__name__} "
+                f"exception={exc!r} "
+                f"cause_type={type(cause).__name__ if cause is not None else '-'} "
+                f"cause={cause!r}\n"
+                f"{traceback_text}"
             ),
             level=logging.WARNING,
         )
