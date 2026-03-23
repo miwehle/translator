@@ -12,6 +12,16 @@ Keine stillschweigende Code-Duplizierung bei Refactorings; Duplikationen muessen
 
 Provisorische Workarounds, Debug-Helfer und asymmetrische Zwischenloesungen sind nach Klaerung der Ursache im selben Task wieder zu entfernen oder explizit zu begruenden; kein liegengebliebenes "temporary fix".
 
+## Production-Code-Aenderungen
+
+Aenderungen im Paket `model` nur nach Ruecksprache.
+
+Im Paket `model` auf keinen Fall voreilig oder auf Verdacht aendern.
+
+Bei nicht-trivialen Aenderungen am Production-Code vor der Umsetzung kurz und buendig beschreiben, was geaendert werden soll, und ein Go einholen.
+
+KISS-Prinzip beachten: Production-Code moeglichst einfach und klein halten; Zusatzlogik und Diagnose nur behalten, wenn ihr Nutzen die Komplexitaet klar rechtfertigt.
+
 ## Temp-Artefakte
 
 Temporäre Verzeichnisse und Dateien für Tests, Verifikation und ad-hoc Läufe sind im Repo-Root ausschließlich unter `.local_tmp/` anzulegen.

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
 
 import torch
 
@@ -15,73 +14,72 @@ def load_preview_tokenizer(tokenizer_model_name: str) -> TokenizerProtocol:
     return HuggingFaceTokenizerAdapter.from_pretrained(tokenizer_model_name)
 
 
-@dataclass(frozen=True)
-class PreviewTranslationFailure(RuntimeError):
-    source_text: str
-    encoded_source_ids: list[int]
-    predicted_ids: list[int]
-    tokenizer_vocab_size: int | None
-    tokenizer_bos_id: int | None
-    tokenizer_eos_id: int | None
-    tokenizer_pad_id: int | None
-    dataset_tgt_bos_id: int | None
-    dataset_tgt_eos_id: int | None
-    dataset_tgt_pad_id: int | None
-    max_len: int
+def _prepare_predicted_ids_for_preview_decode(
+    predicted_ids: Sequence[int],
+    *,
+    tokenizer: TokenizerProtocol,
+    dataset_metadata: DatasetMetadata,
+) -> list[int]:
+    prepared_ids = list(predicted_ids)
 
-    def __init__(
-        self,
-        *,
-        source_text: str,
-        encoded_source_ids: list[int],
-        predicted_ids: list[int],
-        tokenizer: TokenizerProtocol,
-        dataset_metadata: DatasetMetadata,
-        max_len: int,
-        cause: Exception,
-    ) -> None:
-        tokenizer_vocab_size = getattr(tokenizer, "vocab_size", None)
-        invalid_ids = (
-            [
-                token_id
-                for token_id in predicted_ids
-                if isinstance(tokenizer_vocab_size, int)
-                and token_id >= tokenizer_vocab_size
-            ]
-            if isinstance(tokenizer_vocab_size, int)
-            else []
+    dataset_bos_id = dataset_metadata.tgt_bos_id
+    tokenizer_bos_id = getattr(tokenizer, "bos_token_id", None)
+    tokenizer_vocab_size = getattr(tokenizer, "vocab_size", None)
+    should_strip_leading_dataset_bos = (
+        bool(prepared_ids)
+        and dataset_bos_id is not None
+        and prepared_ids[0] == dataset_bos_id
+        and (
+            tokenizer_bos_id is None
+            or tokenizer_bos_id != dataset_bos_id
+            or (
+                isinstance(tokenizer_vocab_size, int)
+                and dataset_bos_id >= tokenizer_vocab_size
+            )
         )
-        message = (
-            "Preview translation decode failed. "
-            f"source_text={source_text!r} "
-            f"src_ids={encoded_source_ids} "
-            f"predicted_ids={predicted_ids} "
-            f"predicted_len={len(predicted_ids)} "
-            f"max_predicted_id={max(predicted_ids) if predicted_ids else None} "
-            f"invalid_predicted_ids={invalid_ids} "
-            f"tokenizer_vocab_size={tokenizer_vocab_size} "
-            f"tokenizer_bos_id={getattr(tokenizer, 'bos_token_id', None)} "
-            f"tokenizer_eos_id={getattr(tokenizer, 'eos_token_id', None)} "
-            f"tokenizer_pad_id={getattr(tokenizer, 'pad_token_id', None)} "
-            f"dataset_tgt_bos_id={dataset_metadata.tgt_bos_id} "
-            f"dataset_tgt_eos_id={dataset_metadata.tgt_eos_id} "
-            f"dataset_tgt_pad_id={dataset_metadata.tgt_pad_id} "
-            f"max_len={max_len} "
-            f"cause={cause!r}"
-        )
-        super().__init__(message)
-        object.__setattr__(self, "source_text", source_text)
-        object.__setattr__(self, "encoded_source_ids", list(encoded_source_ids))
-        object.__setattr__(self, "predicted_ids", list(predicted_ids))
-        object.__setattr__(self, "tokenizer_vocab_size", tokenizer_vocab_size)
-        object.__setattr__(self, "tokenizer_bos_id", getattr(tokenizer, "bos_token_id", None))
-        object.__setattr__(self, "tokenizer_eos_id", getattr(tokenizer, "eos_token_id", None))
-        object.__setattr__(self, "tokenizer_pad_id", getattr(tokenizer, "pad_token_id", None))
-        object.__setattr__(self, "dataset_tgt_bos_id", dataset_metadata.tgt_bos_id)
-        object.__setattr__(self, "dataset_tgt_eos_id", dataset_metadata.tgt_eos_id)
-        object.__setattr__(self, "dataset_tgt_pad_id", dataset_metadata.tgt_pad_id)
-        object.__setattr__(self, "max_len", max_len)
-        object.__setattr__(self, "__cause__", cause)
+    )
+    if should_strip_leading_dataset_bos:
+        prepared_ids = prepared_ids[1:]
+
+    return prepared_ids
+
+
+class PreviewTranslationFailure(RuntimeError):
+    pass
+
+
+def _invalid_predicted_ids(
+    predicted_ids: Sequence[int], *, tokenizer: TokenizerProtocol
+) -> list[int]:
+    tokenizer_vocab_size = getattr(tokenizer, "vocab_size", None)
+    if not isinstance(tokenizer_vocab_size, int):
+        return []
+    return [
+        token_id
+        for token_id in predicted_ids
+        if token_id >= tokenizer_vocab_size
+    ]
+
+
+def _build_preview_translation_failure(
+    *,
+    source_text: str,
+    encoded_source_ids: Sequence[int],
+    predicted_ids: Sequence[int],
+    tokenizer: TokenizerProtocol,
+    dataset_metadata: DatasetMetadata,
+    cause: Exception,
+) -> PreviewTranslationFailure:
+    return PreviewTranslationFailure(
+        "Preview translation decode failed. "
+        f"source_text={source_text!r} "
+        f"src_ids={list(encoded_source_ids)} "
+        f"predicted_ids={list(predicted_ids)} "
+        f"invalid_predicted_ids={_invalid_predicted_ids(predicted_ids, tokenizer=tokenizer)} "
+        f"tokenizer_vocab_size={getattr(tokenizer, 'vocab_size', None)} "
+        f"dataset_tgt_bos_id={dataset_metadata.tgt_bos_id} "
+        f"cause={cause!r}"
+    )
 
 
 def translate_examples(
@@ -109,16 +107,20 @@ def translate_examples(
                 device=device,
                 eos_idx=eos_idx,
             )
+            prepared_predicted_ids = _prepare_predicted_ids_for_preview_decode(
+                predicted_ids,
+                tokenizer=tokenizer,
+                dataset_metadata=dataset_metadata,
+            )
             try:
-                translated_text = tokenizer.decode(predicted_ids)
+                translated_text = tokenizer.decode(prepared_predicted_ids)
             except Exception as exc:
-                raise PreviewTranslationFailure(
+                raise _build_preview_translation_failure(
                     source_text=text,
                     encoded_source_ids=encoded_source_ids,
                     predicted_ids=predicted_ids,
                     tokenizer=tokenizer,
                     dataset_metadata=dataset_metadata,
-                    max_len=max_len,
                     cause=exc,
                 ) from exc
             translations.append((text, translated_text))
