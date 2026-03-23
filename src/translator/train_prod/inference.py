@@ -69,7 +69,7 @@ def _build_preview_translation_failure(
     tokenizer: TokenizerProtocol,
     dataset_metadata: DatasetMetadata,
     cause: Exception,
-) -> PreviewTranslationFailure:
+    ) -> PreviewTranslationFailure:
     return PreviewTranslationFailure(
         "Preview translation decode failed. "
         f"source_text={source_text!r} "
@@ -91,6 +91,32 @@ def translate_examples(
     max_len: int,
     dataset_metadata: DatasetMetadata,
 ) -> list[tuple[str, str]]:
+    
+    def translate_example(text: str, eos_idx: int) -> str:
+        encoded_source_ids = tokenizer.encode(text)
+        predicted_ids = model.translate(
+            encoded_source_ids,
+            max_len=max_len,
+            device=device,
+            eos_idx=eos_idx,
+        )
+        prepared_predicted_ids = _prepare_predicted_ids_for_preview_decode(
+            predicted_ids,
+            tokenizer=tokenizer,
+            dataset_metadata=dataset_metadata,
+        )
+        try:
+            return tokenizer.decode(prepared_predicted_ids)
+        except Exception as exc:
+            raise _build_preview_translation_failure(
+                source_text=text,
+                encoded_source_ids=encoded_source_ids,
+                predicted_ids=predicted_ids,
+                tokenizer=tokenizer,
+                dataset_metadata=dataset_metadata,
+                cause=exc,
+            ) from exc
+
     eos_idx = tokenizer.eos_token_id
     if eos_idx is None:
         raise ValueError("Tokenizer has no eos_token_id for preview translation.")
@@ -100,29 +126,7 @@ def translate_examples(
     try:
         translations: list[tuple[str, str]] = []
         for text in texts:
-            encoded_source_ids = tokenizer.encode(text)
-            predicted_ids = model.translate(
-                encoded_source_ids,
-                max_len=max_len,
-                device=device,
-                eos_idx=eos_idx,
-            )
-            prepared_predicted_ids = _prepare_predicted_ids_for_preview_decode(
-                predicted_ids,
-                tokenizer=tokenizer,
-                dataset_metadata=dataset_metadata,
-            )
-            try:
-                translated_text = tokenizer.decode(prepared_predicted_ids)
-            except Exception as exc:
-                raise _build_preview_translation_failure(
-                    source_text=text,
-                    encoded_source_ids=encoded_source_ids,
-                    predicted_ids=predicted_ids,
-                    tokenizer=tokenizer,
-                    dataset_metadata=dataset_metadata,
-                    cause=exc,
-                ) from exc
+            translated_text = translate_example(text, eos_idx)
             translations.append((text, translated_text))
         return translations
     finally:
