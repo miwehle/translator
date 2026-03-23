@@ -22,6 +22,14 @@ Bei nicht-trivialen Aenderungen am Production-Code vor der Umsetzung kurz und bu
 
 KISS-Prinzip beachten: Production-Code moeglichst einfach und klein halten; Zusatzlogik und Diagnose nur behalten, wenn ihr Nutzen die Komplexitaet klar rechtfertigt.
 
+## Parameterstil
+
+Positional Parameters bevorzugen, wenn der Aufruf dadurch kuerzer und trotzdem klar bleibt.
+
+Keyword-only Parameters nur verwenden, wenn sie einen klaren Vorteil fuer Lesbarkeit, Sicherheit oder Eindeutigkeit bringen.
+
+Aufgeblaehte Funktionsaufrufe durch unnoetige Keyword-only Parameters vermeiden.
+
 ## Temp-Artefakte
 
 Temporäre Verzeichnisse und Dateien für Tests, Verifikation und ad-hoc Läufe sind im Repo-Root ausschließlich unter `.local_tmp/` anzulegen.
