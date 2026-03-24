@@ -4,18 +4,23 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import cast
 
-from tests.translator.train_prod.support import (
+from tests.translator.training.support import (
     create_valid_mapped_dataset,
     train_config_for_test,
 )
-from translator.data_prod import load_arrow_records
-from translator.train_prod import Example, Trainer, check_dataset
-from translator.train_prod.factory import Factory
-from translator.train_prod.training import DataLoaderConfig, ModelConfig
+from translator.training import (
+    DataLoaderConfig,
+    Example,
+    ModelConfig,
+    Trainer,
+    check_dataset,
+)
+from translator.training.dataset import load_arrow_records
+from translator.training.factory import Factory
 
 
 def test_trainer_writes_checkpoint_and_summary(tmp_path: Path) -> None:
-    dataset_path = create_valid_mapped_dataset(tmp_path / "valid_train_prod.mapped")
+    dataset_path = create_valid_mapped_dataset(tmp_path / "valid_training.mapped")
     ds = cast(Iterable[Example], load_arrow_records(dataset_path))
     run_dir = tmp_path / "test_run_root" / "artifacts_run"
     checkpoint_path = run_dir / "checkpoint.pt"

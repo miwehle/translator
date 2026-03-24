@@ -1,40 +1,48 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
+from math import ceil
 
 import torch
 
-from ..data import HuggingFaceTokenizerAdapter, TokenizerProtocol
-from ..data_prod import DatasetMetadata
 from ..model import Seq2Seq
-from .config import ModelConfig, TrainConfig
+from .tokenizer import HuggingFaceTokenizerAdapter, TokenizerProtocol
 
 
-def load_preview_tokenizer(tokenizer_model_name: str) -> TokenizerProtocol:
+def _load_preview_tokenizer(tokenizer_model_name: str) -> TokenizerProtocol:
     return HuggingFaceTokenizerAdapter.from_pretrained(tokenizer_model_name)
+
+
+def _estimate_english_token_count(german_token_count: int) -> int:
+    """Estimate a safe DE->EN target token count for preview decoding.
+
+    On the full local Europarl DE->EN training set with
+    Helsinki-NLP/opus-mt-de-en, p99(tgt_len / src_len) is about 2.74.
+    """
+    if german_token_count < 0:
+        raise ValueError("german_token_count must be non-negative.")
+    return ceil(2.8 * german_token_count) + 5
 
 
 def _prepare_predicted_ids_for_preview_decode(
     predicted_ids: Sequence[int],
     *,
     tokenizer: TokenizerProtocol,
-    dataset_metadata: DatasetMetadata,
+    tgt_bos_id: int | None,
 ) -> list[int]:
     prepared_ids = list(predicted_ids)
 
-    dataset_bos_id = dataset_metadata.tgt_bos_id
     tokenizer_bos_id = getattr(tokenizer, "bos_token_id", None)
     tokenizer_vocab_size = getattr(tokenizer, "vocab_size", None)
     should_strip_leading_dataset_bos = (
         bool(prepared_ids)
-        and dataset_bos_id is not None
-        and prepared_ids[0] == dataset_bos_id
+        and tgt_bos_id is not None
+        and prepared_ids[0] == tgt_bos_id
         and (
-            tokenizer_bos_id is None
-            or tokenizer_bos_id != dataset_bos_id
+            tokenizer_bos_id is None or tokenizer_bos_id != tgt_bos_id
             or (
                 isinstance(tokenizer_vocab_size, int)
-                and dataset_bos_id >= tokenizer_vocab_size
+                and tgt_bos_id >= tokenizer_vocab_size
             )
         )
     )
@@ -67,9 +75,9 @@ def _build_preview_translation_failure(
     encoded_source_ids: Sequence[int],
     predicted_ids: Sequence[int],
     tokenizer: TokenizerProtocol,
-    dataset_metadata: DatasetMetadata,
+    tgt_bos_id: int | None,
     cause: Exception,
-    ) -> PreviewTranslationFailure:
+) -> PreviewTranslationFailure:
     return PreviewTranslationFailure(
         "Preview translation decode failed. "
         f"source_text={source_text!r} "
@@ -77,7 +85,7 @@ def _build_preview_translation_failure(
         f"predicted_ids={list(predicted_ids)} "
         f"invalid_predicted_ids={_invalid_predicted_ids(predicted_ids, tokenizer=tokenizer)} "
         f"tokenizer_vocab_size={getattr(tokenizer, 'vocab_size', None)} "
-        f"dataset_tgt_bos_id={dataset_metadata.tgt_bos_id} "
+        f"dataset_tgt_bos_id={tgt_bos_id} "
         f"cause={cause!r}"
     )
 
@@ -88,12 +96,11 @@ def translate_examples(
     texts: Sequence[str],
     device: torch.device,
     *,
-    max_len: int,
-    dataset_metadata: DatasetMetadata,
+    tgt_bos_id: int | None,
 ) -> list[tuple[str, str]]:
-    
     def translate_example(text: str, eos_idx: int) -> str:
         encoded_source_ids = tokenizer.encode(text)
+        max_len = _estimate_english_token_count(len(encoded_source_ids))
         predicted_ids = model.translate(
             encoded_source_ids,
             max_len=max_len,
@@ -103,7 +110,7 @@ def translate_examples(
         prepared_predicted_ids = _prepare_predicted_ids_for_preview_decode(
             predicted_ids,
             tokenizer=tokenizer,
-            dataset_metadata=dataset_metadata,
+            tgt_bos_id=tgt_bos_id,
         )
         try:
             return tokenizer.decode(prepared_predicted_ids)
@@ -113,7 +120,7 @@ def translate_examples(
                 encoded_source_ids=encoded_source_ids,
                 predicted_ids=predicted_ids,
                 tokenizer=tokenizer,
-                dataset_metadata=dataset_metadata,
+                tgt_bos_id=tgt_bos_id,
                 cause=exc,
             ) from exc
 
@@ -134,28 +141,27 @@ def translate_examples(
 
 
 def create_translation_preview_fn(
-    train_config: TrainConfig,
-    model_config: ModelConfig,
-    dataset_metadata: DatasetMetadata,
+    translate_every: int | None,
+    translate_examples_texts: Sequence[str],
+    tokenizer_model_name: str | None,
+    tgt_bos_id: int | None,
     model: Seq2Seq,
     device: torch.device,
 ) -> Callable[[], list[tuple[str, str]]] | None:
-    if train_config.translate_every is None or not train_config.translate_examples:
+    if translate_every is None or not translate_examples_texts:
         return None
-    if dataset_metadata.tokenizer_model_name is None:
+    if tokenizer_model_name is None:
         raise ValueError("Preview translation requires dataset tokenizer_model_name.")
 
-    preview_tokenizer = load_preview_tokenizer(dataset_metadata.tokenizer_model_name)
-    preview_max_len = min(model_config.max_seq_len, 64)
+    preview_tokenizer = _load_preview_tokenizer(tokenizer_model_name)
 
     def translation_preview_fn() -> list[tuple[str, str]]:
         return translate_examples(
             model,
             preview_tokenizer,
-            train_config.translate_examples,
+            translate_examples_texts,
             device,
-            max_len=preview_max_len,
-            dataset_metadata=dataset_metadata,
+            tgt_bos_id=tgt_bos_id,
         )
 
     return translation_preview_fn

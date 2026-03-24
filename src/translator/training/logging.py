@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
-from ..logging_utils import configure_translator_logging, detect_hardware_type
+from ..shared.logging_utils import configure_translator_logging, detect_hardware_type
 
 _CU_RATES = {
     "T4": 1.8,
@@ -46,7 +46,7 @@ class TrainingLogger:
     last_log_time: float = field(default_factory=time.time)
     decoder_token_count: int = 0
     decoder_sequence_count: int = 0
-    logger_name: str = "translator.train_prod.training"
+    logger_name: str = "translator.training.trainer"
     logger: logging.Logger = field(init=False)
 
     def __post_init__(self) -> None:

@@ -11,11 +11,11 @@ from statistics import median
 import torch
 import torch.nn as nn
 
+from ..inference import create_translation_preview_fn
 from ..model import Seq2Seq
-from ..types import Example
+from ..shared.types import Example
 from .config import DataLoaderConfig, ModelConfig, TrainConfig
 from .factory import Factory
-from .inference import create_translation_preview_fn
 from .logging import TrainingLogger
 
 
@@ -54,7 +54,8 @@ class TrainingSummary:
     num_examples: int
     final_loss: float | None
     checkpoint_path: str
-class TrainingObserver:
+    
+class _TrainingObserver:
     def __init__(
         self,
         train_config: TrainConfig,
@@ -136,27 +137,31 @@ class Trainer:
         *,
         train_config: TrainConfig,
         model_config: ModelConfig = ModelConfig(),
-        data_loader_config: DataLoaderConfig = DataLoaderConfig(),
+        data_loader_config: DataLoaderConfig = DataLoaderConfig()
     ) -> TrainingSummary:
+        def createTrainingObserver(model: Seq2Seq, device: torch.device, log_path: Path
+        ) -> _TrainingObserver:
+            tokenizer_model_name = getattr(
+                self.factory.dataset_metadata, "tokenizer_model_name", None
+            )
+            tgt_bos_id = getattr(self.factory.dataset_metadata, "tgt_bos_id", None)
+            return _TrainingObserver(
+                train_config,
+                log_path,
+                translation_preview_fn=create_translation_preview_fn(
+                    train_config.translate_every, train_config.translate_examples,
+                    tokenizer_model_name, tgt_bos_id, model, device
+                ),
+            )
+
         run_dir = Path(train_config.runs_dir) / train_config.run_name
         checkpoint_path = run_dir / "checkpoint.pt"
 
         _set_seed(train_config.seed)
         device = _resolve_device(train_config.device)
         model = self.factory.create_model(model_config, device)
-        observer = TrainingObserver(
-            train_config,
-            run_dir / "training.log",
-            translation_preview_fn=create_translation_preview_fn(
-                train_config,
-                model_config,
-                self.factory.dataset_metadata,
-                model,
-                device,
-            ),
-        )
-        loader = self.factory.create_data_loader(examples, data_loader_config,
-                                                 device)
+        observer = createTrainingObserver(model, device, run_dir / "training.log")
+        loader = self.factory.create_data_loader(examples, data_loader_config, device)
         criterion = nn.CrossEntropyLoss(ignore_index=model.tgt_pad_idx)
         optim = torch.optim.Adam(model.parameters(), lr=train_config.lr)
         model.train()
@@ -170,7 +175,7 @@ class Trainer:
                 logits = model(src, tgt)
                 loss = criterion(
                     logits.reshape(-1, logits.size(-1)),
-                    tgt[:, 1:].reshape(-1),
+                    tgt[:, 1:].reshape(-1)
                 )
                 loss.backward()
                 grad_norm = float(

@@ -35,3 +35,9 @@ Aufgeblaehte Funktionsaufrufe durch unnoetige Keyword-only Parameters vermeiden.
 Temporäre Verzeichnisse und Dateien für Tests, Verifikation und ad-hoc Läufe sind im Repo-Root ausschließlich unter `.local_tmp/` anzulegen.
 
 Keine neuen temporären Root-Ordner wie `.tmp_pytest*`, `.pytest_tmp*` oder ähnliche Namen anlegen.
+
+## Code-Links
+
+Wenn auf Code verwiesen wird, die vom Client unterstützten Datei-Referenzen verwenden.
+
+Keine Browser-Links oder Datei-URIs konstruieren. Stattdessen Pfad und optional Zeilennummer in der vom Client erwarteten Form angeben.

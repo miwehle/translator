@@ -5,7 +5,8 @@ from pathlib import Path
 from typing import Mapping, cast
 
 from datasets import Dataset
-from translator.train_prod.training import TrainConfig
+
+from translator.training import TrainConfig
 
 _INITIALIZED_LOG_PATHS: set[Path] = set()
 
@@ -21,7 +22,7 @@ def create_valid_mapped_dataset(dataset_dir: Path) -> Path:
 
 
 def pad_index_from_records(dataset_path: Path, field: str) -> int:
-    from translator.data_prod.arrow_dataset import load_arrow_records
+    from translator.training.dataset.arrow_dataset import load_arrow_records
 
     records = load_arrow_records(dataset_path)
     max_token = -1
@@ -53,8 +54,8 @@ def log(
     """Append a test section to the module log in the caller's package-local `.log` directory.
 
     The log file is written to `<module package>/.log/<module name>.log`.
-    For example, calls from `tests/translator/train_prod/test_train_prod_loss_progress.py`
-    write to `tests/translator/train_prod/.log/test_train_prod_loss_progress.log`.
+    For example, calls from `tests/translator/training/test_training_loss_progress.py`
+    write to `tests/translator/training/.log/test_training_loss_progress.log`.
 
     The first write to a given module log file during the current pytest process truncates
     the file; subsequent writes append a blank line and then a new section headed by a

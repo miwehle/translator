@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from translator.logging_utils import close_translator_logging
+from translator.shared.logging_utils import close_translator_logging
 
 
 @pytest.fixture(autouse=True)

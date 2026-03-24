@@ -9,23 +9,21 @@ from typing import cast
 
 import pytest
 
-from tests.translator.train_prod.support import (
+from tests.translator.training.support import (
     create_valid_mapped_dataset,
     log,
     pad_index_from_records,
     train_config_for_test,
 )
-from translator.data_prod import load_arrow_records
-from translator.train_prod import (
+from translator.training import (
+    DataLoaderConfig,
     Example,
+    ModelConfig,
     Trainer,
     check_dataset,
 )
-from translator.train_prod.factory import Factory
-from translator.train_prod.training import (
-    DataLoaderConfig,
-    ModelConfig,
-)
+from translator.training.dataset import load_arrow_records
+from translator.training.factory import Factory
 
 LOSS_LINE_RE = re.compile(r"\bloss=(?P<loss>\d+(?:\.\d+)?)\b")
 STEP_LINE_RE = re.compile(
@@ -85,7 +83,7 @@ def test_trainer_loss_trend_decreases_on_synthetic_smoke_dataset(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    dataset_path = create_valid_mapped_dataset(tmp_path / "valid_train_prod.mapped")
+    dataset_path = create_valid_mapped_dataset(tmp_path / "valid_training.mapped")
     ds = cast(Iterable[Example], load_arrow_records(dataset_path))
     src_pad_idx = pad_index_from_records(dataset_path, "src_ids")
     tgt_pad_idx = pad_index_from_records(dataset_path, "tgt_ids")

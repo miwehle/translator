@@ -20,16 +20,15 @@ class TokenizerProtocol(Protocol):
     def eos_token_id(self) -> int | None: ...
 
 
-TOKENIZER_CHOICES = ("custom", "hf")
+TOKENIZER_CHOICES = ("hf",)
 
 
 def create_tokenizer(
     tokenizer: str, texts: list[str], hf_tokenizer_name: str
 ) -> TokenizerProtocol:
-    from .tokenizer import HuggingFaceTokenizerAdapter, Tokenizer
+    del texts
+    from .tokenizer import HuggingFaceTokenizerAdapter
 
-    if tokenizer == "custom":
-        return Tokenizer.build(texts)
     if tokenizer == "hf":
         return HuggingFaceTokenizerAdapter.from_pretrained(hf_tokenizer_name)
     raise ValueError(

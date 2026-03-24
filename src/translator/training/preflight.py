@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping
 from typing import Any
 
-from ..types import Example
+from ..shared.types import Example
 
 
 def _format_example_ids(example_ids: list[int], limit: int = 5) -> str:

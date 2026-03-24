@@ -1,4 +1,4 @@
-from translator.data_prod import collate_fn_prod
+from translator.training.dataset import collate_fn_prod
 
 
 def test_collate_fn_prod_pads_and_returns_batch_ids():

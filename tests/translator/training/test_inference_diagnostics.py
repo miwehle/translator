@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-import torch
 import pytest
+import torch
 
-from translator.data_prod import DatasetMetadata
-from translator.train_prod.inference import (
+from translator.inference import (
     PreviewTranslationFailure,
     translate_examples,
 )
+from translator.training.dataset import DatasetMetadata
 
 
 class _FakeTokenizer:
@@ -79,8 +79,7 @@ def test_translate_examples_raises_preview_failure_with_diagnostics() -> None:
             _FakeTokenizer(),
             ["Hallo Welt"],
             torch.device("cpu"),
-            max_len=16,
-            dataset_metadata=dataset_metadata,
+            tgt_bos_id=dataset_metadata.tgt_bos_id,
         )
 
     message = str(exc_info.value)
@@ -115,8 +114,7 @@ def test_translate_examples_strips_leading_dataset_bos_for_preview_decode() -> N
         _FakeTokenizer(),
         ["Hallo Welt"],
         torch.device("cpu"),
-        max_len=16,
-        dataset_metadata=dataset_metadata,
+        tgt_bos_id=dataset_metadata.tgt_bos_id,
     )
 
     assert translations == [("Hallo Welt", "ok")]

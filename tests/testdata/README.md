@@ -1,6 +1,6 @@
 # Test Data
 
-Store mapped Arrow datasets for `train_prod` tests in this directory.
+Store mapped Arrow datasets for `training` tests in this directory.
 
 Expected structure example:
 

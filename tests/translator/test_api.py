@@ -4,9 +4,9 @@ from pathlib import Path
 
 import yaml
 
-from tests.translator.train_prod.support import create_valid_mapped_dataset, train_config_for_test
+from tests.translator.training.support import create_valid_mapped_dataset, train_config_for_test
 from translator.api import train
-from translator.train_prod.training import DataLoaderConfig, ModelConfig
+from translator.training import DataLoaderConfig, ModelConfig
 
 
 def _write_dataset_manifest(dataset_dir: Path) -> None:

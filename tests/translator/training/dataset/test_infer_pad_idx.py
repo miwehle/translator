@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from translator.data_prod.arrow_dataset import infer_pad_idx
+from translator.training.dataset.arrow_dataset import infer_pad_idx
 
 
 def _find_preprocessed_dataset() -> Path:
@@ -19,7 +19,7 @@ def _find_preprocessed_dataset() -> Path:
             f"{candidate}"
         )
 
-    testdata_dir = Path(__file__).resolve().parents[2] / "testdata"
+    testdata_dir = Path(__file__).resolve().parents[3] / "testdata"
     if not testdata_dir.exists():
         pytest.skip(f"Missing test data directory: {testdata_dir}")
 

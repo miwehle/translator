@@ -6,10 +6,10 @@ from typing import TYPE_CHECKING, Any
 import torch
 from torch.utils.data import DataLoader, IterableDataset, get_worker_info
 
-from ..data_prod import DatasetMetadata, collate_fn_prod
 from ..model import Seq2Seq
-from ..types import Example
+from ..shared.types import Example
 from .config import DataLoaderConfig
+from .dataset import DatasetMetadata, collate_fn_prod
 
 if TYPE_CHECKING:
     from .config import ModelConfig

@@ -4,8 +4,8 @@ from typing import cast
 
 from datasets import Dataset
 
-from translator.data_prod import load_arrow_records
-from translator.train_prod import Example, check_dataset
+from translator.training import Example, check_dataset
+from translator.training.dataset import load_arrow_records
 
 
 def _write_dataset(tmp_path: Path, rows: list[dict[str, object]]) -> Path:

@@ -13,18 +13,18 @@ from typing import cast
 
 import yaml
 
-from .data_prod import DatasetMetadata, load_arrow_records
-from .logging_utils import configure_translator_logging, detect_hardware_type
-from .train_prod import (
+from .shared.logging_utils import configure_translator_logging, detect_hardware_type
+from .shared.types import Example
+from .training import (
     DataLoaderConfig,
     ModelConfig,
     TrainConfig,
+    Trainer,
     TrainingSummary,
     check_dataset,
 )
-from .train_prod.factory import Factory
-from .train_prod.training import Trainer
-from .types import Example
+from .training.dataset import DatasetMetadata, load_arrow_records
+from .training.factory import Factory
 
 logger = logging.getLogger(__name__)
 

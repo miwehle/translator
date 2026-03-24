@@ -11,8 +11,8 @@ SRC_DIR = REPO_ROOT / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-from translator.data_prod import DatasetMetadata, load_arrow_records
-from translator.train_prod import check_dataset
+from translator.training import check_dataset
+from translator.training.dataset import DatasetMetadata, load_arrow_records
 
 
 def main() -> int:
