@@ -13,8 +13,7 @@ if str(SRC_DIR) not in sys.path:
 
 
 def main() -> int:
-    from translator.training import check_dataset
-    from translator.training.dataset import DatasetMetadata, load_arrow_records
+    from translator import check_dataset
 
     if len(sys.argv) != 2:
         print("Usage: python scripts/preflight.py <config-path>")
@@ -29,25 +28,9 @@ def main() -> int:
         return 1
 
     try:
-        dataset_path = Path(cfg["dataset_path"])
-        if not dataset_path.exists():
-            raise FileNotFoundError(f"Dataset not found: {dataset_path}")
-
-        manifest_path = dataset_path / "dataset_manifest.yaml"
-        if not manifest_path.exists():
-            raise FileNotFoundError(f"Dataset manifest not found: {manifest_path}")
-
-        examples = load_arrow_records(dataset_path)
-        metadata = DatasetMetadata.from_file(manifest_path)
-        extra_preflight_config = cfg.get("preflight_config") or {}
         result = check_dataset(
-            examples,
-            id_field=metadata.id_field,
-            src_field=metadata.src_field,
-            tgt_field=metadata.tgt_field,
-            src_pad_idx=metadata.src_pad_id,
-            tgt_pad_idx=metadata.tgt_pad_id,
-            **extra_preflight_config,
+            dataset_path=Path(cfg["dataset_path"]),
+            **(cfg.get("preflight_config") or {}),
         )
     except Exception as exc:
         print(f"Preflight check failed: {exc}")

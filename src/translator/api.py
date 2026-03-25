@@ -23,6 +23,7 @@ from .training import (
     TrainConfig,
     Trainer,
     TrainingSummary,
+    preflight,
 )
 
 logger = logging.getLogger(__name__)
@@ -98,6 +99,37 @@ def _append_checkpoint_register(
         )
 
 
+def _load_dataset(dataset_path: str | Path) -> tuple[Path, Sequence[Example], DatasetMetadata]:
+    dataset_dir = Path(dataset_path)
+    if not dataset_dir.exists():
+        raise FileNotFoundError(f"Dataset not found: {dataset_dir}")
+
+    logger.info("Load arrow dataset from %s", dataset_dir)
+    examples = cast(Sequence[Example], load_arrow_records(dataset_dir))
+    metadata = DatasetMetadata.from_file(dataset_dir / "dataset_manifest.yaml")
+    return dataset_dir, examples, metadata
+
+
+def check_dataset(
+    *,
+    dataset_path: str | Path,
+    require_unique_ids: bool,
+    min_seq_len: int,
+) -> dict[str, object]:
+    _, examples, metadata = _load_dataset(dataset_path)
+
+    return preflight.check_dataset(
+        examples,
+        id_field=metadata.id_field,
+        src_field=metadata.src_field,
+        tgt_field=metadata.tgt_field,
+        src_pad_idx=metadata.src_pad_id,
+        tgt_pad_idx=metadata.tgt_pad_id,
+        require_unique_ids=require_unique_ids,
+        min_seq_len=min_seq_len,
+    )
+
+
 def train(
     *,
     dataset_path: str | Path,
@@ -115,9 +147,7 @@ def train(
 
     def prepare_training() -> tuple[Sequence[Example], DatasetMetadata, str, TrainConfig]:
         logger.info("Prepare training")
-        dataset_dir = Path(dataset_path)
-        if not dataset_dir.exists():
-            raise FileNotFoundError(f"Dataset not found: {dataset_dir}")
+        dataset_dir, examples, metadata = _load_dataset(dataset_path)
 
         # Avoid overwriting earlier runs by picking the next free run directory.
         run_dir = _next_available_run_dir(Path(train_config.runs_dir) / train_config.run_name)
@@ -138,10 +168,6 @@ def train(
             },
             build_commit=git_commit,
         )
-
-        logger.info("Load arrow dataset from %s", dataset_dir)
-        examples = cast(Sequence[Example], load_arrow_records(dataset_dir))
-        metadata = DatasetMetadata.from_file(dataset_dir / "dataset_manifest.yaml")
 
         return examples, metadata, git_commit, resolved_train_config
 

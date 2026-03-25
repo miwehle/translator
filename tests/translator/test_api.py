@@ -4,8 +4,11 @@ from pathlib import Path
 
 import yaml
 
-from tests.translator.training.support import create_valid_mapped_dataset, train_config_for_test
-from translator.api import train
+from tests.translator.training.support import (
+    create_valid_mapped_dataset,
+    train_config_for_test,
+)
+from translator.api import check_dataset, train
 from translator.training import DataLoaderConfig, ModelConfig
 
 
@@ -80,3 +83,16 @@ def test_train_avoids_run_dir_name_collisions(tmp_path: Path, monkeypatch) -> No
     assert new_run_dir.joinpath("summary.yaml").is_file()
     assert new_run_dir.joinpath("training.log").is_file()
     assert Path(summary.checkpoint_path) == new_run_dir / "checkpoint.pt"
+
+
+def test_check_dataset_uses_dataset_manifest_defaults(tmp_path: Path) -> None:
+    dataset_dir = create_valid_mapped_dataset(tmp_path / "dataset.mapped")
+    _write_dataset_manifest(dataset_dir)
+
+    result = check_dataset(dataset_path=dataset_dir, require_unique_ids=True, min_seq_len=2)
+
+    assert result["id_field"] == "id"
+    assert result["src_field"] == "src_ids"
+    assert result["tgt_field"] == "tgt_ids"
+    assert result["src_pad_idx"] == 0
+    assert result["tgt_pad_idx"] == 1
