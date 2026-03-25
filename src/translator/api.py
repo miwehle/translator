@@ -194,9 +194,11 @@ def train(
         )
         logger.info("Registered checkpoint output_ckpt=%s", summary.checkpoint_path)
 
+    # main flow
     examples, metadata, git_commit, resolved_train_config = prepare_training()
     log_training_start(resolved_train_config)
 
+    # core
     summary = Trainer(Factory(metadata)).train(
         examples,
         train_config=resolved_train_config,
