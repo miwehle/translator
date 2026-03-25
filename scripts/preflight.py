@@ -11,11 +11,11 @@ SRC_DIR = REPO_ROOT / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-from translator.training import check_dataset
-from translator.training.dataset import DatasetMetadata, load_arrow_records
-
 
 def main() -> int:
+    from translator.training import check_dataset
+    from translator.training.dataset import DatasetMetadata, load_arrow_records
+
     if len(sys.argv) != 2:
         print("Usage: python scripts/preflight.py <config-path>")
         return 1

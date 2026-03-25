@@ -10,10 +10,10 @@ SRC_DIR = REPO_ROOT / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-from translator import DataLoaderConfig, ModelConfig, TrainConfig, train
-
 
 def main() -> int:
+    from translator import DataLoaderConfig, ModelConfig, TrainConfig, train
+
     if len(sys.argv) != 2:
         print("Usage: python scripts/train.py <config-path>")
         return 1
