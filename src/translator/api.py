@@ -138,6 +138,7 @@ def train(
     data_loader_config: DataLoaderConfig = DataLoaderConfig(),
     repo_root: str | Path | None = None,
 ) -> TrainingSummary:
+    
     def write_summary_yaml(summary_path: Path, summary: TrainingSummary) -> None:
         summary_path.parent.mkdir(parents=True, exist_ok=True)
         summary_path.write_text(
@@ -194,7 +195,6 @@ def train(
         logger.info("Registered checkpoint output_ckpt=%s", summary.checkpoint_path)
 
     examples, metadata, git_commit, resolved_train_config = prepare_training()
-
     log_training_start(resolved_train_config)
 
     summary = Trainer(Factory(metadata)).train(
@@ -206,7 +206,6 @@ def train(
 
     summary_path = Path(resolved_train_config.runs_dir) / resolved_train_config.run_name / "summary.yaml"
     write_summary_yaml(summary_path, summary)
-
     _append_checkpoint_register(
         Path(train_config.runs_dir) / "checkpoint_register.csv",
         timestamp=datetime.now().isoformat(timespec="seconds"),
@@ -214,7 +213,6 @@ def train(
         git_commit=git_commit,
         output_ckpt=summary.checkpoint_path,
     )
-
     log_training_finish(summary, summary_path)
 
     return summary
