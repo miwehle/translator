@@ -7,7 +7,7 @@ import torch
 from torch.utils.data import DataLoader, IterableDataset, get_worker_info
 
 from ..model import Seq2Seq
-from ..shared.types import Example
+from ..shared import Example
 from .config import DataLoaderConfig
 from .dataset import DatasetMetadata, collate_fn_prod
 

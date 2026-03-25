@@ -13,7 +13,7 @@ import torch.nn as nn
 
 from ..inference import create_translation_preview_fn
 from ..model import Seq2Seq
-from ..shared.types import Example
+from ..shared import Example
 from .config import DataLoaderConfig, ModelConfig, TrainConfig
 from .factory import Factory
 from .logging import TrainingLogger
