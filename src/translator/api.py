@@ -1,4 +1,4 @@
-"""Public Translator2 API."""
+"""Public Translator API."""
 
 from __future__ import annotations
 
