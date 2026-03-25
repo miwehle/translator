@@ -13,6 +13,8 @@ from typing import cast
 
 import yaml
 
+from translator.training.dataset import DatasetMetadata, load_arrow_records
+
 from .shared import Example, configure_translator_logging, detect_hardware_type
 from .training import (
     DataLoaderConfig,
