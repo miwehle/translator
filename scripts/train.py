@@ -15,7 +15,6 @@ def main() -> int:
     from translator import (
         DataLoaderConfig,
         ModelConfig,
-        ResumeConfig,
         TrainConfig,
         train,
     )
@@ -41,16 +40,13 @@ def main() -> int:
             None if cfg.get("model_config") is None
             else ModelConfig(**cfg["model_config"])
         )
-        resume_config = (
-            None if cfg.get("resume") is None
-            else ResumeConfig(**cfg["resume"])
-        )
+        checkpoint_path = cfg.get("checkpoint_path")
 
         train_config = TrainConfig(**(cfg.get("train_config") or {}))
         data_loader_config = DataLoaderConfig(**(cfg.get("data_loader_config") or {}))
         train(
             dataset_path, train_config, data_loader_config, REPO_ROOT,
-            model_config=model_config, resume_config=resume_config)
+            model_config=model_config, checkpoint_path=checkpoint_path)
     except Exception as exc:
         print(f"Training failed: {exc}")
         return 1

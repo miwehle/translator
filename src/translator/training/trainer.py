@@ -16,7 +16,7 @@ from ..model import Seq2Seq
 from ..shared import Example
 from .checkpointing import load as load_checkpoint
 from .checkpointing import save as save_checkpoint
-from .config import DataLoaderConfig, ModelConfig, ResumeConfig, TrainConfig
+from .config import DataLoaderConfig, ModelConfig, TrainConfig
 from .factory import Factory
 from .logging import TrainingLogger
 
@@ -120,19 +120,18 @@ class Trainer:
         factory: Factory,
         train_config: TrainConfig,
         model_config: ModelConfig | None = None,
-        resume_config: ResumeConfig | None = None,
+        checkpoint_path: str | None = None,
     ) -> None:
         self.factory = factory
         self.train_config = train_config
 
-        if (model_config is None) == (resume_config is None):
-            raise ValueError("Exactly one of model_config or resume_config must be provided.")
+        if (model_config is None) == (checkpoint_path is None):
+            raise ValueError("Exactly one of model_config or checkpoint_path must be provided.")
 
         _set_seed(train_config.seed)
         self.device = _resolve_device(train_config.device)
-        if resume_config is not None:
-            loaded = load_checkpoint(
-                resume_config.checkpoint_path, self.factory, self.device)
+        if checkpoint_path is not None:
+            loaded = load_checkpoint(checkpoint_path, self.factory, self.device)
             self.model = loaded.model
             self.optimizer = loaded.optimizer
             self.model_config = loaded.model_config

@@ -14,7 +14,6 @@ from translator.training import (
     DataLoaderConfig,
     Example,
     ModelConfig,
-    ResumeConfig,
     Trainer,
     check_dataset,
 )
@@ -87,7 +86,7 @@ class TestTrainer:
                 log_every=1000,
                 run_name="second_run",
             ),
-            resume_config=ResumeConfig(checkpoint_path=first_summary.checkpoint_path),
+            checkpoint_path=first_summary.checkpoint_path,
         ).train(
             ds,
             DataLoaderConfig(

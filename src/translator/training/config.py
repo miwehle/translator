@@ -16,11 +16,6 @@ class ModelConfig:
     attention: str = "torch"
 
 
-@dataclass(frozen=True)
-class ResumeConfig:
-    checkpoint_path: str
-
-
 @dataclass(frozen=True, kw_only=True)
 class TrainConfig:
     runs_dir: str

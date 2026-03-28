@@ -20,7 +20,6 @@ from .training import (
     DataLoaderConfig,
     Factory,
     ModelConfig,
-    ResumeConfig,
     TrainConfig,
     Trainer,
     TrainingSummary,
@@ -116,7 +115,7 @@ def train(
     repo_root: str | Path,
     *,
     model_config: ModelConfig | None = None,
-    resume_config: ResumeConfig | None = None,
+    checkpoint_path: str | None = None,
 ) -> TrainingSummary:
     def append_checkpoint_register(output_ckpt: str) -> None:
         register_path = Path(train_config.runs_dir) / "checkpoint_register.csv"
@@ -132,9 +131,7 @@ def train(
             writer.writerow(
                 {
                     "timestamp": datetime.now().isoformat(timespec="seconds"),
-                    "input_ckpt": (
-                        resume_config.checkpoint_path if resume_config is not None else ""
-                    ),
+                    "input_ckpt": checkpoint_path or "",
                     "dataset_path": str(Path(dataset_path)),
                     "git_commit": git_commit,
                     "output_ckpt": output_ckpt,
@@ -157,7 +154,7 @@ def train(
             {
                 "dataset_path": str(dataset_dir),
                 "model_config": asdict(model_config) if model_config is not None else None,
-                "resume": asdict(resume_config) if resume_config is not None else None,
+                "checkpoint_path": checkpoint_path,
                 "train_config": asdict(resolved_train_config),
                 "data_loader_config": asdict(data_loader_config),
             },
@@ -187,7 +184,7 @@ def train(
     # core
     summary = Trainer(
         Factory(metadata), resolved_train_config, model_config=model_config,
-        resume_config=resume_config).train(examples, data_loader_config)
+        checkpoint_path=checkpoint_path).train(examples, data_loader_config)
 
     summary_path = (Path(resolved_train_config.runs_dir) /
                     resolved_train_config.run_name / "training_summary.yaml")

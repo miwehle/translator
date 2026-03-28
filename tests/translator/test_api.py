@@ -10,7 +10,7 @@ from tests.translator.training.support import (
     train_config_for_test,
 )
 from translator.api import check_dataset, train
-from translator.training import DataLoaderConfig, ModelConfig, ResumeConfig
+from translator.training import DataLoaderConfig, ModelConfig
 
 
 def _write_dataset_manifest(dataset_dir: Path) -> None:
@@ -135,7 +135,7 @@ def test_train_resumes_from_checkpoint(tmp_path: Path, monkeypatch) -> None:
             shuffle=False,
         ),
         tmp_path,
-        resume_config=ResumeConfig(checkpoint_path=first_summary.checkpoint_path),
+        checkpoint_path=first_summary.checkpoint_path,
     )
 
     second_run_dir = run_root / "run2"
@@ -156,7 +156,7 @@ def test_train_resumes_from_checkpoint(tmp_path: Path, monkeypatch) -> None:
     assert manifest["checkpoint_file"] == "checkpoint.pt"
     assert "summary" not in manifest
     assert train_cfg["model_config"] is None
-    assert train_cfg["resume"] == {"checkpoint_path": first_summary.checkpoint_path}
+    assert train_cfg["checkpoint_path"] == first_summary.checkpoint_path
     assert training_summary["checkpoint_path"] == second_summary.checkpoint_path
     assert training_summary["final_loss"] == second_summary.final_loss
     assert len(register_rows) == 2
