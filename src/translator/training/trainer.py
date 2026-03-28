@@ -14,7 +14,9 @@ import torch.nn as nn
 from ..inference import create_translation_preview_fn
 from ..model import Seq2Seq
 from ..shared import Example
-from .config import DataLoaderConfig, ModelConfig, TrainConfig
+from .checkpointing import load as load_checkpoint
+from .checkpointing import save as save_checkpoint
+from .config import DataLoaderConfig, ModelConfig, ResumeConfig, TrainConfig
 from .factory import Factory
 from .logging import TrainingLogger
 
@@ -32,21 +34,6 @@ def _resolve_device(device: str | torch.device | None) -> torch.device:
     if isinstance(device, torch.device):
         return device
     return torch.device(device)
-
-
-def _save_training_checkpoint(
-    checkpoint_path: str | Path,
-    model: Seq2Seq,
-) -> Path:
-    checkpoint_file = Path(checkpoint_path)
-    checkpoint_file.parent.mkdir(parents=True, exist_ok=True)
-    torch.save(
-        {
-            "model_state_dict": model.state_dict(),
-        },
-        checkpoint_file,
-    )
-    return checkpoint_file
 
 
 @dataclass(frozen=True)
@@ -128,16 +115,38 @@ class _TrainingObserver:
                 )
 
 class Trainer:
-    def __init__(self, factory: Factory) -> None:
+    def __init__(
+        self,
+        factory: Factory,
+        train_config: TrainConfig,
+        model_config: ModelConfig | None = None,
+        resume_config: ResumeConfig | None = None,
+    ) -> None:
         self.factory = factory
+        self.train_config = train_config
+
+        if (model_config is None) == (resume_config is None):
+            raise ValueError("Exactly one of model_config or resume_config must be provided.")
+
+        _set_seed(train_config.seed)
+        self.device = _resolve_device(train_config.device)
+        if resume_config is not None:
+            loaded = load_checkpoint(
+                resume_config.checkpoint_path, self.factory, self.device)
+            self.model = loaded.model
+            self.optimizer = loaded.optimizer
+            self.model_config = loaded.model_config
+            return
+
+        assert model_config is not None
+        self.model_config = model_config
+        self.model = self.factory.create_model(model_config, self.device)
+        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=train_config.lr)
 
     def train(
         self,
         examples: Iterable[Example] | Sequence[Example],
-        *,
-        train_config: TrainConfig,
-        model_config: ModelConfig = ModelConfig(),
-        data_loader_config: DataLoaderConfig = DataLoaderConfig()
+        data_loader_config: DataLoaderConfig = DataLoaderConfig(),
     ) -> TrainingSummary:
         def createTrainingObserver(model: Seq2Seq, device: torch.device, log_path: Path
         ) -> _TrainingObserver:
@@ -146,50 +155,44 @@ class Trainer:
             )
             tgt_bos_id = getattr(self.factory.dataset_metadata, "tgt_bos_id", None)
             return _TrainingObserver(
-                train_config,
+                self.train_config,
                 log_path,
                 translation_preview_fn=create_translation_preview_fn(
-                    train_config.translate_every, train_config.translate_examples,
-                    tokenizer_model_name, tgt_bos_id, model, device
-                ),
-            )
+                    self.train_config.translate_every,
+                    self.train_config.translate_examples, tokenizer_model_name,
+                    tgt_bos_id, model, device))
+        
+        # main flow
+        run_dir = Path(self.train_config.runs_dir) / self.train_config.run_name
 
-        run_dir = Path(train_config.runs_dir) / train_config.run_name
-        checkpoint_path = run_dir / "checkpoint.pt"
+        observer = createTrainingObserver(self.model, self.device, run_dir / "training.log")
+        loader = self.factory.create_data_loader(examples, data_loader_config, self.device)
+        criterion = nn.CrossEntropyLoss(ignore_index=self.model.tgt_pad_idx)
+        self.model.train()
 
-        _set_seed(train_config.seed)
-        device = _resolve_device(train_config.device)
-        model = self.factory.create_model(model_config, device)
-        observer = createTrainingObserver(model, device, run_dir / "training.log")
-        loader = self.factory.create_data_loader(examples, data_loader_config, device)
-        criterion = nn.CrossEntropyLoss(ignore_index=model.tgt_pad_idx)
-        optim = torch.optim.Adam(model.parameters(), lr=train_config.lr)
-        model.train()
-
-        for epoch in range(1, train_config.epochs + 1):
+        for epoch in range(1, self.train_config.epochs + 1):
             for src, tgt, batch_ids in loader:
-                src = src.to(device)
-                tgt = tgt.to(device)
+                src = src.to(self.device)
+                tgt = tgt.to(self.device)
 
-                optim.zero_grad()
-                logits = model(src, tgt)
+                self.optimizer.zero_grad()
+                logits = self.model(src, tgt)
                 loss = criterion(
                     logits.reshape(-1, logits.size(-1)),
-                    tgt[:, 1:].reshape(-1)
-                )
+                    tgt[:, 1:].reshape(-1))
                 loss.backward()
                 grad_norm = float(
-                    nn.utils.clip_grad_norm_(model.parameters(), 1.0)
-                )
-                optim.step()
+                    nn.utils.clip_grad_norm_(self.model.parameters(), 1.0))
+                self.optimizer.step()
 
                 # log batch metrics via observer (to keep logging details out of here)
                 observer.on_batch_end(
                     epoch, loss.item(), grad_norm, batch_ids,
-                    tgt.size(0), tgt_token_count = tgt[:, 1:].numel()
-                )
+                    tgt.size(0), tgt_token_count = tgt[:, 1:].numel())
 
-        checkpoint_file = _save_training_checkpoint(checkpoint_path, model)
+        checkpoint_file = save_checkpoint(
+            run_dir, self.model, self.optimizer, self.model_config,
+            self.factory.dataset_metadata)
 
         return TrainingSummary(observer.processed_examples, observer.loss_value,
                                str(checkpoint_file))

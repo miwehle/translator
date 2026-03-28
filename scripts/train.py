@@ -12,7 +12,13 @@ if str(SRC_DIR) not in sys.path:
 
 
 def main() -> int:
-    from translator import DataLoaderConfig, ModelConfig, TrainConfig, train
+    from translator import (
+        DataLoaderConfig,
+        ModelConfig,
+        ResumeConfig,
+        TrainConfig,
+        train,
+    )
 
     if len(sys.argv) != 2:
         print("Usage: python scripts/train.py <config-path>")
@@ -31,16 +37,20 @@ def main() -> int:
         if not dataset_path.exists():
             raise FileNotFoundError(f"Dataset not found: {dataset_path}")
 
-        model_config = ModelConfig(**(cfg.get("model_config") or {}))
+        model_config = (
+            None if cfg.get("model_config") is None
+            else ModelConfig(**cfg["model_config"])
+        )
+        resume_config = (
+            None if cfg.get("resume") is None
+            else ResumeConfig(**cfg["resume"])
+        )
+
         train_config = TrainConfig(**(cfg.get("train_config") or {}))
         data_loader_config = DataLoaderConfig(**(cfg.get("data_loader_config") or {}))
         train(
-            dataset_path=dataset_path,
-            train_config=train_config,
-            model_config=model_config,
-            data_loader_config=data_loader_config,
-            repo_root=REPO_ROOT,
-        )
+            dataset_path, train_config, data_loader_config, REPO_ROOT,
+            model_config=model_config, resume_config=resume_config)
     except Exception as exc:
         print(f"Training failed: {exc}")
         return 1

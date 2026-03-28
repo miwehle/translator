@@ -107,24 +107,26 @@ def test_trainer_loss_trend_decreases_on_synthetic_smoke_dataset(
                 "src_pad_id": check_result["src_pad_idx"],
                 "tgt_pad_id": check_result["tgt_pad_idx"],
                 "tgt_bos_id": check_result["tgt_sos_idx"],
+                "tokenizer_model_name": "test-tokenizer",
                 "id_field": check_result["id_field"],
                 "src_field": check_result["src_field"],
                 "tgt_field": check_result["tgt_field"],
             },
         )()
     )
+    train_config = train_config_for_test(
+        str(tmp_path),
+        run_name="synthetic_run",
+        device="cpu",
+        seed=7,
+        lr=1e-3,
+        epochs=2,
+        log_every=1,
+    )
     t0 = time.perf_counter()
-    out = Trainer(factory).train(
-        ds,
-        train_config=train_config_for_test(
-            str(tmp_path),
-            run_name="synthetic_run",
-            device="cpu",
-            seed=7,
-            lr=1e-3,
-            epochs=2,
-            log_every=1,
-        ),
+    out = Trainer(
+        factory,
+        train_config,
         model_config=ModelConfig(
             d_model=64,
             ff_dim=128,
@@ -132,7 +134,9 @@ def test_trainer_loss_trend_decreases_on_synthetic_smoke_dataset(
             num_layers=2,
             dropout=0.0,
         ),
-        data_loader_config=DataLoaderConfig(
+    ).train(
+        ds,
+        DataLoaderConfig(
             batch_size=32,
             shuffle=False,
         ),
@@ -212,24 +216,26 @@ def test_trainer_loss_trend_decreases_on_real_preprocessed_dataset(
                 "src_pad_id": check_result["src_pad_idx"],
                 "tgt_pad_id": check_result["tgt_pad_idx"],
                 "tgt_bos_id": check_result["tgt_sos_idx"],
+                "tokenizer_model_name": "test-tokenizer",
                 "id_field": check_result["id_field"],
                 "src_field": check_result["src_field"],
                 "tgt_field": check_result["tgt_field"],
             },
         )()
     )
+    train_config = train_config_for_test(
+        str(tmp_path),
+        run_name="real_run",
+        device="cpu",
+        seed=7,
+        lr=1e-3,
+        epochs=4,
+        log_every=1,
+    )
     t0 = time.perf_counter()
-    out = Trainer(factory).train(
-        ds,
-        train_config=train_config_for_test(
-            str(tmp_path),
-            run_name="real_run",
-            device="cpu",
-            seed=7,
-            lr=1e-3,
-            epochs=4,
-            log_every=1,
-        ),
+    out = Trainer(
+        factory,
+        train_config,
         model_config=ModelConfig(
             d_model=64,
             ff_dim=128,
@@ -237,7 +243,9 @@ def test_trainer_loss_trend_decreases_on_real_preprocessed_dataset(
             num_layers=2,
             dropout=0.0,
         ),
-        data_loader_config=DataLoaderConfig(
+    ).train(
+        ds,
+        DataLoaderConfig(
             batch_size=32,
             shuffle=False,
         ),

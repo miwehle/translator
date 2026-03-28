@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 from pathlib import Path
 
 import yaml
@@ -9,7 +10,7 @@ from tests.translator.training.support import (
     train_config_for_test,
 )
 from translator.api import check_dataset, train
-from translator.training import DataLoaderConfig, ModelConfig
+from translator.training import DataLoaderConfig, ModelConfig, ResumeConfig
 
 
 def _write_dataset_manifest(dataset_dir: Path) -> None:
@@ -48,8 +49,8 @@ def test_train_avoids_run_dir_name_collisions(tmp_path: Path, monkeypatch) -> No
     monkeypatch.setattr("translator.api._git_head", lambda _: "test-commit")
 
     summary = train(
-        dataset_path=dataset_dir,
-        train_config=train_config_for_test(
+        dataset_dir,
+        train_config_for_test(
             str(run_root),
             run_name="run1",
             device="cpu",
@@ -58,6 +59,11 @@ def test_train_avoids_run_dir_name_collisions(tmp_path: Path, monkeypatch) -> No
             lr=1e-3,
             seed=7,
         ),
+        DataLoaderConfig(
+            batch_size=32,
+            shuffle=False,
+        ),
+        tmp_path,
         model_config=ModelConfig(
             d_model=32,
             ff_dim=64,
@@ -65,11 +71,6 @@ def test_train_avoids_run_dir_name_collisions(tmp_path: Path, monkeypatch) -> No
             num_layers=2,
             dropout=0.0,
         ),
-        data_loader_config=DataLoaderConfig(
-            batch_size=32,
-            shuffle=False,
-        ),
-        repo_root=tmp_path,
     )
 
     new_run_dir = run_root / "run1 (1)"
@@ -78,11 +79,89 @@ def test_train_avoids_run_dir_name_collisions(tmp_path: Path, monkeypatch) -> No
         "existing checkpoint"
     )
     assert new_run_dir.is_dir()
-    assert new_run_dir.joinpath("train_config.yaml").is_file()
+    assert new_run_dir.joinpath("training_config.yaml").is_file()
+    assert new_run_dir.joinpath("training_summary.yaml").is_file()
     assert new_run_dir.joinpath("checkpoint.pt").is_file()
-    assert new_run_dir.joinpath("summary.yaml").is_file()
+    assert new_run_dir.joinpath("checkpoint_manifest.yaml").is_file()
     assert new_run_dir.joinpath("training.log").is_file()
     assert Path(summary.checkpoint_path) == new_run_dir / "checkpoint.pt"
+
+
+def test_train_resumes_from_checkpoint(tmp_path: Path, monkeypatch) -> None:
+    dataset_dir = create_valid_mapped_dataset(tmp_path / "dataset.mapped")
+    _write_dataset_manifest(dataset_dir)
+    run_root = tmp_path / "training_runs"
+
+    monkeypatch.setattr("translator.api._git_head", lambda _: "test-commit")
+
+    first_summary = train(
+        dataset_dir,
+        train_config_for_test(
+            str(run_root),
+            run_name="run1",
+            device="cpu",
+            epochs=1,
+            log_every=1000,
+            lr=1e-3,
+            seed=7,
+        ),
+        DataLoaderConfig(
+            batch_size=32,
+            shuffle=False,
+        ),
+        tmp_path,
+        model_config=ModelConfig(
+            d_model=32,
+            ff_dim=64,
+            num_heads=4,
+            num_layers=2,
+            dropout=0.0,
+        ),
+    )
+
+    second_summary = train(
+        dataset_dir,
+        train_config_for_test(
+            str(run_root),
+            run_name="run2",
+            device="cpu",
+            epochs=1,
+            log_every=1000,
+            lr=5e-4,
+            seed=7,
+        ),
+        DataLoaderConfig(
+            batch_size=32,
+            shuffle=False,
+        ),
+        tmp_path,
+        resume_config=ResumeConfig(checkpoint_path=first_summary.checkpoint_path),
+    )
+
+    second_run_dir = run_root / "run2"
+    manifest = yaml.safe_load(
+        second_run_dir.joinpath("checkpoint_manifest.yaml").read_text(encoding="utf-8")
+    )
+    train_cfg = yaml.safe_load(
+        second_run_dir.joinpath("training_config.yaml").read_text(encoding="utf-8")
+    )
+    training_summary = yaml.safe_load(
+        second_run_dir.joinpath("training_summary.yaml").read_text(encoding="utf-8")
+    )
+    with run_root.joinpath("checkpoint_register.csv").open("r", encoding="utf-8", newline="") as handle:
+        register_rows = list(csv.DictReader(handle))
+
+    assert Path(second_summary.checkpoint_path) == second_run_dir / "checkpoint.pt"
+    assert manifest["optimizer"]["type"] == "adam"
+    assert manifest["checkpoint_file"] == "checkpoint.pt"
+    assert "summary" not in manifest
+    assert train_cfg["model_config"] is None
+    assert train_cfg["resume"] == {"checkpoint_path": first_summary.checkpoint_path}
+    assert training_summary["checkpoint_path"] == second_summary.checkpoint_path
+    assert training_summary["final_loss"] == second_summary.final_loss
+    assert len(register_rows) == 2
+    assert register_rows[1]["input_ckpt"] == first_summary.checkpoint_path
+    assert register_rows[1]["output_ckpt"] == second_summary.checkpoint_path
 
 
 def test_check_dataset_uses_dataset_manifest_defaults(tmp_path: Path) -> None:
