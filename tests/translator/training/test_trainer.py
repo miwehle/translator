@@ -52,7 +52,7 @@ class TestTrainer:
         first_summary = Trainer(
             factory,
             train_config_for_test(
-                str(train_root),
+                str(tmp_path),
                 seed=7,
                 device="cpu",
                 lr=1e-3,
@@ -78,7 +78,7 @@ class TestTrainer:
         second_summary = Trainer(
             factory,
             train_config_for_test(
-                str(train_root),
+                str(tmp_path),
                 seed=7,
                 device="cpu",
                 lr=5e-4,
@@ -86,7 +86,7 @@ class TestTrainer:
                 log_every=1000,
                 run_name="second_run",
             ),
-            checkpoint_path=first_summary.checkpoint_path,
+            resume_run="first_run",
         ).train(
             ds,
             DataLoaderConfig(
@@ -95,6 +95,7 @@ class TestTrainer:
             ),
         )
 
+        train_root = tmp_path / "training_runs"
         second_run_dir = train_root / "second_run"
         manifest = yaml.safe_load(
             second_run_dir.joinpath("checkpoint_manifest.yaml").read_text(encoding="utf-8")

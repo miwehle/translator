@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 
 import torch
 
@@ -18,7 +19,7 @@ class ModelConfig:
 
 @dataclass(frozen=True, kw_only=True)
 class TrainConfig:
-    runs_dir: str
+    artifacts_dir: str
     run_name: str = "run1"
     device: str | torch.device | None = None
     seed: int = 42
@@ -29,6 +30,14 @@ class TrainConfig:
     translate_examples: tuple[str, ...] = ()
     spike_window: int = 100
     spike_factor: float = 3.0
+
+    @property
+    def datasets_dir(self) -> Path:
+        return Path(self.artifacts_dir) / "datasets"
+
+    @property
+    def training_runs_dir(self) -> Path:
+        return Path(self.artifacts_dir) / "training_runs"
 
 
 @dataclass(frozen=True)

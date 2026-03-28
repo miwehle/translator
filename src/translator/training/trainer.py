@@ -120,18 +120,20 @@ class Trainer:
         factory: Factory,
         train_config: TrainConfig,
         model_config: ModelConfig | None = None,
-        checkpoint_path: str | None = None,
+        resume_run: str | None = None,
     ) -> None:
         self.factory = factory
         self.train_config = train_config
 
-        if (model_config is None) == (checkpoint_path is None):
-            raise ValueError("Exactly one of model_config or checkpoint_path must be provided.")
+        if (model_config is None) == (resume_run is None):
+            raise ValueError("Exactly one of model_config or resume_run must be provided.")
 
         _set_seed(train_config.seed)
         self.device = _resolve_device(train_config.device)
-        if checkpoint_path is not None:
-            loaded = load_checkpoint(checkpoint_path, self.factory, self.device)
+        if resume_run is not None:
+            loaded = load_checkpoint(
+                train_config.training_runs_dir / resume_run / "checkpoint.pt",
+                self.factory, self.device)
             self.model = loaded.model
             self.optimizer = loaded.optimizer
             self.model_config = loaded.model_config
@@ -162,7 +164,7 @@ class Trainer:
                     tgt_bos_id, model, device))
         
         # main flow
-        run_dir = Path(self.train_config.runs_dir) / self.train_config.run_name
+        run_dir = self.train_config.training_runs_dir / self.train_config.run_name
 
         observer = createTrainingObserver(self.model, self.device, run_dir / "training.log")
         loader = self.factory.create_data_loader(examples, data_loader_config, self.device)

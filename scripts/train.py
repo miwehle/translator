@@ -32,21 +32,19 @@ def main() -> int:
         return 1
 
     try:
-        dataset_path = Path(cfg["dataset_path"])
-        if not dataset_path.exists():
-            raise FileNotFoundError(f"Dataset not found: {dataset_path}")
+        dataset = cfg["dataset"]
 
         model_config = (
             None if cfg.get("model_config") is None
             else ModelConfig(**cfg["model_config"])
         )
-        checkpoint_path = cfg.get("checkpoint_path")
+        resume_run = cfg.get("resume_run")
 
         train_config = TrainConfig(**(cfg.get("train_config") or {}))
         data_loader_config = DataLoaderConfig(**(cfg.get("data_loader_config") or {}))
         train(
-            dataset_path, train_config, data_loader_config, REPO_ROOT,
-            model_config=model_config, checkpoint_path=checkpoint_path)
+            dataset, train_config, data_loader_config, REPO_ROOT,
+            model_config=model_config, resume_run=resume_run)
     except Exception as exc:
         print(f"Training failed: {exc}")
         return 1

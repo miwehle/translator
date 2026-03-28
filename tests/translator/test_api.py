@@ -38,10 +38,11 @@ def _write_dataset_manifest(dataset_dir: Path) -> None:
 
 
 def test_train_avoids_run_dir_name_collisions(tmp_path: Path, monkeypatch) -> None:
-    dataset_dir = create_valid_mapped_dataset(tmp_path / "dataset.mapped")
+    artifacts_dir = tmp_path / "artifacts"
+    dataset_dir = create_valid_mapped_dataset(artifacts_dir / "datasets" / "dataset.mapped")
     _write_dataset_manifest(dataset_dir)
 
-    run_root = tmp_path / "training_runs"
+    run_root = artifacts_dir / "training_runs"
     existing_run_dir = run_root / "run1"
     existing_run_dir.mkdir(parents=True)
     (existing_run_dir / "checkpoint.pt").write_text("existing checkpoint", encoding="utf-8")
@@ -49,9 +50,9 @@ def test_train_avoids_run_dir_name_collisions(tmp_path: Path, monkeypatch) -> No
     monkeypatch.setattr("translator.api._git_head", lambda _: "test-commit")
 
     summary = train(
-        dataset_dir,
+        "dataset.mapped",
         train_config_for_test(
-            str(run_root),
+            str(artifacts_dir),
             run_name="run1",
             device="cpu",
             epochs=1,
@@ -88,16 +89,17 @@ def test_train_avoids_run_dir_name_collisions(tmp_path: Path, monkeypatch) -> No
 
 
 def test_train_resumes_from_checkpoint(tmp_path: Path, monkeypatch) -> None:
-    dataset_dir = create_valid_mapped_dataset(tmp_path / "dataset.mapped")
+    artifacts_dir = tmp_path / "artifacts"
+    dataset_dir = create_valid_mapped_dataset(artifacts_dir / "datasets" / "dataset.mapped")
     _write_dataset_manifest(dataset_dir)
-    run_root = tmp_path / "training_runs"
+    run_root = artifacts_dir / "training_runs"
 
     monkeypatch.setattr("translator.api._git_head", lambda _: "test-commit")
 
     first_summary = train(
-        dataset_dir,
+        "dataset.mapped",
         train_config_for_test(
-            str(run_root),
+            str(artifacts_dir),
             run_name="run1",
             device="cpu",
             epochs=1,
@@ -120,9 +122,9 @@ def test_train_resumes_from_checkpoint(tmp_path: Path, monkeypatch) -> None:
     )
 
     second_summary = train(
-        dataset_dir,
+        "dataset.mapped",
         train_config_for_test(
-            str(run_root),
+            str(artifacts_dir),
             run_name="run2",
             device="cpu",
             epochs=1,
@@ -135,7 +137,7 @@ def test_train_resumes_from_checkpoint(tmp_path: Path, monkeypatch) -> None:
             shuffle=False,
         ),
         tmp_path,
-        checkpoint_path=first_summary.checkpoint_path,
+        resume_run="run1",
     )
 
     second_run_dir = run_root / "run2"
@@ -156,7 +158,7 @@ def test_train_resumes_from_checkpoint(tmp_path: Path, monkeypatch) -> None:
     assert manifest["checkpoint_file"] == "checkpoint.pt"
     assert "summary" not in manifest
     assert train_cfg["model_config"] is None
-    assert train_cfg["checkpoint_path"] == first_summary.checkpoint_path
+    assert train_cfg["resume_run"] == "run1"
     assert training_summary["checkpoint_path"] == second_summary.checkpoint_path
     assert training_summary["final_loss"] == second_summary.final_loss
     assert len(register_rows) == 2

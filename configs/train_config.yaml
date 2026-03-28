@@ -1,4 +1,4 @@
-dataset_path: /content/drive/MyDrive/nmt_lab/artifacts/datasets/europarl_de-en_train_10000
+dataset: europarl_de-en_train_10000
 
 model_config:
   d_model: 256
@@ -10,7 +10,7 @@ model_config:
   attention: torch
 
 train_config:
-  runs_dir: /content/drive/MyDrive/nmt_lab/artifacts/training_runs
+  artifacts_dir: /content/drive/MyDrive/nmt_lab/artifacts
   run_name: run1
   seed: 42
   lr: 0.0003

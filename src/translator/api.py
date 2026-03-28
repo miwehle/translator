@@ -109,16 +109,16 @@ def check_dataset(
 
 
 def train(
-    dataset_path: str | Path,
+    dataset: str,
     train_config: TrainConfig,
     data_loader_config: DataLoaderConfig,
     repo_root: str | Path,
     *,
     model_config: ModelConfig | None = None,
-    checkpoint_path: str | None = None,
+    resume_run: str | None = None,
 ) -> TrainingSummary:
     def append_checkpoint_register(output_ckpt: str) -> None:
-        register_path = Path(train_config.runs_dir) / "checkpoint_register.csv"
+        register_path = train_config.training_runs_dir / "checkpoint_register.csv"
         write_header = not register_path.exists()
         with register_path.open("a", encoding="utf-8", newline="") as handle:
             writer = csv.DictWriter(
@@ -131,8 +131,11 @@ def train(
             writer.writerow(
                 {
                     "timestamp": datetime.now().isoformat(timespec="seconds"),
-                    "input_ckpt": checkpoint_path or "",
-                    "dataset_path": str(Path(dataset_path)),
+                    "input_ckpt": (
+                        str(train_config.training_runs_dir / resume_run / "checkpoint.pt")
+                        if resume_run is not None else ""
+                    ),
+                    "dataset_path": str(train_config.datasets_dir / dataset),
                     "git_commit": git_commit,
                     "output_ckpt": output_ckpt,
                 }
@@ -140,10 +143,10 @@ def train(
 
     def prepare_training() -> tuple[Sequence[Example], DatasetMetadata, str, TrainConfig]:
         logger.info("Prepare training")
-        dataset_dir, examples, metadata = _load_dataset(dataset_path)
+        dataset_dir, examples, metadata = _load_dataset(train_config.datasets_dir / dataset)
 
         # Avoid overwriting earlier runs by picking the next free run directory.
-        run_dir = _next_available_run_dir(Path(train_config.runs_dir) / train_config.run_name)
+        run_dir = _next_available_run_dir(train_config.training_runs_dir / train_config.run_name)
         run_dir.mkdir(parents=True, exist_ok=False)
         resolved_train_config = replace(train_config, run_name=run_dir.name)
         configure_translator_logging(log_path=run_dir / "training.log")
@@ -152,9 +155,9 @@ def train(
         _write_run_config(
             run_dir,
             {
-                "dataset_path": str(dataset_dir),
+                "dataset": dataset,
                 "model_config": asdict(model_config) if model_config is not None else None,
-                "checkpoint_path": checkpoint_path,
+                "resume_run": resume_run,
                 "train_config": asdict(resolved_train_config),
                 "data_loader_config": asdict(data_loader_config),
             },
@@ -169,7 +172,7 @@ def train(
         logger.info(
             "Start training hardware=%s run_dir=%s epochs=%s batch_size=%s device=%s",
             detect_hardware_type(),
-            Path(resolved_train_config.runs_dir) / resolved_train_config.run_name,
+            resolved_train_config.training_runs_dir / resolved_train_config.run_name,
             resolved_train_config.epochs,
             data_loader_config.batch_size,
             resolved_device)
@@ -184,9 +187,9 @@ def train(
     # core
     summary = Trainer(
         Factory(metadata), resolved_train_config, model_config=model_config,
-        checkpoint_path=checkpoint_path).train(examples, data_loader_config)
+        resume_run=resume_run).train(examples, data_loader_config)
 
-    summary_path = (Path(resolved_train_config.runs_dir) /
+    summary_path = (resolved_train_config.training_runs_dir /
                     resolved_train_config.run_name / "training_summary.yaml")
     _write_training_summary(summary_path, summary)
     append_checkpoint_register(summary.checkpoint_path)

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import shutil
+import uuid
 from datetime import datetime
 from pathlib import Path
 
@@ -11,7 +12,7 @@ from translator.shared.logging_utils import close_translator_logging
 
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
-_PYTEST_RUNS_DIR = _REPO_ROOT / ".local_tmp" / "pytest-runs"
+_PYTEST_RUNS_DIR = _REPO_ROOT / ".local_tmp" / "pytest-fixture-runs"
 
 
 def _create_pytest_run_dir() -> Path:
@@ -30,20 +31,20 @@ def _cleanup_old_pytest_run_dirs(current_run_dir: Path) -> None:
         shutil.rmtree(run_dir, ignore_errors=True)
 
 
-def pytest_configure(config: pytest.Config) -> None:
-    if config.option.basetemp is not None:
-        return
+@pytest.fixture(scope="session")
+def _translator_pytest_run_dir() -> Path:
     run_dir = _create_pytest_run_dir()
     _cleanup_old_pytest_run_dirs(run_dir)
-    config.option.basetemp = str(run_dir)
-    config._translator_pytest_run_dir = run_dir
-
-
-def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
-    run_dir = getattr(session.config, "_translator_pytest_run_dir", None)
-    if run_dir is None:
-        return
+    yield run_dir
     shutil.rmtree(run_dir, ignore_errors=True)
+
+
+@pytest.fixture
+def tmp_path(_translator_pytest_run_dir: Path) -> Path:
+    path = _translator_pytest_run_dir / f"tmp_{uuid.uuid4().hex}"
+    path.mkdir(parents=True, exist_ok=False)
+    yield path
+    shutil.rmtree(path, ignore_errors=True)
 
 
 @pytest.fixture(autouse=True)

@@ -22,7 +22,7 @@ from translator.training.factory import Factory
 def test_trainer_writes_checkpoint_and_summary(tmp_path: Path) -> None:
     dataset_path = create_valid_mapped_dataset(tmp_path / "valid_training.mapped")
     ds = cast(Iterable[Example], load_arrow_records(dataset_path))
-    run_dir = tmp_path / "test_run_root" / "artifacts_run"
+    run_dir = tmp_path / "test_run_root" / "training_runs" / "artifacts_run"
     checkpoint_path = run_dir / "checkpoint.pt"
     checkpoint_manifest_path = run_dir / "checkpoint_manifest.yaml"
     log_path = run_dir / "training.log"
