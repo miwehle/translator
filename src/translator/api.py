@@ -117,7 +117,7 @@ def train(
     model_config: ModelConfig | None = None,
     resume_run: str | None = None,
 ) -> TrainingSummary:
-    def append_checkpoint_register(output_ckpt: str) -> None:
+    def append_checkpoint_register(output_run: str) -> None:
         register_path = train_config.training_runs_dir / "checkpoint_register.csv"
         write_header = not register_path.exists()
         with register_path.open("a", encoding="utf-8", newline="") as handle:
@@ -131,13 +131,10 @@ def train(
             writer.writerow(
                 {
                     "timestamp": datetime.now().isoformat(timespec="seconds"),
-                    "input_ckpt": (
-                        str(train_config.training_runs_dir / resume_run / "checkpoint.pt")
-                        if resume_run is not None else ""
-                    ),
-                    "dataset_path": str(train_config.datasets_dir / dataset),
-                    "git_commit": git_commit,
-                    "output_ckpt": output_ckpt,
+                    "input_ckpt": resume_run or "",
+                    "dataset_path": Path(dataset).name,
+                    "git_commit": git_commit[:20],
+                    "output_ckpt": output_run,
                 }
             )
 
@@ -192,7 +189,7 @@ def train(
     summary_path = (resolved_train_config.training_runs_dir /
                     resolved_train_config.run_name / "training_summary.yaml")
     _write_training_summary(summary_path, summary)
-    append_checkpoint_register(summary.checkpoint_path)
+    append_checkpoint_register(resolved_train_config.run_name)
     log_training_finish(summary)
 
     return summary

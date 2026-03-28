@@ -162,8 +162,10 @@ def test_train_resumes_from_checkpoint(tmp_path: Path, monkeypatch) -> None:
     assert training_summary["checkpoint_path"] == second_summary.checkpoint_path
     assert training_summary["final_loss"] == second_summary.final_loss
     assert len(register_rows) == 2
-    assert register_rows[1]["input_ckpt"] == first_summary.checkpoint_path
-    assert register_rows[1]["output_ckpt"] == second_summary.checkpoint_path
+    assert register_rows[1]["input_ckpt"] == "run1"
+    assert register_rows[1]["dataset_path"] == "dataset.mapped"
+    assert register_rows[1]["git_commit"] == "test-commit"
+    assert register_rows[1]["output_ckpt"] == "run2"
 
 
 def test_check_dataset_uses_dataset_manifest_defaults(tmp_path: Path) -> None:
