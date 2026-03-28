@@ -1,0 +1,28 @@
+dataset_path: /content/drive/MyDrive/nmt_lab/artifacts/datasets/europarl_de-en_train_10000
+
+checkpoint_path: /path/to/existing/checkpoint.pt
+
+train_config:
+  runs_dir: /content/drive/MyDrive/nmt_lab/artifacts/training_runs
+  run_name: run1_resume
+  seed: 42
+  lr: 0.0003
+  epochs: 10
+  log_every: 100
+  translate_every: 2000
+  translate_examples:
+    - Wir brauchen einen klaren Plan für den nächsten Schritt.
+    - Der Ausschuss hat den Vorschlag gestern gebilligt.
+    - Dieses Abkommen wird die Zusammenarbeit zwischen unseren Ländern stärken.
+    - Das Morgenlicht fiel sanft über die Blumenwiese.
+    - Sie lächelte, als die ersten Noten des Liedes den Raum füllten.
+  spike_window: 100
+  spike_factor: 3.0
+
+data_loader_config:
+  batch_size: 64
+  shuffle: true
+  num_workers: 0
+  prefetch_factor: null
+  persistent_workers: null
+  pin_memory: null
