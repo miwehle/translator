@@ -130,6 +130,11 @@ class Trainer:
         model_config: ModelConfig | None = None,
         resume_run: str | None = None,
     ) -> None:
+        """Create a trainer in one of two modes.
+
+        Use `model_config` to train from scratch. Use `resume_run` to resume from a
+        previous run.
+        """
         self.factory = factory
         self.train_config = train_config
 

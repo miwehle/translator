@@ -117,6 +117,11 @@ def train(
     model_config: ModelConfig | None = None,
     resume_run: str | None = None,
 ) -> TrainingSummary:
+    """Train the translator on a dataset.
+
+    Use `model_config` to start a new run from scratch. Use `resume_run` to
+    continue a previous run from its checkpoint.
+    """
     def append_checkpoint_register(output_run: str) -> None:
         register_path = train_config.training_runs_dir / "checkpoint_register.csv"
         write_header = not register_path.exists()
