@@ -1,3 +1,11 @@
+"""Training orchestration.
+
+Keeps the core train loop focused while adding:
+- easy configuration of model, data loading and training via simple dataclasses,
+- checkpointing via save and resume, and
+- logging via an observer-style helper.
+"""
+
 from __future__ import annotations
 
 import logging
