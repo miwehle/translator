@@ -37,6 +37,8 @@ def _get_gpu_util() -> int | None:
         return int(out.strip())
     except ValueError:
         return None
+
+
 @dataclass
 class TrainingLogger:
     log_path: str | Path | None = None
@@ -46,12 +48,11 @@ class TrainingLogger:
     last_log_time: float = field(default_factory=time.time)
     decoder_token_count: int = 0
     decoder_sequence_count: int = 0
-    logger_name: str = "translator.training.trainer"
     logger: logging.Logger = field(init=False)
 
     def __post_init__(self) -> None:
         configure_translator_logging(log_path=self.log_path)
-        self.logger = logging.getLogger(self.logger_name)
+        self.logger = logging.getLogger("translator.training.trainer")
 
     def add_decoder_tokens(self, count: int, num_sequences: int) -> None:
         self.decoder_token_count += max(0, count)
@@ -129,9 +130,6 @@ class TrainingLogger:
             f"{batch_ids_text}"
         )
 
-    def _emit(self, *, message: str, level: int) -> None:
-        self.logger.log(level, message)
-
     def log_translations(
         self,
         step: int,
@@ -142,7 +140,7 @@ class TrainingLogger:
         for source_text, translated_text in translations:
             lines.append(f"src={source_text}")
             lines.append(f"pred={translated_text}")
-        self._emit(message="\n".join(lines), level=logging.INFO)
+        self.logger.log(logging.INFO, "\n".join(lines))
 
     def log_translation_failure(
         self,
@@ -154,8 +152,9 @@ class TrainingLogger:
         traceback_text = "".join(
             traceback.format_exception(type(exc), exc, exc.__traceback__)
         ).strip()
-        self._emit(
-            message=(
+        self.logger.log(
+            logging.WARNING,
+            (
                 f"TRANSLATE_FAILED step={step} ep={epoch} "
                 f"preview translation failed; training continues. "
                 f"exception_type={type(exc).__name__} "
@@ -164,7 +163,6 @@ class TrainingLogger:
                 f"cause={cause!r}\n"
                 f"{traceback_text}"
             ),
-            level=logging.WARNING,
         )
 
     def log(
@@ -190,7 +188,7 @@ class TrainingLogger:
             lr=lr,
             batch_ids=batch_ids,
         )
-        self._emit(message=message, level=level)
+        self.logger.log(level, message)
         self.last_log_time = time.time()
         self.decoder_token_count = 0
         self.decoder_sequence_count = 0
