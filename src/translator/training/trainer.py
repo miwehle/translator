@@ -28,6 +28,8 @@ from .config import DataLoaderConfig, ModelConfig, TrainConfig
 from .factory import Factory
 from .logging import TrainingLogger
 
+logger = logging.getLogger(__name__)
+
 
 def _set_seed(seed: int) -> None:
     random.seed(seed)
@@ -141,18 +143,34 @@ class Trainer:
         if (model_config is None) == (resume_run is None):
             raise ValueError("Exactly one of model_config or resume_run must be provided.")
 
+        def validate_dataset_max_src_len(max_seq_len: int) -> None:
+            configured_max_src_len = getattr(
+                self.factory.dataset_metadata, "configured_max_src_len", None)
+            if configured_max_src_len is None or configured_max_src_len <= max_seq_len:
+                return
+            message = (
+                "Dataset configured_max_src_len exceeds model max_seq_len: "
+                f"configured_max_src_len={configured_max_src_len} max_seq_len={max_seq_len}"
+            )
+            if self.train_config.force:
+                logger.warning("%s; continue because force=True.", message)
+                return
+            raise ValueError(f"{message}. Set train_config.force=True to continue anyway.")
+
         _set_seed(train_config.seed)
         self.device = _resolve_device(train_config.device)
         if resume_run is not None:
             loaded = load_checkpoint(
                 train_config.training_runs_dir / resume_run / "checkpoint.pt",
                 self.factory, self.device)
+            validate_dataset_max_src_len(loaded.model_config.max_seq_len)
             self.model = loaded.model
             self.optimizer = loaded.optimizer
             self.model_config = loaded.model_config
             return
 
         assert model_config is not None
+        validate_dataset_max_src_len(model_config.max_seq_len)
         self.model_config = model_config
         self.model = self.factory.create_model(model_config, self.device)
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=train_config.lr)

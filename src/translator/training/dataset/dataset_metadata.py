@@ -21,6 +21,7 @@ class DatasetMetadata:
     tgt_bos_id: int
     tgt_eos_id: int
     num_examples: int
+    configured_max_src_len: int | None = None
 
     @classmethod
     def from_file(cls, path: str | Path) -> "DatasetMetadata":

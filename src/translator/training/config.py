@@ -21,6 +21,7 @@ class ModelConfig:
 class TrainConfig:
     artifacts_dir: str
     run_name: str = "run1"
+    force: bool = False
     device: str | torch.device | None = None
     seed: int = 42
     lr: float = 3e-4
