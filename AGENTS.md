@@ -61,6 +61,20 @@ Bei nicht-trivialen Aenderungen am Production-Code vor der Umsetzung kurz und bu
 
 KISS-Prinzip beachten: Production-Code moeglichst einfach und klein halten; Zusatzlogik und Diagnose nur behalten, wenn ihr Nutzen die Komplexitaet klar rechtfertigt.
 
+## Kompakte Python-Schreibweise
+
+Python-Code standardmäßig kompakt schreiben, aber nicht künstlich verdichten.
+
+Funktionsköpfe und Funktionsaufrufe so kompakt wie sinnvoll formulieren und die konfigurierte maximale Zeilenlänge ausnutzen. Nicht vorschnell in Ein-Parameter-pro-Zeile-Layouts umbrechen.
+
+Positionale Parameter bevorzugen, wenn der Aufruf dadurch kürzer und trotzdem klar bleibt. Keyword-only-Parameter nur mit klarem Mehrwert.
+
+Zusätzliche Hilfsfunktionen, Basismodule und Abstraktionen nur einführen, wenn sie echte Wiederverwendung oder klare fachliche Vereinfachung bringen.
+
+Keine Einzeiler für Funktionsdefinitionen. Zwischen Funktionssignatur und Funktionsrumpf steht immer ein Zeilenumbruch.
+
+Die im jeweiligen Repo konfigurierte Tooling-Konfiguration ist zu beachten, insbesondere `ruff` in `pyproject.toml` inklusive `line-length` und Stilregeln.
+
 ## Parameterstil
 
 Positional Parameters bevorzugen, wenn der Aufruf dadurch kuerzer und trotzdem klar bleibt.
