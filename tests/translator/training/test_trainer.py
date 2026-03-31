@@ -24,7 +24,7 @@ from translator.training.factory import Factory
 def _create_factory(
     ds: Iterable[Example],
     *,
-    configured_max_src_len: int | None = None,
+    configured_max_seq_len: int | None = None,
 ) -> Factory:
     check_result = check_dataset(ds)
     return Factory(
@@ -44,22 +44,22 @@ def _create_factory(
             id_field=check_result["id_field"],
             src_field=check_result["src_field"],
             tgt_field=check_result["tgt_field"],
-            configured_max_src_len=configured_max_src_len,
+            configured_max_seq_len=configured_max_seq_len,
         )
 )
 
 
-def _assert_init_handles_configured_src_len_above_model_limit(
+def _assert_init_handles_configured_seq_len_above_model_limit(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     dataset_path = create_valid_mapped_dataset(tmp_path / "valid_training.mapped")
     ds = cast(Iterable[Example], load_arrow_records(dataset_path))
-    factory = _create_factory(ds, configured_max_src_len=5)
+    factory = _create_factory(ds, configured_max_seq_len=5)
     model_config = ModelConfig(max_seq_len=4)
     warning_messages: list[str] = []
 
-    with pytest.raises(ValueError, match="configured_max_src_len"):
+    with pytest.raises(ValueError, match="configured_max_seq_len"):
         Trainer(
             factory,
             train_config_for_test(str(tmp_path), device="cpu"),
@@ -76,16 +76,16 @@ def _assert_init_handles_configured_src_len_above_model_limit(
         model_config=model_config,
     )
 
-    assert any("configured_max_src_len" in message for message in warning_messages)
+    assert any("configured_max_seq_len" in message for message in warning_messages)
 
 
-def _assert_resume_rejects_configured_src_len_above_model_limit(
+def _assert_resume_rejects_configured_seq_len_above_model_limit(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     dataset_path = create_valid_mapped_dataset(tmp_path / "valid_training.mapped")
     ds = cast(Iterable[Example], load_arrow_records(dataset_path))
-    factory = _create_factory(ds, configured_max_src_len=5)
+    factory = _create_factory(ds, configured_max_seq_len=5)
     monkeypatch.setattr(
         "translator.training.trainer.load_checkpoint",
         lambda checkpoint_path, factory, device: SimpleNamespace(
@@ -95,7 +95,7 @@ def _assert_resume_rejects_configured_src_len_above_model_limit(
         ),
     )
 
-    with pytest.raises(ValueError, match="configured_max_src_len"):
+    with pytest.raises(ValueError, match="configured_max_seq_len"):
         Trainer(
             factory,
             train_config_for_test(str(tmp_path), device="cpu"),
@@ -104,16 +104,16 @@ def _assert_resume_rejects_configured_src_len_above_model_limit(
 
 
 class TestTrainer:
-    def test_init_handles_configured_src_len_above_model_limit(
+    def test_init_handles_configured_seq_len_above_model_limit(
         self,
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        _assert_init_handles_configured_src_len_above_model_limit(tmp_path, monkeypatch)
+        _assert_init_handles_configured_seq_len_above_model_limit(tmp_path, monkeypatch)
 
     def test_train_resumes_from_checkpoint(
         self,
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        _assert_resume_rejects_configured_src_len_above_model_limit(tmp_path, monkeypatch)
+        _assert_resume_rejects_configured_seq_len_above_model_limit(tmp_path, monkeypatch)
