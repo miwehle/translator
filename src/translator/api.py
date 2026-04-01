@@ -188,8 +188,8 @@ def train(
 
     # core
     summary = Trainer(
-        Factory(metadata), resolved_train_config, model_config=model_config,
-        resume_run=resume_run).train(examples, data_loader_config)
+        Factory(metadata), resolved_train_config, data_loader_config,
+        model_config=model_config, resume_run=resume_run).train(examples)
 
     summary_path = (resolved_train_config.training_runs_dir /
                     resolved_train_config.run_name / "training_summary.yaml")

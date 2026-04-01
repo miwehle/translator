@@ -57,6 +57,10 @@ def test_trainer_writes_checkpoint_and_summary(tmp_path: Path) -> None:
     out = Trainer(
         factory,
         train_config,
+        DataLoaderConfig(
+            batch_size=32,
+            shuffle=False,
+        ),
         model_config=ModelConfig(
             d_model=32,
             ff_dim=64,
@@ -64,13 +68,7 @@ def test_trainer_writes_checkpoint_and_summary(tmp_path: Path) -> None:
             num_layers=2,
             dropout=0.0,
         ),
-    ).train(
-        ds,
-        DataLoaderConfig(
-            batch_size=32,
-            shuffle=False,
-        ),
-    )
+    ).train(ds)
 
     assert checkpoint_path.is_file()
     assert checkpoint_manifest_path.is_file()

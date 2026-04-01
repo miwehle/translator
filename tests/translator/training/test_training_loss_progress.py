@@ -127,6 +127,10 @@ def test_trainer_loss_trend_decreases_on_synthetic_smoke_dataset(
     out = Trainer(
         factory,
         train_config,
+        DataLoaderConfig(
+            batch_size=32,
+            shuffle=False,
+        ),
         model_config=ModelConfig(
             d_model=64,
             ff_dim=128,
@@ -134,13 +138,7 @@ def test_trainer_loss_trend_decreases_on_synthetic_smoke_dataset(
             num_layers=2,
             dropout=0.0,
         ),
-    ).train(
-        ds,
-        DataLoaderConfig(
-            batch_size=32,
-            shuffle=False,
-        ),
-    )
+    ).train(ds)
     training_duration_seconds = time.perf_counter() - t0
 
     assert out.num_examples > 0
@@ -236,6 +234,10 @@ def test_trainer_loss_trend_decreases_on_real_preprocessed_dataset(
     out = Trainer(
         factory,
         train_config,
+        DataLoaderConfig(
+            batch_size=32,
+            shuffle=False,
+        ),
         model_config=ModelConfig(
             d_model=64,
             ff_dim=128,
@@ -243,13 +245,7 @@ def test_trainer_loss_trend_decreases_on_real_preprocessed_dataset(
             num_layers=2,
             dropout=0.0,
         ),
-    ).train(
-        ds,
-        DataLoaderConfig(
-            batch_size=32,
-            shuffle=False,
-        ),
-    )
+    ).train(ds)
     training_duration_seconds = time.perf_counter() - t0
 
     assert out.num_examples > 0

@@ -12,7 +12,7 @@ import logging
 import random
 from collections import deque
 from collections.abc import Callable, Iterable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from statistics import median
 
@@ -44,7 +44,6 @@ def _resolve_device(device: str | torch.device | None) -> torch.device:
     if isinstance(device, torch.device):
         return device
     return torch.device(device)
-
 
 @dataclass(frozen=True)
 class TrainingSummary:
@@ -129,6 +128,7 @@ class Trainer:
         self,
         factory: Factory,
         train_config: TrainConfig,
+        data_loader_config: DataLoaderConfig = DataLoaderConfig(),
         model_config: ModelConfig | None = None,
         resume_run: str | None = None,
     ) -> None:
@@ -137,85 +137,107 @@ class Trainer:
         Use `model_config` to train from scratch. Use `resume_run` to resume from a
         previous run.
         """
-        self.factory = factory
-        self.train_config = train_config
+        self._factory = factory
+        self._train_config = train_config
+        self._data_loader_config = data_loader_config
 
         if (model_config is None) == (resume_run is None):
             raise ValueError("Exactly one of model_config or resume_run must be provided.")
 
         def validate_dataset_max_seq_len(max_seq_len: int) -> None:
             configured_max_seq_len = getattr(
-                self.factory.dataset_metadata, "configured_max_seq_len", None)
+                self._factory.dataset_metadata, "configured_max_seq_len", None)
             if configured_max_seq_len is None or configured_max_seq_len <= max_seq_len:
                 return
             message = (
                 "Dataset configured_max_seq_len exceeds model max_seq_len: "
                 f"configured_max_seq_len={configured_max_seq_len} max_seq_len={max_seq_len}"
             )
-            if self.train_config.force:
+            if self._train_config.force:
                 logger.warning("%s; continue because force=True.", message)
                 return
             raise ValueError(f"{message}. Set train_config.force=True to continue anyway.")
 
         _set_seed(train_config.seed)
-        self.device = _resolve_device(train_config.device)
+        self._device = _resolve_device(train_config.device)
+        self._criterion = nn.CrossEntropyLoss(
+            ignore_index=self._factory.dataset_metadata.tgt_pad_id)
+        
         if resume_run is not None:
             loaded = load_checkpoint(
                 train_config.training_runs_dir / resume_run / "checkpoint.pt",
-                self.factory, self.device)
+                self._factory, self._device)
             validate_dataset_max_seq_len(loaded.model_config.max_seq_len)
-            self.model = loaded.model
-            self.optimizer = loaded.optimizer
-            self.model_config = loaded.model_config
+            self._model = loaded.model
+            self._optimizer = loaded.optimizer
+            self._model_config = loaded.model_config
             return
 
         assert model_config is not None
         validate_dataset_max_seq_len(model_config.max_seq_len)
-        self.model_config = model_config
-        self.model = self.factory.create_model(model_config, self.device)
-        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=train_config.lr)
+        self._model_config = model_config
+        self._model = self._factory.create_model(model_config, self._device)
+        self._optimizer = torch.optim.Adam(self._model.parameters(), lr=train_config.lr)
 
-    def train(
-        self,
-        examples: Iterable[Example] | Sequence[Example],
-        data_loader_config: DataLoaderConfig = DataLoaderConfig(),
+    def _loss(self, logits: torch.Tensor, tgt: torch.Tensor) -> torch.Tensor:
+        return self._criterion(logits.reshape(-1, logits.size(-1)),
+                              tgt[:, 1:].reshape(-1))
+
+    def evaluate(self, examples: Iterable[Example] | Sequence[Example]
+    ) -> float | None:
+        loader = self._factory.create_data_loader(examples, self._data_loader_config,
+                                                 self._device)
+        self._model.eval()
+        loss_sum = 0.0
+        token_count = 0
+        with torch.no_grad():
+            for src, tgt, _ in loader:
+                src = src.to(self._device)
+                tgt = tgt.to(self._device)
+                logits = self._model(src, tgt)
+                loss = self._loss(logits, tgt)
+                valid_tokens = int((tgt[:, 1:] != self._model.tgt_pad_idx).sum())
+                loss_sum += loss.item() * valid_tokens
+                token_count += valid_tokens
+        return None if token_count == 0 else loss_sum / token_count
+
+    def train(self, examples: Iterable[Example] | Sequence[Example]
     ) -> TrainingSummary:
         def createTrainingObserver(model: Seq2Seq, device: torch.device, log_path: Path
         ) -> _TrainingObserver:
             tokenizer_model_name = getattr(
-                self.factory.dataset_metadata, "tokenizer_model_name", None
+                self._factory.dataset_metadata, "tokenizer_model_name", None
             )
-            tgt_bos_id = getattr(self.factory.dataset_metadata, "tgt_bos_id", None)
+            tgt_bos_id = getattr(self._factory.dataset_metadata, "tgt_bos_id", None)
             return _TrainingObserver(
-                self.train_config,
+                self._train_config,
                 log_path,
                 translation_preview_fn=create_translation_preview_fn(
-                    self.train_config.translate_every,
-                    self.train_config.translate_examples, tokenizer_model_name,
+                    self._train_config.translate_every,
+                    self._train_config.translate_examples, tokenizer_model_name,
                     tgt_bos_id, model, device))
         
         # main flow
-        run_dir = self.train_config.training_runs_dir / self.train_config.run_name
+        run_dir = self._train_config.training_runs_dir / self._train_config.run_name
 
-        observer = createTrainingObserver(self.model, self.device, run_dir / "training.log")
-        loader = self.factory.create_data_loader(examples, data_loader_config, self.device)
-        criterion = nn.CrossEntropyLoss(ignore_index=self.model.tgt_pad_idx)
-        self.model.train()
+        observer = createTrainingObserver(self._model, self._device, run_dir / "training.log")
+        loader = self._factory.create_data_loader(
+            examples, self._data_loader_config, self._device)
+        self._model.train()
 
-        for epoch in range(1, self.train_config.epochs + 1):
+        for epoch in range(1, self._train_config.epochs + 1):
             for src, tgt, batch_ids in loader:
-                src = src.to(self.device)
-                tgt = tgt.to(self.device)
+                src = src.to(self._device)
+                tgt = tgt.to(self._device)
 
-                self.optimizer.zero_grad()
-                logits = self.model(src, tgt)
-                loss = criterion(
-                    logits.reshape(-1, logits.size(-1)),
-                    tgt[:, 1:].reshape(-1))
+                self._optimizer.zero_grad()
+                logits = self._model(src, tgt)
+                loss = self._loss(logits, tgt)
+                
                 loss.backward()
                 grad_norm = float(
-                    nn.utils.clip_grad_norm_(self.model.parameters(), 1.0))
-                self.optimizer.step()
+                    nn.utils.clip_grad_norm_(self._model.parameters(), 1.0))
+                self._optimizer.step()
 
                 # log batch metrics via observer (to keep logging details out of here)
                 observer.on_batch_end(
@@ -223,9 +245,8 @@ class Trainer:
                     tgt.size(0), tgt_token_count = tgt[:, 1:].numel())
 
         checkpoint_file = save_checkpoint(
-            run_dir, self.model, self.optimizer, self.model_config,
-            self.factory.dataset_metadata)
+            run_dir, self._model, self._optimizer, self._model_config,
+            self._factory.dataset_metadata)
 
         return TrainingSummary(observer.processed_examples, observer.loss_value,
                                str(checkpoint_file))
-    
