@@ -186,8 +186,6 @@ def train(
         training_metadata: DatasetMetadata,
     ) -> Sequence[Example]:
         validation_dataset = resolved_train_config.validation_dataset
-        if validation_dataset is None:
-            raise ValueError("validation_dataset is not configured.")
         validation_path = resolved_train_config.datasets_dir / validation_dataset
         _, validation_examples, validation_metadata = _load_dataset(validation_path)
         if (
@@ -213,31 +211,24 @@ def train(
         )
 
     def log_training_finish(summary: TrainingSummary) -> None:
-        if summary.validation_loss is not None:
-            logger.info(
-                "Finished training final_loss=%s validation_loss=%s",
-                summary.final_loss,
-                summary.validation_loss,
-            )
-            return
-        logger.info("Finished training final_loss=%s", summary.final_loss)
+        logger.info(
+            "Finished training final_loss=%s validation_loss=%s",
+            summary.final_loss,
+            summary.validation_loss,
+        )
 
     # main flow
     examples, metadata, git_commit, resolved_train_config = prepare_training()
     log_training_start(resolved_train_config)
-
-    validation_examples = None
+    
+    # core: train
+    trainer = Trainer(Factory(metadata), resolved_train_config, data_loader_config,
+                      model_config=model_config, resume_run=resume_run)
+    summary = trainer.train(examples)
+    
+    # evaluate
     if resolved_train_config.validation_dataset is not None:
         validation_examples = load_validation_dataset(resolved_train_config, metadata)
-
-    # core
-    trainer = Trainer(
-        Factory(metadata), resolved_train_config, data_loader_config,
-        model_config=model_config, resume_run=resume_run,
-    )
-    summary = trainer.train(examples)
-
-    if validation_examples is not None:
         validation_loss = trainer.evaluate(validation_examples)
         summary = replace(summary, validation_loss=validation_loss)
 

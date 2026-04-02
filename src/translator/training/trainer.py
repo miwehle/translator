@@ -51,7 +51,7 @@ class TrainingSummary:
     num_examples: int
     final_loss: float | None
     checkpoint_path: str
-    validation_loss: float | None = None
+    validation_loss: float | None
 
 
 class _TrainingObserver:
@@ -259,5 +259,5 @@ class Trainer:
 
         return TrainingSummary(
             observer.processed_examples, observer.loss_value,
-            str(checkpoint_file),
+            str(checkpoint_file), None,
         )

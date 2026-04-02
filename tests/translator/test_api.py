@@ -67,7 +67,6 @@ def test_train_avoids_run_dir_name_collisions(tmp_path: Path, monkeypatch) -> No
         train_config_for_test(
             str(artifacts_dir),
             run_name="run1",
-            validation_dataset="validation.mapped",
             device="cpu",
             epochs=1,
             log_every=1000,
@@ -108,7 +107,11 @@ def test_train_resumes_from_checkpoint(tmp_path: Path, monkeypatch) -> None:
     dataset_dir = create_valid_mapped_dataset(
         artifacts_dir / "datasets" / "dataset.mapped"
     )
+    validation_dir = create_valid_mapped_dataset(
+        artifacts_dir / "datasets" / "validation.mapped"
+    )
     _write_dataset_manifest(dataset_dir)
+    _write_dataset_manifest(validation_dir)
     run_root = artifacts_dir / "training_runs"
 
     monkeypatch.setattr("translator.api._git_head", lambda _: "test-commit")
@@ -166,13 +169,13 @@ def test_train_resumes_from_checkpoint(tmp_path: Path, monkeypatch) -> None:
     assert train_cfg["resume_run"] == "run1"
     assert training_summary["checkpoint_path"] == second_summary.checkpoint_path
     assert training_summary["final_loss"] == second_summary.final_loss
-    assert training_summary["validation_loss"] is None
+    assert training_summary["validation_loss"] == second_summary.validation_loss
     assert len(register_rows) == 2
     assert register_rows[1]["input_ckpt"] == "run1"
     assert register_rows[1]["dataset_path"] == "dataset.mapped"
     assert register_rows[1]["git_commit"] == "test-commit"
     assert register_rows[1]["output_ckpt"] == "run2"
-    assert register_rows[1]["validation_loss"] == ""
+    assert register_rows[1]["validation_loss"] == str(second_summary.validation_loss)
 
 
 def test_train_rejects_incompatible_validation_dataset(
@@ -195,7 +198,6 @@ def test_train_rejects_incompatible_validation_dataset(
         train(
             train_config_for_test(
                 str(artifacts_dir),
-                validation_dataset="validation.mapped",
                 device="cpu",
                 epochs=1,
                 log_every=1000,
