@@ -63,25 +63,21 @@ KISS-Prinzip beachten: Production-Code moeglichst einfach und klein halten; Zusa
 
 ## Kompakte Python-Schreibweise
 
-Python-Code standardmäßig kompakt schreiben, aber nicht künstlich verdichten.
+Python-Code standardmäßig kompakt schreiben. Innerhalb der konfigurierten maximalen Zeilenlänge ist im Zweifel die kompaktere Form zu bevorzugen.
 
-Funktionsköpfe und Funktionsaufrufe so kompakt wie sinnvoll formulieren und die konfigurierte maximale Zeilenlänge ausnutzen. Nicht vorschnell in Ein-Parameter-pro-Zeile-Layouts umbrechen.
+Funktionsköpfe und besonders Funktionsaufrufe nicht vorschnell vertikal aufbrechen. Ein-Parameter-pro-Zeile-Layouts sind nicht der Default. Sie sind nur sinnvoll, wenn die kompakte Form die Zeilenlänge überschreitet oder fachlich klar schlechter lesbar wäre.
 
-Positionale Parameter bevorzugen, wenn der Aufruf dadurch kürzer und trotzdem klar bleibt. Keyword-only-Parameter nur mit klarem Mehrwert.
+Bestehende kompakte Aufruf-Layouts nicht ohne fachlichen Grund aufspreizen. Reine Stil-Umbauten hin zu mehr vertikaler Länge vermeiden.
 
-Zusätzliche Hilfsfunktionen, Basismodule und Abstraktionen nur einführen, wenn sie echte Wiederverwendung oder klare fachliche Vereinfachung bringen.
+Positionale Parameter bevorzugen, wenn der Aufruf dadurch kürzer und trotzdem klar bleibt. Keyword-only-Parameter nur mit klarem Mehrwert für Lesbarkeit, Sicherheit oder Eindeutigkeit. Aufgeblähte Funktionsaufrufe durch unnötige Keywords vermeiden.
+
+Zusätzliche Hilfsfunktionen, Basismodule und Abstraktionen nur einführen, wenn sie echte Wiederverwendung oder klare fachliche Vereinfachung bringen. Ein bloß generischerer oder vermeintlich saubererer Stil rechtfertigt keinen zusätzlichen Code.
+
+Bei kleinen oder lokalen Änderungen sind kleiner Diff und geringe LOC wichtiger als stilistische Umformungen ohne fachlichen Nutzen.
 
 Keine Einzeiler für Funktionsdefinitionen. Zwischen Funktionssignatur und Funktionsrumpf steht immer ein Zeilenumbruch.
 
 Die im jeweiligen Repo konfigurierte Tooling-Konfiguration ist zu beachten, insbesondere `ruff` in `pyproject.toml` inklusive `line-length` und Stilregeln.
-
-## Parameterstil
-
-Positional Parameters bevorzugen, wenn der Aufruf dadurch kuerzer und trotzdem klar bleibt.
-
-Keyword-only Parameters nur verwenden, wenn sie einen klaren Vorteil fuer Lesbarkeit, Sicherheit oder Eindeutigkeit bringen.
-
-Aufgeblaehte Funktionsaufrufe durch unnoetige Keyword-only Parameters vermeiden.
 
 ## Temp-Artefakte
 
