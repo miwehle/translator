@@ -12,7 +12,7 @@ import logging
 import random
 from collections import deque
 from collections.abc import Callable, Iterable, Sequence
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from pathlib import Path
 from statistics import median
 
@@ -45,12 +45,15 @@ def _resolve_device(device: str | torch.device | None) -> torch.device:
         return device
     return torch.device(device)
 
+
 @dataclass(frozen=True)
 class TrainingSummary:
     num_examples: int
     final_loss: float | None
     checkpoint_path: str
-    
+    validation_loss: float | None = None
+
+
 class _TrainingObserver:
     def __init__(
         self,
@@ -61,9 +64,7 @@ class _TrainingObserver:
         self.train_config = train_config
         self.training_logger = TrainingLogger(log_path=log_path)
         self.translation_preview_fn = translation_preview_fn
-        self.loss_history: deque[float] = deque(
-            maxlen=train_config.spike_window
-        )
+        self.loss_history: deque[float] = deque(maxlen=train_config.spike_window)
         self.global_step = 0
         self.processed_examples = 0
         self.loss_value: float | None = None
@@ -80,11 +81,7 @@ class _TrainingObserver:
         self.global_step += 1
         self.processed_examples += tgt_size
         self.loss_value = loss_value
-        median_loss = (
-            median(self.loss_history)
-            if self.loss_history
-            else loss_value
-        )
+        median_loss = median(self.loss_history) if self.loss_history else loss_value
         is_spike = bool(self.loss_history) and (
             loss_value > (median_loss * self.train_config.spike_factor)
         )
@@ -123,6 +120,7 @@ class _TrainingObserver:
                     exc,
                 )
 
+
 class Trainer:
     def __init__(
         self,
@@ -142,31 +140,40 @@ class Trainer:
         self._data_loader_config = data_loader_config
 
         if (model_config is None) == (resume_run is None):
-            raise ValueError("Exactly one of model_config or resume_run must be provided.")
+            raise ValueError(
+                "Exactly one of model_config or resume_run must be provided."
+            )
 
         def validate_dataset_max_seq_len(max_seq_len: int) -> None:
             configured_max_seq_len = getattr(
-                self._factory.dataset_metadata, "configured_max_seq_len", None)
+                self._factory.dataset_metadata, "configured_max_seq_len", None
+            )
             if configured_max_seq_len is None or configured_max_seq_len <= max_seq_len:
                 return
             message = (
                 "Dataset configured_max_seq_len exceeds model max_seq_len: "
-                f"configured_max_seq_len={configured_max_seq_len} max_seq_len={max_seq_len}"
+                "configured_max_seq_len="
+                f"{configured_max_seq_len} max_seq_len={max_seq_len}"
             )
             if self._train_config.force:
                 logger.warning("%s; continue because force=True.", message)
                 return
-            raise ValueError(f"{message}. Set train_config.force=True to continue anyway.")
+            raise ValueError(
+                f"{message}. Set train_config.force=True to continue anyway."
+            )
 
         _set_seed(train_config.seed)
         self._device = _resolve_device(train_config.device)
         self._criterion = nn.CrossEntropyLoss(
-            ignore_index=self._factory.dataset_metadata.tgt_pad_id)
-        
+            ignore_index=self._factory.dataset_metadata.tgt_pad_id
+        )
+
         if resume_run is not None:
             loaded = load_checkpoint(
                 train_config.training_runs_dir / resume_run / "checkpoint.pt",
-                self._factory, self._device)
+                self._factory,
+                self._device,
+            )
             validate_dataset_max_seq_len(loaded.model_config.max_seq_len)
             self._model = loaded.model
             self._optimizer = loaded.optimizer
@@ -183,8 +190,7 @@ class Trainer:
         return self._criterion(logits.reshape(-1, logits.size(-1)),
                               tgt[:, 1:].reshape(-1))
 
-    def evaluate(self, examples: Iterable[Example] | Sequence[Example]
-    ) -> float | None:
+    def evaluate(self, examples: Iterable[Example] | Sequence[Example]) -> float | None:
         loader = self._factory.create_data_loader(examples, self._data_loader_config,
                                                  self._device)
         self._model.eval()
@@ -201,9 +207,9 @@ class Trainer:
                 token_count += valid_tokens
         return None if token_count == 0 else loss_sum / token_count
 
-    def train(self, examples: Iterable[Example] | Sequence[Example]
-    ) -> TrainingSummary:
-        def createTrainingObserver(model: Seq2Seq, device: torch.device, log_path: Path
+    def train(self, examples: Iterable[Example] | Sequence[Example]) -> TrainingSummary:
+        def createTrainingObserver(
+            model: Seq2Seq, device: torch.device, log_path: Path
         ) -> _TrainingObserver:
             tokenizer_model_name = getattr(
                 self._factory.dataset_metadata, "tokenizer_model_name", None
@@ -215,12 +221,14 @@ class Trainer:
                 translation_preview_fn=create_translation_preview_fn(
                     self._train_config.translate_every,
                     self._train_config.translate_examples, tokenizer_model_name,
-                    tgt_bos_id, model, device))
-        
+                    tgt_bos_id, model, device),
+            )
+
         # main flow
         run_dir = self._train_config.training_runs_dir / self._train_config.run_name
 
-        observer = createTrainingObserver(self._model, self._device, run_dir / "training.log")
+        observer = createTrainingObserver(
+            self._model, self._device, run_dir / "training.log")
         loader = self._factory.create_data_loader(
             examples, self._data_loader_config, self._device)
         self._model.train()
@@ -233,7 +241,7 @@ class Trainer:
                 self._optimizer.zero_grad()
                 logits = self._model(src, tgt)
                 loss = self._loss(logits, tgt)
-                
+
                 loss.backward()
                 grad_norm = float(
                     nn.utils.clip_grad_norm_(self._model.parameters(), 1.0))
@@ -242,11 +250,14 @@ class Trainer:
                 # log batch metrics via observer (to keep logging details out of here)
                 observer.on_batch_end(
                     epoch, loss.item(), grad_norm, batch_ids,
-                    tgt.size(0), tgt_token_count = tgt[:, 1:].numel())
+                    tgt.size(0), tgt_token_count=tgt[:, 1:].numel())
 
         checkpoint_file = save_checkpoint(
             run_dir, self._model, self._optimizer, self._model_config,
-            self._factory.dataset_metadata)
+            self._factory.dataset_metadata,
+        )
 
-        return TrainingSummary(observer.processed_examples, observer.loss_value,
-                               str(checkpoint_file))
+        return TrainingSummary(
+            observer.processed_examples, observer.loss_value,
+            str(checkpoint_file),
+        )

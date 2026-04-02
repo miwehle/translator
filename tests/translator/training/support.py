@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from datetime import datetime
 from pathlib import Path
-from typing import Mapping, cast
+from typing import cast
 
 from datasets import Dataset
 
@@ -30,7 +31,10 @@ def pad_index_from_records(dataset_path: Path, field: str) -> int:
         row_map = cast(Mapping[str, object], row)
         values_obj = row_map.get(field)
         if not isinstance(values_obj, list):
-            raise ValueError(f"Expected list[int] in field '{field}', got {type(values_obj).__name__}.")
+            raise ValueError(
+                f"Expected list[int] in field '{field}', got "
+                f"{type(values_obj).__name__}."
+            )
         values = [int(x) for x in values_obj]
         max_token = max(max_token, max(values))
     return max_token + 1
@@ -39,6 +43,7 @@ def pad_index_from_records(dataset_path: Path, field: str) -> int:
 def train_config_for_test(run_root: str, **overrides: object) -> TrainConfig:
     config = {
         "artifacts_dir": run_root,
+        "dataset": "dataset.mapped",
         "run_name": "run1",
         **overrides,
     }
@@ -51,15 +56,16 @@ def log(
     test_name: str,
     body: str,
 ) -> Path:
-    """Append a test section to the module log in the caller's package-local `.log` directory.
+    """Append a test section to the module log in the caller's package-local
+    `.log` directory.
 
     The log file is written to `<module package>/.log/<module name>.log`.
     For example, calls from `tests/translator/training/test_training_loss_progress.py`
     write to `tests/translator/training/.log/test_training_loss_progress.log`.
 
-    The first write to a given module log file during the current pytest process truncates
-    the file; subsequent writes append a blank line and then a new section headed by a
-    timestamp and the test function name.
+    The first write to a given module log file during the current pytest process
+    truncates the file; subsequent writes append a blank line and then a new
+    section headed by a timestamp and the test function name.
     """
     package_dir = module_file.resolve().parent
     log_dir = package_dir / ".log"
@@ -73,8 +79,7 @@ def log(
         if mode == "a":
             f.write("\n")
         f.write(
-            f"=== {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | "
-            f"{test_name} ===\n"
+            f"=== {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | {test_name} ===\n"
         )
         f.write(body)
         if not body.endswith("\n"):

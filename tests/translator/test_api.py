@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 from pathlib import Path
 
+import pytest
 import yaml
 
 from tests.translator.training.support import (
@@ -12,8 +13,12 @@ from tests.translator.training.support import (
 from translator.api import check_dataset, train
 from translator.training import DataLoaderConfig, ModelConfig
 
+_MODEL_CONFIG = ModelConfig(
+    d_model=32, ff_dim=64, num_heads=4, num_layers=2, dropout=0.0
+)
 
-def _write_dataset_manifest(dataset_dir: Path) -> None:
+
+def _write_dataset_manifest(dataset_dir: Path, **overrides: object) -> None:
     manifest = {
         "schema_version": 1,
         "tokenizer_model_name": "test-tokenizer",
@@ -30,6 +35,7 @@ def _write_dataset_manifest(dataset_dir: Path) -> None:
         "tgt_bos_id": 2,
         "tgt_eos_id": 3,
         "num_examples": 512,
+        **overrides,
     }
     (dataset_dir / "dataset_manifest.yaml").write_text(
         yaml.safe_dump(manifest, sort_keys=False),
@@ -39,42 +45,48 @@ def _write_dataset_manifest(dataset_dir: Path) -> None:
 
 def test_train_avoids_run_dir_name_collisions(tmp_path: Path, monkeypatch) -> None:
     artifacts_dir = tmp_path / "artifacts"
-    dataset_dir = create_valid_mapped_dataset(artifacts_dir / "datasets" / "dataset.mapped")
+    dataset_dir = create_valid_mapped_dataset(
+        artifacts_dir / "datasets" / "dataset.mapped"
+    )
+    validation_dir = create_valid_mapped_dataset(
+        artifacts_dir / "datasets" / "validation.mapped"
+    )
     _write_dataset_manifest(dataset_dir)
+    _write_dataset_manifest(validation_dir)
 
     run_root = artifacts_dir / "training_runs"
     existing_run_dir = run_root / "run1"
     existing_run_dir.mkdir(parents=True)
-    (existing_run_dir / "checkpoint.pt").write_text("existing checkpoint", encoding="utf-8")
+    (existing_run_dir / "checkpoint.pt").write_text(
+        "existing checkpoint", encoding="utf-8"
+    )
 
     monkeypatch.setattr("translator.api._git_head", lambda _: "test-commit")
 
     summary = train(
-        "dataset.mapped",
         train_config_for_test(
             str(artifacts_dir),
             run_name="run1",
+            validation_dataset="validation.mapped",
             device="cpu",
             epochs=1,
             log_every=1000,
             lr=1e-3,
             seed=7,
         ),
-        DataLoaderConfig(
-            batch_size=32,
-            shuffle=False,
-        ),
+        DataLoaderConfig(batch_size=32, shuffle=False),
         tmp_path,
-        model_config=ModelConfig(
-            d_model=32,
-            ff_dim=64,
-            num_heads=4,
-            num_layers=2,
-            dropout=0.0,
-        ),
+        model_config=_MODEL_CONFIG,
     )
 
     new_run_dir = run_root / "run1 (1)"
+    training_summary = yaml.safe_load(
+        new_run_dir.joinpath("training_summary.yaml").read_text(encoding="utf-8")
+    )
+    with run_root.joinpath("checkpoint_register.csv").open(
+        "r", encoding="utf-8", newline=""
+    ) as handle:
+        register_rows = list(csv.DictReader(handle))
 
     assert existing_run_dir.joinpath("checkpoint.pt").read_text(encoding="utf-8") == (
         "existing checkpoint"
@@ -86,18 +98,22 @@ def test_train_avoids_run_dir_name_collisions(tmp_path: Path, monkeypatch) -> No
     assert new_run_dir.joinpath("checkpoint_manifest.yaml").is_file()
     assert new_run_dir.joinpath("training.log").is_file()
     assert Path(summary.checkpoint_path) == new_run_dir / "checkpoint.pt"
+    assert summary.validation_loss is not None
+    assert training_summary["validation_loss"] == summary.validation_loss
+    assert register_rows[0]["validation_loss"] == str(summary.validation_loss)
 
 
 def test_train_resumes_from_checkpoint(tmp_path: Path, monkeypatch) -> None:
     artifacts_dir = tmp_path / "artifacts"
-    dataset_dir = create_valid_mapped_dataset(artifacts_dir / "datasets" / "dataset.mapped")
+    dataset_dir = create_valid_mapped_dataset(
+        artifacts_dir / "datasets" / "dataset.mapped"
+    )
     _write_dataset_manifest(dataset_dir)
     run_root = artifacts_dir / "training_runs"
 
     monkeypatch.setattr("translator.api._git_head", lambda _: "test-commit")
 
-    first_summary = train(
-        "dataset.mapped",
+    train(
         train_config_for_test(
             str(artifacts_dir),
             run_name="run1",
@@ -107,22 +123,12 @@ def test_train_resumes_from_checkpoint(tmp_path: Path, monkeypatch) -> None:
             lr=1e-3,
             seed=7,
         ),
-        DataLoaderConfig(
-            batch_size=32,
-            shuffle=False,
-        ),
+        DataLoaderConfig(batch_size=32, shuffle=False),
         tmp_path,
-        model_config=ModelConfig(
-            d_model=32,
-            ff_dim=64,
-            num_heads=4,
-            num_layers=2,
-            dropout=0.0,
-        ),
+        model_config=_MODEL_CONFIG,
     )
 
     second_summary = train(
-        "dataset.mapped",
         train_config_for_test(
             str(artifacts_dir),
             run_name="run2",
@@ -132,10 +138,7 @@ def test_train_resumes_from_checkpoint(tmp_path: Path, monkeypatch) -> None:
             lr=5e-4,
             seed=7,
         ),
-        DataLoaderConfig(
-            batch_size=32,
-            shuffle=False,
-        ),
+        DataLoaderConfig(batch_size=32, shuffle=False),
         tmp_path,
         resume_run="run1",
     )
@@ -150,7 +153,9 @@ def test_train_resumes_from_checkpoint(tmp_path: Path, monkeypatch) -> None:
     training_summary = yaml.safe_load(
         second_run_dir.joinpath("training_summary.yaml").read_text(encoding="utf-8")
     )
-    with run_root.joinpath("checkpoint_register.csv").open("r", encoding="utf-8", newline="") as handle:
+    with run_root.joinpath("checkpoint_register.csv").open(
+        "r", encoding="utf-8", newline=""
+    ) as handle:
         register_rows = list(csv.DictReader(handle))
 
     assert Path(second_summary.checkpoint_path) == second_run_dir / "checkpoint.pt"
@@ -161,18 +166,55 @@ def test_train_resumes_from_checkpoint(tmp_path: Path, monkeypatch) -> None:
     assert train_cfg["resume_run"] == "run1"
     assert training_summary["checkpoint_path"] == second_summary.checkpoint_path
     assert training_summary["final_loss"] == second_summary.final_loss
+    assert training_summary["validation_loss"] is None
     assert len(register_rows) == 2
     assert register_rows[1]["input_ckpt"] == "run1"
     assert register_rows[1]["dataset_path"] == "dataset.mapped"
     assert register_rows[1]["git_commit"] == "test-commit"
     assert register_rows[1]["output_ckpt"] == "run2"
+    assert register_rows[1]["validation_loss"] == ""
+
+
+def test_train_rejects_incompatible_validation_dataset(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    artifacts_dir = tmp_path / "artifacts"
+    dataset_dir = create_valid_mapped_dataset(
+        artifacts_dir / "datasets" / "dataset.mapped"
+    )
+    validation_dir = create_valid_mapped_dataset(
+        artifacts_dir / "datasets" / "validation.mapped"
+    )
+    _write_dataset_manifest(dataset_dir)
+    _write_dataset_manifest(validation_dir, src_pad_id=999)
+
+    monkeypatch.setattr("translator.api._git_head", lambda _: "test-commit")
+
+    with pytest.raises(ValueError, match="Validation dataset metadata mismatch"):
+        train(
+            train_config_for_test(
+                str(artifacts_dir),
+                validation_dataset="validation.mapped",
+                device="cpu",
+                epochs=1,
+                log_every=1000,
+                lr=1e-3,
+                seed=7,
+            ),
+            DataLoaderConfig(batch_size=32, shuffle=False),
+            tmp_path,
+            model_config=_MODEL_CONFIG,
+        )
 
 
 def test_check_dataset_uses_dataset_manifest_defaults(tmp_path: Path) -> None:
     dataset_dir = create_valid_mapped_dataset(tmp_path / "dataset.mapped")
     _write_dataset_manifest(dataset_dir)
 
-    result = check_dataset(dataset_path=dataset_dir, require_unique_ids=True, min_seq_len=2)
+    result = check_dataset(
+        dataset_path=dataset_dir, require_unique_ids=True, min_seq_len=2
+    )
 
     assert result["id_field"] == "id"
     assert result["src_field"] == "src_ids"

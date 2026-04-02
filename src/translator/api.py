@@ -25,7 +25,6 @@ from .training import (
     TrainingSummary,
     preflight,
 )
-from .training.checkpointing import checkpoint_manifest_path
 
 logger = logging.getLogger(__name__)
 
@@ -77,7 +76,9 @@ def _next_available_run_dir(base_dir: Path) -> Path:
             return candidate
         i += 1
 
-def _load_dataset(dataset_path: str | Path) -> tuple[Path, Sequence[Example], DatasetMetadata]:
+
+def _load_dataset(dataset_path: str | Path
+) -> tuple[Path, Sequence[Example], DatasetMetadata]:
     dataset_dir = Path(dataset_path)
     if not dataset_dir.exists():
         raise FileNotFoundError(f"Dataset not found: {dataset_dir}")
@@ -109,7 +110,6 @@ def check_dataset(
 
 
 def train(
-    dataset: str,
     train_config: TrainConfig,
     data_loader_config: DataLoaderConfig,
     repo_root: str | Path,
@@ -117,38 +117,50 @@ def train(
     model_config: ModelConfig | None = None,
     resume_run: str | None = None,
 ) -> TrainingSummary:
-    """Train the translator on a dataset.
+    """Train the translator on `train_config.dataset`.
 
     Use `model_config` to start a new run from scratch. Use `resume_run` to
     continue a previous run from its checkpoint.
     """
-    def append_checkpoint_register(output_run: str) -> None:
+
+    def append_checkpoint_register(
+        output_run: str,
+        validation_loss: float | None,
+    ) -> None:
         register_path = train_config.training_runs_dir / "checkpoint_register.csv"
         write_header = not register_path.exists()
         with register_path.open("a", encoding="utf-8", newline="") as handle:
             writer = csv.DictWriter(
                 handle,
                 fieldnames=[
-                    "timestamp", "input_ckpt", "dataset_path", "git_commit",
-                    "output_ckpt"])
+                    "timestamp", "input_ckpt", "dataset_path",
+                    "git_commit", "output_ckpt", "validation_loss",
+                ],
+            )
             if write_header:
                 writer.writeheader()
             writer.writerow(
                 {
                     "timestamp": datetime.now().isoformat(timespec="seconds"),
                     "input_ckpt": resume_run or "",
-                    "dataset_path": Path(dataset).name,
+                    "dataset_path": Path(train_config.dataset).name,
                     "git_commit": git_commit[:20],
                     "output_ckpt": output_run,
+                    "validation_loss": (
+                        "" if validation_loss is None else validation_loss
+                    ),
                 }
             )
 
-    def prepare_training() -> tuple[Sequence[Example], DatasetMetadata, str, TrainConfig]:
+    def prepare_training():
         logger.info("Prepare training")
-        dataset_dir, examples, metadata = _load_dataset(train_config.datasets_dir / dataset)
+        dataset_path = train_config.datasets_dir / train_config.dataset
+        _, examples, metadata = _load_dataset(dataset_path)
 
         # Avoid overwriting earlier runs by picking the next free run directory.
-        run_dir = _next_available_run_dir(train_config.training_runs_dir / train_config.run_name)
+        run_dir = _next_available_run_dir(
+            train_config.training_runs_dir / train_config.run_name
+        )
         run_dir.mkdir(parents=True, exist_ok=False)
         resolved_train_config = replace(train_config, run_name=run_dir.name)
         configure_translator_logging(log_path=run_dir / "training.log")
@@ -157,19 +169,39 @@ def train(
         _write_run_config(
             run_dir,
             {
-                "dataset": dataset,
-                "model_config": asdict(model_config) if model_config is not None else None,
+                "model_config": (
+                    asdict(model_config) if model_config is not None else None
+                ),
                 "resume_run": resume_run,
                 "train_config": asdict(resolved_train_config),
                 "data_loader_config": asdict(data_loader_config),
             },
-            build_commit=git_commit)
+            build_commit=git_commit,
+        )
 
         return examples, metadata, git_commit, resolved_train_config
 
+    def load_validation_dataset(
+        resolved_train_config: TrainConfig,
+        training_metadata: DatasetMetadata,
+    ) -> Sequence[Example]:
+        validation_dataset = resolved_train_config.validation_dataset
+        if validation_dataset is None:
+            raise ValueError("validation_dataset is not configured.")
+        validation_path = resolved_train_config.datasets_dir / validation_dataset
+        _, validation_examples, validation_metadata = _load_dataset(validation_path)
+        if (
+            replace(validation_metadata, num_examples=training_metadata.num_examples)
+            != training_metadata
+        ):
+            raise ValueError("Validation dataset metadata mismatch.")
+        return validation_examples
+
     def log_training_start(resolved_train_config: TrainConfig) -> None:
         resolved_device = (
-            resolved_train_config.device if resolved_train_config.device is not None else "auto"
+            resolved_train_config.device
+            if resolved_train_config.device is not None
+            else "auto"
         )
         logger.info(
             "Start training hardware=%s run_dir=%s epochs=%s batch_size=%s device=%s",
@@ -177,24 +209,45 @@ def train(
             resolved_train_config.training_runs_dir / resolved_train_config.run_name,
             resolved_train_config.epochs,
             data_loader_config.batch_size,
-            resolved_device)
+            resolved_device,
+        )
 
     def log_training_finish(summary: TrainingSummary) -> None:
+        if summary.validation_loss is not None:
+            logger.info(
+                "Finished training final_loss=%s validation_loss=%s",
+                summary.final_loss,
+                summary.validation_loss,
+            )
+            return
         logger.info("Finished training final_loss=%s", summary.final_loss)
 
     # main flow
     examples, metadata, git_commit, resolved_train_config = prepare_training()
     log_training_start(resolved_train_config)
 
-    # core
-    summary = Trainer(
-        Factory(metadata), resolved_train_config, data_loader_config,
-        model_config=model_config, resume_run=resume_run).train(examples)
+    validation_examples = None
+    if resolved_train_config.validation_dataset is not None:
+        validation_examples = load_validation_dataset(resolved_train_config, metadata)
 
-    summary_path = (resolved_train_config.training_runs_dir /
-                    resolved_train_config.run_name / "training_summary.yaml")
+    # core
+    trainer = Trainer(
+        Factory(metadata), resolved_train_config, data_loader_config,
+        model_config=model_config, resume_run=resume_run,
+    )
+    summary = trainer.train(examples)
+
+    if validation_examples is not None:
+        validation_loss = trainer.evaluate(validation_examples)
+        summary = replace(summary, validation_loss=validation_loss)
+
+    summary_path = (
+        resolved_train_config.training_runs_dir
+        / resolved_train_config.run_name
+        / "training_summary.yaml"
+    )
     _write_training_summary(summary_path, summary)
-    append_checkpoint_register(resolved_train_config.run_name)
+    append_checkpoint_register(resolved_train_config.run_name, summary.validation_loss)
     log_training_finish(summary)
 
     return summary

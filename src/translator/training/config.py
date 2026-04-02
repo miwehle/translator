@@ -20,6 +20,8 @@ class ModelConfig:
 @dataclass(frozen=True, kw_only=True)
 class TrainConfig:
     artifacts_dir: str
+    dataset: str
+    validation_dataset: str | None = None
     run_name: str = "run1"
     force: bool = False
     device: str | torch.device | None = None
