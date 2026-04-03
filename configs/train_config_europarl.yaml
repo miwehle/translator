@@ -7,11 +7,13 @@ model_config:
   max_seq_len: 250
   attention: torch
 
+#resume_run: europarl
+
 train_config:
   artifacts_dir: /content/drive/MyDrive/nmt_lab/artifacts
-  dataset: iwslt2017_iwslt2017-de-en_train (7)
-  validation_dataset: iwslt2017_iwslt2017-de-en_validation  # optional
-  run_name: ted_talks
+  dataset: europarl_de-en_train (8)
+  #validation_dataset: iwslt2017_iwslt2017-de-en_validation  # optional
+  run_name: europarl
   seed: 42
   lr: 0.0003
   epochs: 10

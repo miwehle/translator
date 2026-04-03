@@ -1,15 +1,24 @@
-dataset: europarl_de-en_train_10000
+model_config:
+  d_model: 256
+  ff_dim: 1024
+  num_heads: 8
+  num_layers: 4
+  dropout: 0.1
+  max_seq_len: 250
+  attention: torch
 
-resume_run: run15_resume1
+#resume_run: tedtalks
 
 train_config:
   artifacts_dir: /content/drive/MyDrive/nmt_lab/artifacts
-  run_name: run1_resume
+  dataset: iwslt2017_iwslt2017-de-en_train (7)
+  validation_dataset: iwslt2017_iwslt2017-de-en_validation  # optional
+  run_name: tedtalks
   seed: 42
   lr: 0.0003
   epochs: 10
   log_every: 100
-  translate_every: 2000
+  translate_every: 5000
   translate_examples:
     - Wir brauchen einen klaren Plan für den nächsten Schritt.
     - Der Ausschuss hat den Vorschlag gestern gebilligt.
@@ -20,9 +29,9 @@ train_config:
   spike_factor: 3.0
 
 data_loader_config:
-  batch_size: 64
+  batch_size: 128
   shuffle: true
-  num_workers: 0
-  prefetch_factor: null
-  persistent_workers: null
-  pin_memory: null
+  num_workers: 4
+  persistent_workers: true
+  prefetch_factor: 4
+  pin_memory: true
