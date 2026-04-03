@@ -32,8 +32,6 @@ def main() -> int:
         return 1
 
     try:
-        dataset = cfg["dataset"]
-
         model_config = (
             None if cfg.get("model_config") is None
             else ModelConfig(**cfg["model_config"])
@@ -43,7 +41,7 @@ def main() -> int:
         train_config = TrainConfig(**(cfg.get("train_config") or {}))
         data_loader_config = DataLoaderConfig(**(cfg.get("data_loader_config") or {}))
         train(
-            dataset, train_config, data_loader_config, REPO_ROOT,
+            train_config, data_loader_config, REPO_ROOT,
             model_config=model_config, resume_run=resume_run)
     except Exception as exc:
         print(f"Training failed: {exc}")
