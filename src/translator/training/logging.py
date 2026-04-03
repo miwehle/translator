@@ -130,18 +130,6 @@ class TrainingLogger:
             f"{batch_ids_text}"
         )
 
-    def log_translations(
-        self,
-        step: int,
-        epoch: int,
-        translations: Sequence[tuple[str, str]],
-    ) -> None:
-        lines = [f"TRANSLATE step={step} ep={epoch}"]
-        for source_text, translated_text in translations:
-            lines.append(f"src={source_text}")
-            lines.append(f"pred={translated_text}")
-        self.logger.log(logging.INFO, "\n".join(lines))
-
     def log_translation_failure(
         self,
         step: int,

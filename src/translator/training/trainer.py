@@ -27,6 +27,7 @@ from .checkpointing import save as save_checkpoint
 from .config import DataLoaderConfig, ModelConfig, TrainConfig
 from .factory import Factory
 from .logging import TrainingLogger
+from .translation_examples import TranslationExamplesWriter
 
 logger = logging.getLogger(__name__)
 
@@ -59,10 +60,14 @@ class _TrainingObserver:
         self,
         train_config: TrainConfig,
         log_path: str | Path,
+        translation_examples_path: str | Path,
         translation_preview_fn: Callable[[], list[tuple[str, str]]] | None = None,
     ) -> None:
         self.train_config = train_config
         self.training_logger = TrainingLogger(log_path=log_path)
+        self.translation_examples_writer = TranslationExamplesWriter(
+            translation_examples_path
+        )
         self.translation_preview_fn = translation_preview_fn
         self.loss_history: deque[float] = deque(maxlen=train_config.spike_window)
         self.global_step = 0
@@ -108,9 +113,10 @@ class _TrainingObserver:
             )
         ):
             try:
-                self.training_logger.log_translations(
+                self.translation_examples_writer.append(
                     self.global_step,
                     epoch,
+                    loss_value,
                     self.translation_preview_fn(),
                 )
             except Exception as exc:
@@ -218,6 +224,7 @@ class Trainer:
             return _TrainingObserver(
                 self._train_config,
                 log_path,
+                log_path.with_name("translation_examples.txt"),
                 translation_preview_fn=create_translation_preview_fn(
                     self._train_config.translate_every,
                     self._train_config.translate_examples, tokenizer_model_name,
