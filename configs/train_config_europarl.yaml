@@ -12,11 +12,11 @@ model_config:
 train_config:
   artifacts_dir: /content/drive/MyDrive/nmt_lab/artifacts
   dataset: europarl_de-en_train (8)
-  #validation_dataset: iwslt2017_iwslt2017-de-en_validation  # optional
+  #validation_dataset: # optional
   run_name: europarl
   seed: 42
   lr: 0.0003
-  epochs: 10
+  epochs: 1
   log_every: 100
   translate_every: 5000
   translate_examples:
