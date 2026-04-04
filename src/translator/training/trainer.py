@@ -59,15 +59,14 @@ class _TrainingObserver:
         self,
         train_config: TrainConfig,
         translator: Translator | None = None,
-        translate_examples: Sequence[str] = (),
     ) -> None:
         run_dir = train_config.training_runs_dir / train_config.run_name
         run_dir.mkdir(parents=True, exist_ok=True)
         self.train_config = train_config
         self.training_logger = TrainingLogger(run_dir / "training.log")
         self.translation_examples_path = run_dir / "translation_examples.txt"
+        self.translate_examples = list(train_config.translate_examples)
         self.translator = translator
-        self.translate_examples = list(translate_examples)
         self.loss_history: deque[float] = deque(maxlen=train_config.spike_window)
         self.global_step = 0
         self.processed_examples = 0
@@ -238,11 +237,11 @@ class Trainer:
             if tokenizer_model_name is None:
                 raise ValueError("Preview translation requires dataset tokenizer_model_name.")
             tokenizer = create_tokenizer("hf", [], tokenizer_model_name)
-            translator = Translator(model, tokenizer, device, getattr(
-                self._factory.dataset_metadata, "tgt_bos_id", None
-            ))
             return _TrainingObserver(
-                self._train_config, translator, self._train_config.translate_examples
+                self._train_config,
+                Translator(model, tokenizer, device, getattr(
+                    self._factory.dataset_metadata, "tgt_bos_id", None
+                )),
             )
 
         # main flow
