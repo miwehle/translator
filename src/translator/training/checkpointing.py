@@ -73,6 +73,7 @@ def save(
         yaml.safe_dump(
             {
                 "checkpoint_file": checkpoint_file.name,
+                "tokenizer_model_name": str(dataset_metadata.tokenizer_model_name),
                 "model_config": asdict(model_config),
                 "optimizer": {
                     "type": _optimizer_type(optimizer),

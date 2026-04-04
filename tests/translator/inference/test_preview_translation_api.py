@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 import torch
 
-from translator.inference import create_translation_preview_fn
+from translator.inference import Translator, create_translation_preview_fn
 
 
 class _FakeModel:
@@ -89,4 +89,49 @@ def test_create_translation_preview_fn_builds_callable_from_public_api(
         "texts": ["Hallo Welt"],
         "device": device,
         "tgt_bos_id": 8,
+    }
+
+
+def test_translate_examples_delegates_to_translator() -> None:
+    model = _FakeModel()
+    tokenizer = object()
+    device = torch.device("cpu")
+    calls: dict[str, object] = {}
+
+    class _FakeTranslator:
+        def __init__(
+            self,
+            model_arg: object,
+            tokenizer_arg: object,
+            device_arg: torch.device,
+            tgt_bos_id_arg: int | None,
+        ) -> None:
+            calls["model"] = model_arg
+            calls["tokenizer"] = tokenizer_arg
+            calls["device"] = device_arg
+            calls["tgt_bos_id"] = tgt_bos_id_arg
+
+        def translate_many(self, texts: list[str]) -> list[str]:
+            calls["texts"] = texts
+            return ["Hello world"]
+
+    original = Translator
+    try:
+        import translator.inference.preview_translation as preview_translation
+
+        preview_translation.Translator = _FakeTranslator
+        assert preview_translation.translate_examples(
+            model, tokenizer, ["Hallo Welt"], device, tgt_bos_id=8
+        ) == [("Hallo Welt", "Hello world")]
+    finally:
+        import translator.inference.preview_translation as preview_translation
+
+        preview_translation.Translator = original
+
+    assert calls == {
+        "model": model,
+        "tokenizer": tokenizer,
+        "device": device,
+        "tgt_bos_id": 8,
+        "texts": ["Hallo Welt"],
     }

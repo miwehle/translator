@@ -164,6 +164,7 @@ def test_train_resumes_from_checkpoint(tmp_path: Path, monkeypatch) -> None:
     assert Path(second_summary.checkpoint_path) == second_run_dir / "checkpoint.pt"
     assert manifest["optimizer"]["type"] == "adam"
     assert manifest["checkpoint_file"] == "checkpoint.pt"
+    assert manifest["tokenizer_model_name"] == "test-tokenizer"
     assert "summary" not in manifest
     assert train_cfg["model_config"] is None
     assert train_cfg["resume_run"] == "run1"
