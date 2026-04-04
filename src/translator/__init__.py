@@ -12,8 +12,9 @@ MIT motto "Mens et Manus":
   "Sequence to Sequence Learning with Neural Networks"
   (https://arxiv.org/abs/1409.3215),
 - Bahdanau, Cho and Bengio 2014
+  "Neural Machine Translation by Jointly Learning to Align and Translate"
   (https://arxiv.org/abs/1409.0473),
-- the Transformer paper by Vaswani et al. 2017
+- the Transformer paper "Attention Is All You Need" by Vaswani et al. 2017
   (https://arxiv.org/abs/1706.03762),
 on transformer models in encoder-decoder configuration.
 """
