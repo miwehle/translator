@@ -120,11 +120,15 @@ def test_trainer_writes_translation_examples_to_separate_file(
         )()
     )
     monkeypatch.setattr(
-        "translator.training.trainer.create_translation_preview_fn",
-        lambda *args: lambda: [
-            ("Hallo Welt.", "Hello world."),
-            ("Ich mag Kaffee.", "I like coffee."),
-        ],
+        "translator.training.trainer.create_tokenizer", lambda *args: object()
+    )
+    monkeypatch.setattr(
+        "translator.training.trainer.Translator",
+        lambda *args: type(
+            "_FakeTranslator",
+            (),
+            {"translate_many": lambda self, texts: ["Hello world.", "I like coffee."]},
+        )(),
     )
     trainer = Trainer(
         factory,

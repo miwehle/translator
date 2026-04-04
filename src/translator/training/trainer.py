@@ -11,14 +11,15 @@ from __future__ import annotations
 import logging
 import random
 from collections import deque
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from statistics import median
 
 import torch
 import torch.nn as nn
 
-from ..inference import create_translation_preview_fn
+from ..inference import Translator
+from ..inference.tokenizer import create_tokenizer
 from ..model import Seq2Seq
 from ..shared import Example
 from .checkpointing import load as load_checkpoint
@@ -57,14 +58,16 @@ class _TrainingObserver:
     def __init__(
         self,
         train_config: TrainConfig,
-        translation_preview_fn: Callable[[], list[tuple[str, str]]] | None = None,
+        translator: Translator | None = None,
+        translate_examples: Sequence[str] = (),
     ) -> None:
         run_dir = train_config.training_runs_dir / train_config.run_name
         run_dir.mkdir(parents=True, exist_ok=True)
         self.train_config = train_config
         self.training_logger = TrainingLogger(run_dir / "training.log")
         self.translation_examples_path = run_dir / "translation_examples.txt"
-        self.translation_preview_fn = translation_preview_fn
+        self.translator = translator
+        self.translate_examples = list(translate_examples)
         self.loss_history: deque[float] = deque(maxlen=train_config.spike_window)
         self.global_step = 0
         self.processed_examples = 0
@@ -119,15 +122,18 @@ class _TrainingObserver:
             )
         if (
             self.train_config.translate_every is not None
-            and self.translation_preview_fn is not None
+            and self.translator is not None
             and (
                 self.global_step == 1
                 or self.global_step % self.train_config.translate_every == 0
             )
         ):
             try:
+                translations = self.translator.translate_many(self.translate_examples)
                 self.append_translation_examples(
-                    self.global_step, epoch, loss_value, self.translation_preview_fn())
+                    self.global_step, epoch, loss_value,
+                    list(zip(self.translate_examples, translations, strict=True)),
+                )
             except Exception as exc:
                 self.training_logger.log_translation_failure(
                     self.global_step,
@@ -227,13 +233,16 @@ class Trainer:
             tokenizer_model_name = getattr(
                 self._factory.dataset_metadata, "tokenizer_model_name", None
             )
-            tgt_bos_id = getattr(self._factory.dataset_metadata, "tgt_bos_id", None)
+            if self._train_config.translate_every is None:
+                return _TrainingObserver(self._train_config)
+            if tokenizer_model_name is None:
+                raise ValueError("Preview translation requires dataset tokenizer_model_name.")
+            tokenizer = create_tokenizer("hf", [], tokenizer_model_name)
+            translator = Translator(model, tokenizer, device, getattr(
+                self._factory.dataset_metadata, "tgt_bos_id", None
+            ))
             return _TrainingObserver(
-                self._train_config,
-                translation_preview_fn=create_translation_preview_fn(
-                    self._train_config.translate_every,
-                    self._train_config.translate_examples, tokenizer_model_name,
-                    tgt_bos_id, model, device),
+                self._train_config, translator, self._train_config.translate_examples
             )
 
         # main flow
