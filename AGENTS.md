@@ -79,14 +79,12 @@ Keine Einzeiler für Funktionsdefinitionen. Zwischen Funktionssignatur und Funkt
 
 Die im jeweiligen Repo konfigurierte Tooling-Konfiguration ist zu beachten, insbesondere `ruff` in `pyproject.toml` inklusive `line-length` und Stilregeln.
 
+## Lokale Hilfsfunktionen
+
+Lokale Hilfsfunktionen innerhalb einer Funktion oder Methode nicht mitten im Hauptfluss definieren. Wenn eine lokale Hilfsfunktion sinnvoll ist, dann am Anfang des umschließenden Blocks platzieren oder als eigene private Funktion/Methode auslagern. Der Scope ist dabei so klein wie möglich zu halten: Eine Hilfsfunktion soll nur dort sichtbar sein, wo sie fachlich benötigt wird, aber den Hauptfluss nicht unterbrechen. Ziel ist, dass der Hauptfluss ohne Unterbrechung lesbar bleibt und Hilfslogik bei Bedarf separat nachgeschlagen werden kann.
+
 ## Temp-Artefakte
 
 Temporäre Verzeichnisse und Dateien für Tests, Verifikation und ad-hoc Läufe sind im Repo-Root ausschließlich unter `.local_tmp/` anzulegen.
 
 Keine neuen temporären Root-Ordner wie `.tmp_pytest*`, `.pytest_tmp*` oder ähnliche Namen anlegen.
-
-## Code-Links
-
-Wenn auf Code verwiesen wird, die vom Client unterstützten Datei-Referenzen verwenden.
-
-Keine Browser-Links oder Datei-URIs konstruieren. Stattdessen Pfad und optional Zeilennummer in der vom Client erwarteten Form angeben.
