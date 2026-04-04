@@ -6,13 +6,13 @@ from typing import TYPE_CHECKING, Any
 import torch
 from torch.utils.data import DataLoader, IterableDataset, get_worker_info
 
-from ..model import Seq2Seq
-from ..shared import Example
-from .config import DataLoaderConfig
-from .dataset import DatasetMetadata, collate_fn_prod
+from ...model import Seq2Seq
+from ...shared import Example
+from ..config import DataLoaderConfig
+from ..dataset import DatasetMetadata, collate_fn_prod
 
 if TYPE_CHECKING:
-    from .config import ModelConfig
+    from ..config import ModelConfig
 
 
 class _ExampleIterableDataset(IterableDataset):

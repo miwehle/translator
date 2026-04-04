@@ -8,8 +8,8 @@ import torch
 import yaml
 
 from ..model import Seq2Seq
-from ..training.checkpointing import checkpoint_manifest_path
 from ..training.config import ModelConfig
+from ..training.internal.checkpointing import checkpoint_manifest_path
 from .tokenizer import TokenizerProtocol, create_tokenizer
 
 

@@ -7,8 +7,8 @@ from typing import Any
 import torch
 import yaml
 
-from ..model import Seq2Seq
-from .config import ModelConfig
+from ...model import Seq2Seq
+from ..config import ModelConfig
 
 _CHECKPOINT_FILE_NAME = "checkpoint.pt"
 _CHECKPOINT_MANIFEST_FILE_NAME = "checkpoint_manifest.yaml"

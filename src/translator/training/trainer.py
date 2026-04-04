@@ -22,11 +22,11 @@ from ..inference import Translator
 from ..inference.tokenizer import create_tokenizer
 from ..model import Seq2Seq
 from ..shared import Example
-from .checkpointing import load as load_checkpoint
-from .checkpointing import save as save_checkpoint
 from .config import DataLoaderConfig, ModelConfig, TrainConfig
-from .factory import Factory
-from .logging import TrainingLogger
+from .internal.checkpointing import load as load_checkpoint
+from .internal.checkpointing import save as save_checkpoint
+from .internal.factory import Factory
+from .internal.logging import TrainingLogger
 
 logger = logging.getLogger(__name__)
 

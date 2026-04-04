@@ -23,7 +23,7 @@ from translator.training import (
     check_dataset,
 )
 from translator.training.dataset import load_arrow_records
-from translator.training.factory import Factory
+from translator.training.internal.factory import Factory
 
 LOSS_LINE_RE = re.compile(r"\bloss=(?P<loss>\d+(?:\.\d+)?)\b")
 STEP_LINE_RE = re.compile(

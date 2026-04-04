@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
-from ..shared import configure_translator_logging, detect_hardware_type
+from ...shared import configure_translator_logging, detect_hardware_type
 
 _CU_RATES = {
     "T4": 1.8,

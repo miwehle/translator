@@ -18,7 +18,7 @@ from translator.training import (
     check_dataset,
 )
 from translator.training.dataset import load_arrow_records
-from translator.training.factory import Factory
+from translator.training.internal.factory import Factory
 
 
 def test_trainer_writes_checkpoint_and_summary(tmp_path: Path) -> None:
