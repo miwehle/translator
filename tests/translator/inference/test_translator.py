@@ -71,7 +71,6 @@ class TestTranslator:
             yaml.safe_dump(
                 {
                     "checkpoint_file": "checkpoint.pt",
-                    "tokenizer_model_name": "dummy-tokenizer",
                     "model_config": {
                         "d_model": 8,
                         "ff_dim": 16,
@@ -82,7 +81,8 @@ class TestTranslator:
                         "attention": "torch",
                     },
                     "optimizer": {"type": "adam", "lr": 0.001},
-                    "dataset": {
+                    "tokenizer": {
+                        "model_name": "dummy-tokenizer",
                         "src_vocab_size": 16,
                         "tgt_vocab_size": 16,
                         "src_pad_id": 0,

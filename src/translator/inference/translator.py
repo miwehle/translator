@@ -123,14 +123,14 @@ class Translator:
     ) -> "Translator":
         checkpoint_file = Path(checkpoint_path)
         manifest = _load_manifest(checkpoint_file)
-        checkpoint_dataset = manifest["dataset"]
+        checkpoint_dataset = manifest["tokenizer"]
         resolved_device = _resolve_device(device)
         model = _create_model(
             ModelConfig(**manifest["model_config"]), checkpoint_dataset, resolved_device
         )
         payload = torch.load(checkpoint_file, map_location=resolved_device)
         model.load_state_dict(payload["model_state_dict"])
-        tokenizer = create_tokenizer("hf", [], manifest["tokenizer_model_name"])
+        tokenizer = create_tokenizer("hf", [], checkpoint_dataset["model_name"])
         return cls(model, tokenizer, resolved_device, int(checkpoint_dataset["tgt_bos_id"]))
 
     def translate(self, text: str) -> str:

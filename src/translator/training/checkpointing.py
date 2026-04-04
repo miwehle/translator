@@ -37,7 +37,7 @@ def load(
     checkpoint_file = Path(checkpoint_path)
     manifest_path = checkpoint_manifest_path(checkpoint_file.parent)
     manifest = _load_manifest(manifest_path)
-    _validate_dataset_metadata(manifest["dataset"], factory.dataset_metadata)
+    _validate_tokenizer_metadata(manifest["tokenizer"], factory.dataset_metadata)
 
     model_config = ModelConfig(**manifest["model_config"])
     model = factory.create_model(model_config, device)
@@ -55,7 +55,7 @@ def save(
     model: Seq2Seq,
     optimizer: torch.optim.Optimizer,
     model_config: ModelConfig,
-    dataset_metadata: Any,
+    tokenizer_metadata: Any,
 ) -> Path:
     run_dir_path = Path(run_dir)
     run_dir_path.mkdir(parents=True, exist_ok=True)
@@ -73,18 +73,18 @@ def save(
         yaml.safe_dump(
             {
                 "checkpoint_file": checkpoint_file.name,
-                "tokenizer_model_name": str(dataset_metadata.tokenizer_model_name),
                 "model_config": asdict(model_config),
                 "optimizer": {
                     "type": _optimizer_type(optimizer),
                     "lr": float(optimizer.param_groups[0]["lr"]),
                 },
-                "dataset": {
-                    "src_vocab_size": int(dataset_metadata.src_vocab_size),
-                    "tgt_vocab_size": int(dataset_metadata.tgt_vocab_size),
-                    "src_pad_id": int(dataset_metadata.src_pad_id),
-                    "tgt_pad_id": int(dataset_metadata.tgt_pad_id),
-                    "tgt_bos_id": int(dataset_metadata.tgt_bos_id),
+                "tokenizer": {
+                    "model_name": str(tokenizer_metadata.tokenizer_model_name),
+                    "src_vocab_size": int(tokenizer_metadata.src_vocab_size),
+                    "tgt_vocab_size": int(tokenizer_metadata.tgt_vocab_size),
+                    "src_pad_id": int(tokenizer_metadata.src_pad_id),
+                    "tgt_pad_id": int(tokenizer_metadata.tgt_pad_id),
+                    "tgt_bos_id": int(tokenizer_metadata.tgt_bos_id),
                 },
             },
             sort_keys=True,
@@ -120,21 +120,21 @@ def _optimizer_type(optimizer: torch.optim.Optimizer) -> str:
     raise ValueError(f"Unsupported optimizer type for checkpoint save: {type(optimizer).__name__}")
 
 
-def _validate_dataset_metadata(
-    manifest_dataset: dict[str, Any],
-    dataset_metadata: Any,
+def _validate_tokenizer_metadata(
+    manifest_tokenizer: dict[str, Any],
+    tokenizer_metadata: Any,
 ) -> None:
-    current_dataset = {
-        "src_vocab_size": int(dataset_metadata.src_vocab_size),
-        "tgt_vocab_size": int(dataset_metadata.tgt_vocab_size),
-        "src_pad_id": int(dataset_metadata.src_pad_id),
-        "tgt_pad_id": int(dataset_metadata.tgt_pad_id),
-        "tgt_bos_id": int(dataset_metadata.tgt_bos_id),
+    current_tokenizer = {
+        "src_vocab_size": int(tokenizer_metadata.src_vocab_size),
+        "tgt_vocab_size": int(tokenizer_metadata.tgt_vocab_size),
+        "src_pad_id": int(tokenizer_metadata.src_pad_id),
+        "tgt_pad_id": int(tokenizer_metadata.tgt_pad_id),
+        "tgt_bos_id": int(tokenizer_metadata.tgt_bos_id),
     }
-    for field_name, current_value in current_dataset.items():
-        manifest_value = int(manifest_dataset[field_name])
+    for field_name, current_value in current_tokenizer.items():
+        manifest_value = int(manifest_tokenizer[field_name])
         if manifest_value != current_value:
             raise ValueError(
-                "Checkpoint dataset metadata mismatch for "
+                "Checkpoint tokenizer metadata mismatch for "
                 f"{field_name}: checkpoint={manifest_value} current={current_value}"
             )
