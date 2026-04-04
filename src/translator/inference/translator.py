@@ -24,25 +24,22 @@ class TranslationFailure(RuntimeError):
     pass
 
 
-def _invalid_predicted_ids(
-    predicted_ids: Sequence[int], tokenizer: TokenizerProtocol
-) -> list[int]:
-    tokenizer_vocab_size = getattr(tokenizer, "vocab_size", None)
-    if not isinstance(tokenizer_vocab_size, int):
-        return []
-    return [token_id for token_id in predicted_ids if token_id >= tokenizer_vocab_size]
-
-
 def _build_translation_failure(
     source_text: str, encoded_source_ids: Sequence[int], predicted_ids: Sequence[int],
     tokenizer: TokenizerProtocol, tgt_bos_id: int | None, cause: Exception,
 ) -> TranslationFailure:
+    def invalid_predicted_ids() -> list[int]:
+        tokenizer_vocab_size = getattr(tokenizer, "vocab_size", None)
+        if not isinstance(tokenizer_vocab_size, int):
+            return []
+        return [token_id for token_id in predicted_ids if token_id >= tokenizer_vocab_size]
+
     return TranslationFailure(
         "Translation decode failed. "
         f"source_text={source_text!r} "
         f"src_ids={list(encoded_source_ids)} "
         f"predicted_ids={list(predicted_ids)} "
-        f"invalid_predicted_ids={_invalid_predicted_ids(predicted_ids, tokenizer)} "
+        f"invalid_predicted_ids={invalid_predicted_ids()} "
         f"tokenizer_vocab_size={getattr(tokenizer, 'vocab_size', None)} "
         f"tgt_bos_id={tgt_bos_id} "
         f"cause={cause!r}"
