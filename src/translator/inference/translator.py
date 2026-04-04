@@ -21,29 +21,30 @@ def _estimate_target_token_count(source_token_count: int) -> int:
 
 
 class TranslationFailure(RuntimeError):
-    pass
+    def __init__(
+        self, source_text: str,
+        encoded_source_ids: Sequence[int], predicted_ids: Sequence[int],
+        tokenizer: TokenizerProtocol, tgt_bos_id: int | None,
+        cause: Exception
+    ) -> None:
+        def invalid_predicted_ids() -> list[int]:
+            tokenizer_vocab_size = getattr(tokenizer, "vocab_size", None)
+            if not isinstance(tokenizer_vocab_size, int):
+                return []
+            return [
+                token_id for token_id in predicted_ids if token_id >= tokenizer_vocab_size
+            ]
 
-
-def _build_translation_failure(
-    source_text: str, encoded_source_ids: Sequence[int], predicted_ids: Sequence[int],
-    tokenizer: TokenizerProtocol, tgt_bos_id: int | None, cause: Exception,
-) -> TranslationFailure:
-    def invalid_predicted_ids() -> list[int]:
-        tokenizer_vocab_size = getattr(tokenizer, "vocab_size", None)
-        if not isinstance(tokenizer_vocab_size, int):
-            return []
-        return [token_id for token_id in predicted_ids if token_id >= tokenizer_vocab_size]
-
-    return TranslationFailure(
-        "Translation decode failed. "
-        f"source_text={source_text!r} "
-        f"src_ids={list(encoded_source_ids)} "
-        f"predicted_ids={list(predicted_ids)} "
-        f"invalid_predicted_ids={invalid_predicted_ids()} "
-        f"tokenizer_vocab_size={getattr(tokenizer, 'vocab_size', None)} "
-        f"tgt_bos_id={tgt_bos_id} "
-        f"cause={cause!r}"
-    )
+        super().__init__(
+            "Translation decode failed. "
+            f"source_text={source_text!r} "
+            f"src_ids={list(encoded_source_ids)} "
+            f"predicted_ids={list(predicted_ids)} "
+            f"invalid_predicted_ids={invalid_predicted_ids()} "
+            f"tokenizer_vocab_size={getattr(tokenizer, 'vocab_size', None)} "
+            f"tgt_bos_id={tgt_bos_id} "
+            f"cause={cause!r}"
+        )
 
 
 def _load_manifest(checkpoint_path: str | Path) -> dict[str, object]:
@@ -123,9 +124,8 @@ class Translator:
         try:
             return self.tokenizer.decode(predicted_ids)
         except Exception as exc:
-            raise _build_translation_failure(
-                text, encoded_source_ids, predicted_ids, self.tokenizer,
-                self.tgt_bos_id, exc
+            raise TranslationFailure(
+                text, encoded_source_ids, predicted_ids, self.tokenizer, self.tgt_bos_id, exc
             ) from exc
 
     def translate_many(self, texts: Sequence[str]) -> list[str]:
