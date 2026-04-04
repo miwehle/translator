@@ -44,7 +44,7 @@ def _build_translation_failure(
         f"predicted_ids={list(predicted_ids)} "
         f"invalid_predicted_ids={_invalid_predicted_ids(predicted_ids, tokenizer)} "
         f"tokenizer_vocab_size={getattr(tokenizer, 'vocab_size', None)} "
-        f"dataset_tgt_bos_id={tgt_bos_id} "
+        f"tgt_bos_id={tgt_bos_id} "
         f"cause={cause!r}"
     )
 
@@ -103,15 +103,15 @@ class Translator:
     ) -> "Translator":
         checkpoint_file = Path(checkpoint_path)
         manifest = _load_manifest(checkpoint_file)
-        checkpoint_dataset = manifest["tokenizer"]
+        checkpoint_tokenizer = manifest["tokenizer"]
         resolved_device = _resolve_device(device)
         model = _create_model(
-            ModelConfig(**manifest["model_config"]), checkpoint_dataset, resolved_device
+            ModelConfig(**manifest["model_config"]), checkpoint_tokenizer, resolved_device
         )
         payload = torch.load(checkpoint_file, map_location=resolved_device)
         model.load_state_dict(payload["model_state_dict"])
-        tokenizer = create_tokenizer("hf", [], checkpoint_dataset["model_name"])
-        return cls(model, tokenizer, resolved_device, int(checkpoint_dataset["tgt_bos_id"]))
+        tokenizer = create_tokenizer("hf", [], checkpoint_tokenizer["model_name"])
+        return cls(model, tokenizer, resolved_device, int(checkpoint_tokenizer["tgt_bos_id"]))
 
     def translate(self, text: str) -> str:
         eos_idx = self.tokenizer.eos_token_id
