@@ -10,10 +10,8 @@ from __future__ import annotations
 
 import logging
 import random
-from collections import deque
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from statistics import median
 
 import torch
 import torch.nn as nn
@@ -26,7 +24,7 @@ from .config import DataLoaderConfig, ModelConfig, TrainConfig
 from .internal.checkpointing import load as load_checkpoint
 from .internal.checkpointing import save as save_checkpoint
 from .internal.factory import Factory
-from .internal.logging import TrainingLogger
+from .internal.training_observer import TrainingObserver
 
 logger = logging.getLogger(__name__)
 
@@ -52,93 +50,6 @@ class TrainingSummary:
     final_loss: float | None
     checkpoint_path: str
     validation_loss: float | None
-
-
-class _TrainingObserver:
-    def __init__(
-        self,
-        train_config: TrainConfig,
-        translator: Translator | None = None,
-    ) -> None:
-        run_dir = train_config.training_runs_dir / train_config.run_name
-        run_dir.mkdir(parents=True, exist_ok=True)
-        self.train_config = train_config
-        self.training_logger = TrainingLogger(run_dir / "training.log")
-        self.translation_examples_path = run_dir / "translation_examples.txt"
-        self.translate_examples = list(train_config.translate_examples)
-        self.translator = translator
-        self.loss_history: deque[float] = deque(maxlen=train_config.spike_window)
-        self.global_step = 0
-        self.processed_examples = 0
-        self.loss_value: float | None = None
-
-    def append_translation_examples(
-        self,
-        step: int,
-        epoch: int,
-        loss: float,
-        translations: Sequence[tuple[str, str]],
-    ) -> None:
-        with self.translation_examples_path.open("a", encoding="utf-8") as handle:
-            handle.write(f"step={step} ep={epoch} loss={loss:.4f}\n")
-            handle.write("---\n")
-            for index, (source_text, translated_text) in enumerate(translations):
-                if index > 0:
-                    handle.write("\n")
-                handle.write(f"src: {source_text}\n")
-                handle.write(f"pred: {translated_text}\n")
-            handle.write("\n")
-
-    def on_batch_end(
-        self,
-        epoch: int,
-        loss_value: float,
-        grad_norm: float,
-        batch_ids: Sequence[int],
-        tgt_size: int,
-        tgt_token_count: int,
-    ) -> None:
-        self.global_step += 1
-        self.processed_examples += tgt_size
-        self.loss_value = loss_value
-        median_loss = median(self.loss_history) if self.loss_history else loss_value
-        is_spike = bool(self.loss_history) and (
-            loss_value > (median_loss * self.train_config.spike_factor)
-        )
-        self.loss_history.append(loss_value)
-        self.training_logger.add_decoder_tokens(tgt_token_count, tgt_size)
-
-        if is_spike:
-            self.training_logger.log(
-                self.global_step, epoch, loss_value, median_loss,
-                label="SPIKE", level=logging.WARNING, batch_ids=batch_ids,
-            )
-
-        if self.global_step == 1 or self.global_step % self.train_config.log_every == 0:
-            self.training_logger.log(
-                self.global_step, epoch, loss_value, median_loss,
-                grad_norm=grad_norm, lr=self.train_config.lr,
-            )
-        if (
-            self.train_config.translate_every is not None
-            and self.translator is not None
-            and (
-                self.global_step == 1
-                or self.global_step % self.train_config.translate_every == 0
-            )
-        ):
-            try:
-                translations = self.translator.translate_many(self.translate_examples)
-                self.append_translation_examples(
-                    self.global_step, epoch, loss_value,
-                    list(zip(self.translate_examples, translations, strict=True)),
-                )
-            except Exception as exc:
-                self.training_logger.log_translation_failure(
-                    self.global_step,
-                    epoch,
-                    exc,
-                )
 
 
 class Trainer:
@@ -228,16 +139,16 @@ class Trainer:
         return None if token_count == 0 else loss_sum / token_count
 
     def train(self, examples: Iterable[Example] | Sequence[Example]) -> TrainingSummary:
-        def createTrainingObserver(model: Seq2Seq, device: torch.device) -> _TrainingObserver:
+        def createTrainingObserver(model: Seq2Seq, device: torch.device) -> TrainingObserver:
             tokenizer_model_name = getattr(
                 self._factory.dataset_metadata, "tokenizer_model_name", None
             )
             if self._train_config.translate_every is None:
-                return _TrainingObserver(self._train_config)
+                return TrainingObserver(self._train_config)
             if tokenizer_model_name is None:
                 raise ValueError("Preview translation requires dataset tokenizer_model_name.")
             tokenizer = create_tokenizer("hf", [], tokenizer_model_name)
-            return _TrainingObserver(
+            return TrainingObserver(
                 self._train_config,
                 Translator(model, tokenizer, device, getattr(
                     self._factory.dataset_metadata, "tgt_bos_id", None
