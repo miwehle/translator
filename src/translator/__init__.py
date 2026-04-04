@@ -8,14 +8,14 @@ The three central objects are:
 This package is also meant as a small lab for understanding and applying
 the following ideas in an implementation-oriented way, in the spirit of the
 MIT motto "Mens et Manus":
-the 2014 paper by Sutskever, Vinyals and Le,
-"Sequence to Sequence Learning with Neural Networks"
-(https://arxiv.org/abs/1409.3215),
-Bahdanau, Cho and Bengio 2014
-(https://arxiv.org/abs/1409.0473),
-and the Transformer paper by Vaswani et al. 2017
-(https://arxiv.org/abs/1706.03762),
-including sequence transduction models in encoder-decoder configuration.
+- the 2014 paper by Sutskever, Vinyals and Le,
+  "Sequence to Sequence Learning with Neural Networks"
+  (https://arxiv.org/abs/1409.3215),
+- Bahdanau, Cho and Bengio 2014
+  (https://arxiv.org/abs/1409.0473),
+- the Transformer paper by Vaswani et al. 2017
+  (https://arxiv.org/abs/1706.03762),
+on transformer models in encoder-decoder configuration.
 """
 
 from .api import check_dataset, train
