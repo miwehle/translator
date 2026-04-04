@@ -5,7 +5,7 @@ The three central objects are:
 - Translator runs inference with the trained model.
 - Under the hood is Seq2Seq, a Transformer-based sequence-to-sequence model.
 
-This package is also meant as a small lab for understanding and using
+This package is also meant as a small lab for understanding and applying
 the following ideas in an implementation-oriented way, in the spirit of the
 MIT motto "Mens et Manus":
 the 2014 paper by Sutskever, Vinyals and Le,
