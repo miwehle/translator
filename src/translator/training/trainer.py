@@ -13,7 +13,6 @@ import random
 from collections import deque
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
-from pathlib import Path
 from statistics import median
 
 import torch
@@ -27,7 +26,6 @@ from .checkpointing import save as save_checkpoint
 from .config import DataLoaderConfig, ModelConfig, TrainConfig
 from .factory import Factory
 from .logging import TrainingLogger
-from .translation_examples import TranslationExamplesWriter
 
 logger = logging.getLogger(__name__)
 
@@ -59,20 +57,35 @@ class _TrainingObserver:
     def __init__(
         self,
         train_config: TrainConfig,
-        log_path: str | Path,
-        translation_examples_path: str | Path,
         translation_preview_fn: Callable[[], list[tuple[str, str]]] | None = None,
     ) -> None:
+        run_dir = train_config.training_runs_dir / train_config.run_name
+        run_dir.mkdir(parents=True, exist_ok=True)
         self.train_config = train_config
-        self.training_logger = TrainingLogger(log_path=log_path)
-        self.translation_examples_writer = TranslationExamplesWriter(
-            translation_examples_path
-        )
+        self.training_logger = TrainingLogger(run_dir / "training.log")
+        self.translation_examples_path = run_dir / "translation_examples.txt"
         self.translation_preview_fn = translation_preview_fn
         self.loss_history: deque[float] = deque(maxlen=train_config.spike_window)
         self.global_step = 0
         self.processed_examples = 0
         self.loss_value: float | None = None
+
+    def append_translation_examples(
+        self,
+        step: int,
+        epoch: int,
+        loss: float,
+        translations: Sequence[tuple[str, str]],
+    ) -> None:
+        with self.translation_examples_path.open("a", encoding="utf-8") as handle:
+            handle.write(f"step={step} ep={epoch} loss={loss:.4f}\n")
+            handle.write("---\n")
+            for index, (source_text, translated_text) in enumerate(translations):
+                if index > 0:
+                    handle.write("\n")
+                handle.write(f"src: {source_text}\n")
+                handle.write(f"pred: {translated_text}\n")
+            handle.write("\n")
 
     def on_batch_end(
         self,
@@ -113,12 +126,8 @@ class _TrainingObserver:
             )
         ):
             try:
-                self.translation_examples_writer.append(
-                    self.global_step,
-                    epoch,
-                    loss_value,
-                    self.translation_preview_fn(),
-                )
+                self.append_translation_examples(
+                    self.global_step, epoch, loss_value, self.translation_preview_fn())
             except Exception as exc:
                 self.training_logger.log_translation_failure(
                     self.global_step,
@@ -214,17 +223,13 @@ class Trainer:
         return None if token_count == 0 else loss_sum / token_count
 
     def train(self, examples: Iterable[Example] | Sequence[Example]) -> TrainingSummary:
-        def createTrainingObserver(
-            model: Seq2Seq, device: torch.device, log_path: Path
-        ) -> _TrainingObserver:
+        def createTrainingObserver(model: Seq2Seq, device: torch.device) -> _TrainingObserver:
             tokenizer_model_name = getattr(
                 self._factory.dataset_metadata, "tokenizer_model_name", None
             )
             tgt_bos_id = getattr(self._factory.dataset_metadata, "tgt_bos_id", None)
             return _TrainingObserver(
                 self._train_config,
-                log_path,
-                log_path.with_name("translation_examples.txt"),
                 translation_preview_fn=create_translation_preview_fn(
                     self._train_config.translate_every,
                     self._train_config.translate_examples, tokenizer_model_name,
@@ -234,8 +239,7 @@ class Trainer:
         # main flow
         run_dir = self._train_config.training_runs_dir / self._train_config.run_name
 
-        observer = createTrainingObserver(
-            self._model, self._device, run_dir / "training.log")
+        observer = createTrainingObserver(self._model, self._device)
         loader = self._factory.create_data_loader(
             examples, self._data_loader_config, self._device)
         self._model.train()
