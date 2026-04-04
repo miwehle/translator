@@ -41,7 +41,7 @@ class _FakeModel:
         self, src_ids: list[int], max_len: int, device: torch.device, eos_idx: int
     ) -> list[int]:
         self.calls.append((src_ids, max_len, device, eos_idx))
-        return [7, 4, eos_idx]
+        return [4, eos_idx]
 
 
 class TestTranslator:

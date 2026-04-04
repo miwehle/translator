@@ -138,6 +138,7 @@ class Seq2Seq(nn.Module):
         """Simple inference: greedy argmax decoding only.
 
         This intentionally does not implement beam search or sampling.
+        Returns token IDs that are ready for tokenizer.decode().
         """
         src = torch.tensor([src_ids], dtype=torch.long, device=device)
         memory, src_key_padding_mask = self.encode(src)
@@ -150,4 +151,4 @@ class Seq2Seq(nn.Module):
             out_ids.append(next_token)
             if next_token == eos_idx:
                 break
-        return out_ids
+        return out_ids[1:]

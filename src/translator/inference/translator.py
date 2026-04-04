@@ -20,26 +20,6 @@ def _estimate_target_token_count(source_token_count: int) -> int:
     return ceil(2.8 * source_token_count) + 5
 
 
-def _prepare_predicted_ids_for_decode(
-    predicted_ids: Sequence[int], tokenizer: TokenizerProtocol, tgt_bos_id: int | None
-) -> list[int]:
-    prepared_ids = list(predicted_ids)
-    tokenizer_bos_id = getattr(tokenizer, "bos_token_id", None)
-    tokenizer_vocab_size = getattr(tokenizer, "vocab_size", None)
-    should_strip_leading_dataset_bos = (
-        bool(prepared_ids)
-        and tgt_bos_id is not None
-        and prepared_ids[0] == tgt_bos_id
-        and (
-            tokenizer_bos_id is None or tokenizer_bos_id != tgt_bos_id
-            or isinstance(tokenizer_vocab_size, int) and tgt_bos_id >= tokenizer_vocab_size
-        )
-    )
-    if should_strip_leading_dataset_bos:
-        prepared_ids = prepared_ids[1:]
-    return prepared_ids
-
-
 class TranslationFailure(RuntimeError):
     pass
 
@@ -143,11 +123,8 @@ class Translator:
             max_len=_estimate_target_token_count(len(encoded_source_ids)),
             device=self.device, eos_idx=eos_idx
         )
-        prepared_predicted_ids = _prepare_predicted_ids_for_decode(
-            predicted_ids, self.tokenizer, self.tgt_bos_id
-        )
         try:
-            return self.tokenizer.decode(prepared_predicted_ids)
+            return self.tokenizer.decode(predicted_ids)
         except Exception as exc:
             raise _build_translation_failure(
                 text, encoded_source_ids, predicted_ids, self.tokenizer,
