@@ -150,18 +150,9 @@ class Trainer:
         Use `model_config` to train from scratch. Use `resume_run` to resume from a
         previous run.
         """
-        self._factory = factory
-        self._train_config = train_config
-        self._data_loader_config = data_loader_config
-
-        if (model_config is None) == (resume_run is None):
-            raise ValueError(
-                "Exactly one of model_config or resume_run must be provided."
-            )
-
         def validate_dataset_max_seq_len(max_seq_len: int) -> None:
             configured_max_seq_len = getattr(
-                self._factory.dataset_metadata, "configured_max_seq_len", None
+                factory.dataset_metadata, "configured_max_seq_len", None
             )
             if configured_max_seq_len is None or configured_max_seq_len <= max_seq_len:
                 return
@@ -170,11 +161,20 @@ class Trainer:
                 "configured_max_seq_len="
                 f"{configured_max_seq_len} max_seq_len={max_seq_len}"
             )
-            if self._train_config.force:
+            if train_config.force:
                 logger.warning("%s; continue because force=True.", message)
                 return
             raise ValueError(
                 f"{message}. Set train_config.force=True to continue anyway."
+            )
+
+        self._factory = factory
+        self._train_config = train_config
+        self._data_loader_config = data_loader_config
+
+        if (model_config is None) == (resume_run is None):
+            raise ValueError(
+                "Exactly one of model_config or resume_run must be provided."
             )
 
         _set_seed(train_config.seed)
