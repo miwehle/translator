@@ -139,28 +139,35 @@ class Trainer:
         return None if token_count == 0 else loss_sum / token_count
 
     def train(self, examples: Iterable[Example] | Sequence[Example]) -> TrainingSummary:
-        def createTrainingObserver(model: Seq2Seq, device: torch.device) -> TrainingObserver:
+        def total_steps(loader: object) -> int | None:
+            if not hasattr(loader, "__len__"):
+                return None
+            return len(loader) * self._train_config.epochs
+
+        def create_training_observer(
+            model: Seq2Seq, device: torch.device, total_steps: int | None
+        ) -> TrainingObserver:
             tokenizer_model_name = getattr(
-                self._factory.dataset_metadata, "tokenizer_model_name", None
-            )
+                self._factory.dataset_metadata, "tokenizer_model_name", None)
             if self._train_config.translate_every is None:
-                return TrainingObserver(self._train_config)
+                return TrainingObserver(self._train_config, total_steps=total_steps)
             if tokenizer_model_name is None:
-                raise ValueError("Preview translation requires dataset tokenizer_model_name.")
+                raise ValueError(
+                    "Preview translation requires dataset tokenizer_model_name.")
             tokenizer = create_tokenizer("hf", [], tokenizer_model_name)
             return TrainingObserver(
                 self._train_config,
-                Translator(model, tokenizer, device, getattr(
-                    self._factory.dataset_metadata, "tgt_bos_id", None
-                )),
-            )
+                total_steps=total_steps,
+                translator=Translator(
+                    model, tokenizer, device,
+                    getattr(self._factory.dataset_metadata, "tgt_bos_id", None)))
 
         # main flow
         run_dir = self._train_config.training_runs_dir / self._train_config.run_name
-
-        observer = createTrainingObserver(self._model, self._device)
         loader = self._factory.create_data_loader(
             examples, self._data_loader_config, self._device)
+        observer = create_training_observer(
+            self._model, self._device, total_steps(loader))
         self._model.train()
 
         for epoch in range(1, self._train_config.epochs + 1):
@@ -184,10 +191,8 @@ class Trainer:
 
         checkpoint_file = save_checkpoint(
             run_dir, self._model, self._optimizer, self._model_config,
-            self._factory.dataset_metadata,
-        )
+            self._factory.dataset_metadata)
 
         return TrainingSummary(
             observer.processed_examples, observer.loss_value,
-            str(checkpoint_file), None,
-        )
+            str(checkpoint_file), None)

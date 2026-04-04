@@ -14,12 +14,15 @@ class TrainingObserver:
     def __init__(
         self,
         train_config: TrainConfig,
+        total_steps: int | None = None,
         translator: Translator | None = None,
     ) -> None:
         run_dir = train_config.training_runs_dir / train_config.run_name
         run_dir.mkdir(parents=True, exist_ok=True)
         self.train_config = train_config
-        self.training_logger = TrainingLogger(run_dir / "training.log")
+        self.training_logger = TrainingLogger(
+            run_dir / "training.log", total_steps=total_steps
+        )
         self.translation_examples_path = run_dir / "translation_examples.txt"
         self.translate_examples = list(train_config.translate_examples)
         self.translator = translator
