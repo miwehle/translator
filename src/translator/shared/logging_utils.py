@@ -37,7 +37,8 @@ def detect_hardware_type() -> str:
     return gpu_name
 
 
-def configure_translator_logging(*, log_path: str | Path | None = None) -> logging.Logger:
+def configure_translator_logging(*, log_path: str | Path | None = None
+                                 ) -> logging.Logger:
     logger = logging.getLogger("translator")
     logger.setLevel(logging.INFO)
     logger.propagate = False
