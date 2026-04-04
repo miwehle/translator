@@ -1,5 +1,8 @@
 # Minimaler Transformer-Translator (PyTorch)
 
+Als Beschreibung der zentralen öffentlichen Objekte siehe
+`src/translator/__init__.py`.
+
 Dieses Projekt enthaelt einen bewusst einfachen Transformer-Translator mit:
 
 - Transformer-Encoder mit Multi-Head Self-Attention
