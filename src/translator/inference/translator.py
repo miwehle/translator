@@ -62,11 +62,14 @@ class Translator:
     def __init__(
         self, model: Seq2Seq, tokenizer: TokenizerProtocol, device: torch.device,
         tgt_bos_id: int | None,
+        *,
+        beam: bool = True
     ) -> None:
         self.model = model
         self.tokenizer = tokenizer
         self.device = device
         self.tgt_bos_id = tgt_bos_id
+        self.beam = beam
 
     @classmethod
     def from_checkpoint(
@@ -95,12 +98,16 @@ class Translator:
                 raise ValueError("Tokenizer has no eos_token_id for translation.")
 
             encoded_source_ids = self.tokenizer.encode(text)
-            predicted_ids = self.model.translate(
+
+            translate_fn = self.model.translate_beam if self.beam else self.model.translate
+
+            predicted_ids = translate_fn(
                 encoded_source_ids,
                 max_len=_estimate_target_token_count(len(encoded_source_ids)),
                 device=self.device,
                 eos_idx=eos_idx,
             )
+
             return self.tokenizer.decode(predicted_ids)
         finally:
             self.model.train(was_training)

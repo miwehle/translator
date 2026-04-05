@@ -152,3 +152,56 @@ class Seq2Seq(nn.Module):
             if next_token == eos_idx:
                 break
         return out_ids[1:]
+
+    @torch.no_grad()
+    def translate_beam(
+        self, src_ids: list[int], max_len: int, device: torch.device, eos_idx: int,
+        beam_width: int = 4, length_penalty: float = 0.6
+    ) -> list[int]:
+        if beam_width < 1:
+            raise ValueError("beam_width must be at least 1.")
+        if length_penalty < 0:
+            raise ValueError("length_penalty must be non-negative.")
+
+        def normalized_score(token_ids: list[int], score: float) -> float:
+            length = max(len(token_ids) - 1, 1)
+            penalty = ((5 + length) / 6) ** length_penalty
+            return score / penalty
+
+        src = torch.tensor([src_ids], dtype=torch.long, device=device)
+        memory, src_key_padding_mask = self.encode(src)
+        beams: list[tuple[list[int], float]] = [([self.tgt_sos_idx], 0.0)]
+
+        for _ in range(max_len):
+            candidates: list[tuple[list[int], float]] = []
+            all_finished = True
+
+            for token_ids, score in beams:
+                if token_ids[-1] == eos_idx:
+                    candidates.append((token_ids, score))
+                    continue
+
+                all_finished = False
+                tgt_in = torch.tensor([token_ids], dtype=torch.long, device=device)
+                logits = self.decode(tgt_in, memory, src_key_padding_mask)
+                log_probs = torch.log_softmax(logits[:, -1, :], dim=-1)
+                top_log_probs, top_token_ids = torch.topk(log_probs, beam_width, dim=-1)
+
+                for next_log_prob, next_token_id in zip(
+                    top_log_probs[0].tolist(), top_token_ids[0].tolist(), strict=True
+                ):
+                    candidates.append((token_ids + [int(next_token_id)], score + next_log_prob))
+
+            if all_finished:
+                break
+
+            beams = sorted(
+                candidates,
+                key=lambda candidate: normalized_score(candidate[0], candidate[1]),
+                reverse=True,
+            )[:beam_width]
+
+        best_token_ids, _ = max(
+            beams, key=lambda candidate: normalized_score(candidate[0], candidate[1])
+        )
+        return best_token_ids[1:]
