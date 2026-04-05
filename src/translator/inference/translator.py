@@ -20,33 +20,6 @@ def _estimate_target_token_count(source_token_count: int) -> int:
     return ceil(2.8 * source_token_count) + 5
 
 
-class TranslationFailure(RuntimeError):
-    def __init__(
-        self, source_text: str,
-        encoded_source_ids: Sequence[int], predicted_ids: Sequence[int],
-        tokenizer: TokenizerProtocol, tgt_bos_id: int | None,
-        cause: Exception
-    ) -> None:
-        def invalid_predicted_ids() -> list[int]:
-            tokenizer_vocab_size = getattr(tokenizer, "vocab_size", None)
-            if not isinstance(tokenizer_vocab_size, int):
-                return []
-            return [
-                token_id for token_id in predicted_ids if token_id >= tokenizer_vocab_size
-            ]
-
-        super().__init__(
-            "Translation decode failed. "
-            f"source_text={source_text!r} "
-            f"src_ids={list(encoded_source_ids)} "
-            f"predicted_ids={list(predicted_ids)} "
-            f"invalid_predicted_ids={invalid_predicted_ids()} "
-            f"tokenizer_vocab_size={getattr(tokenizer, 'vocab_size', None)} "
-            f"tgt_bos_id={tgt_bos_id} "
-            f"cause={cause!r}"
-        )
-
-
 def _load_manifest(checkpoint_path: str | Path) -> dict[str, object]:
     manifest_path = checkpoint_manifest_path(Path(checkpoint_path).parent)
     if not manifest_path.is_file():
@@ -111,27 +84,27 @@ class Translator:
         tokenizer = create_tokenizer("hf", [], checkpoint_tokenizer["model_name"])
         return cls(model, tokenizer, resolved_device, int(checkpoint_tokenizer["tgt_bos_id"]))
 
-    def translate(self, text: str) -> str:
-        eos_idx = self.tokenizer.eos_token_id
-        if eos_idx is None:
-            raise ValueError("Tokenizer has no eos_token_id for translation.")
-        encoded_source_ids = self.tokenizer.encode(text)
-        predicted_ids = self.model.translate(
-            encoded_source_ids,
-            max_len=_estimate_target_token_count(len(encoded_source_ids)),
-            device=self.device, eos_idx=eos_idx
-        )
-        try:
-            return self.tokenizer.decode(predicted_ids)
-        except Exception as exc:
-            raise TranslationFailure(
-                text, encoded_source_ids, predicted_ids, self.tokenizer, self.tgt_bos_id, exc
-            ) from exc
 
-    def translate_many(self, texts: Sequence[str]) -> list[str]:
+    def translate(self, text: str) -> str:
         was_training = self.model.training
-        self.model.eval()
         try:
-            return [self.translate(text) for text in texts]
+            self.model.eval()
+
+            eos_idx = self.tokenizer.eos_token_id
+            if eos_idx is None:
+                raise ValueError("Tokenizer has no eos_token_id for translation.")
+
+            encoded_source_ids = self.tokenizer.encode(text)
+            predicted_ids = self.model.translate(
+                encoded_source_ids,
+                max_len=_estimate_target_token_count(len(encoded_source_ids)),
+                device=self.device,
+                eos_idx=eos_idx,
+            )
+            return self.tokenizer.decode(predicted_ids)
         finally:
             self.model.train(was_training)
+
+
+    def translate_many(self, texts: Sequence[str]) -> list[str]:
+        return [self.translate(text) for text in texts]
