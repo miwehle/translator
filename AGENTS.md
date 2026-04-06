@@ -61,6 +61,12 @@ Bei nicht-trivialen Aenderungen am Production-Code vor der Umsetzung kurz und bu
 
 KISS-Prinzip beachten: Production-Code moeglichst einfach und klein halten; Zusatzlogik und Diagnose nur behalten, wenn ihr Nutzen die Komplexitaet klar rechtfertigt.
 
+## Kleinste wirksame Aenderung
+
+Erst die kleinste wirksame Aenderung suchen.
+
+KISS-Prinzip beachten: `LOC` und mentale Last sind als harte Kosten zu behandeln. Zusaetzliche `LOC` sind nur gerechtfertigt, wenn sie einen klaren fachlichen Mehrwert bringen, vor allem in Form zusaetzlicher oder deutlich besserer Funktion.
+
 ## Kompakte Python-Schreibweise
 
 Python-Code standardmäßig kompakt schreiben. Innerhalb der konfigurierten maximalen Zeilenlänge ist im Zweifel die kompaktere Form zu bevorzugen.
