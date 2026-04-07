@@ -16,7 +16,7 @@ Provisorische Workarounds, Debug-Helfer und asymmetrische Zwischenloesungen sind
 
 ### 1 Grundprinzip
 1.1 Testcode soll klar strukturiert und klar benannt sein.  
-1.2 Regulärer Testcode folgt einer 1:1-Korrespondenz zum öffentlichen Production-Code.  
+1.2 Testcode folgt einer 1:1-Korrespondenz zum Production-Code.  
 1.3 Abweichungen davon sind zu begründen.
 
 ### 2 Definition von "öffentlich"
@@ -24,12 +24,13 @@ Provisorische Workarounds, Debug-Helfer und asymmetrische Zwischenloesungen sind
 2.2 Das betrifft Module, Klassen und Funktionen.  
 
 ### 3 Strukturierung von Testcode
-3.1 Öffentliches Production-Modul <-> korrespondierendes Test-Modul.  
-3.2 Öffentliche Production-Klasse <-> im Regelfall korrespondierende Test-Klasse.  
-3.3 Öffentliche Production-Funktion oder -Methode <-> korrespondierende Test-Funktion oder Test-Methode.  
+3.1 Production-Modul <-> korrespondierendes Test-Modul.  
+3.2 Production-Klasse <-> im Regelfall korrespondierende Test-Klasse.  
+3.3 Production-Funktion oder -Methode <-> korrespondierende Test-Funktion oder Test-Methode.  
 3.4 Diese Zuordnung ist verbindlich. Abweichungen sind zu begründen.
-3.5 Nicht jedes öffentliche Production-Objekt benötigt einen eigenen Test. Der Schwerpunkt soll dort liegen, wo die Dichte der Fachlogik hoch ist; triviale Getter sind im Regelfall kein eigener Testgegenstand.
-3.6 Nicht-öffentliche Production-Objekte sind im Regelfall kein eigener Testgegenstand. Sonst entstehen leicht Tests, die fragil sind oder Refactorings des Production-Codes erschweren.
+3.5 Tests priorisieren die öffentliche API. Sonst entstehen leicht Tests, die fragil sind oder Refactorings des Production-Codes erschweren.
+3.6 Nicht-öffentliche Objekte können eigene Tests haben, wenn sie substanzielle Fachlogik tragen oder die Tests über die öffentliche API unhandlich würden. Auch solche Tests folgen möglichst der Struktur des Production-Codes.
+3.7 Nicht jedes öffentliche Production-Objekt benötigt einen eigenen Test. Der Schwerpunkt soll dort liegen, wo die Dichte der Fachlogik hoch ist; triviale Getter sind im Regelfall kein eigener Testgegenstand.
 
 ### 4 Integrationstests
 4.1 Tests für Zusammensetzungen mehrerer Production-Bausteine sind erlaubt.  
