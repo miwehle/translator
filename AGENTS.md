@@ -19,6 +19,10 @@ Provisorische Workarounds, Debug-Helfer und asymmetrische Zwischenloesungen sind
 1.1 Testcode soll klar strukturiert und klar benannt sein.  
 1.2 Testcode folgt einer 1:1-Korrespondenz zum Production-Code.  
 1.3 Abweichungen davon sind zu begründen.
+1.4 Auch fuer Unit-Tests gilt das KISS-Prinzip. Testcode soll moeglichst klein, zielgerichtet und mit geringer mentaler Last bleiben.
+1.5 Bestehenden Testcode bevorzugt geschickt wiederverwenden und erweitern, wenn dadurch Diff, `LOC` und Redundanz kleiner bleiben.
+1.6 Auch bei Testcode aktiv prüfen, ob eine kleine Vereinfachung oder ein kleines Refactoring bestehenden Testcode vereinfachen und `LOC` sparen kann.
+1.7 Vor groesseren Refactorings am Testcode kurz beschreiben, was vereinfacht werden soll, und ein Go einholen.
 
 ### 2 Definition von "öffentlich"
 2.1 Öffentlich ist ausschließlich, was über das zuständige `__init__.py` öffentlich gemacht wird.  
