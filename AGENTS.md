@@ -81,6 +81,8 @@ Funktionsköpfe und besonders Funktionsaufrufe nicht vorschnell vertikal aufbrec
 
 Mehrzeilige Python-Aufrufe sind möglichst kompakt zu schreiben. Zeilen, die nur aus einer schließenden Klammer bestehen, sind im Regelfall zu vermeiden. Funktionsaufrufe und ähnliche Konstrukte sollen erst bis zur maximal erlaubten Zeilenlänge horizontal wachsen, bevor sie vertikal wachsen.
 
+Ein häufiges unnötiges Muster ist ein abschließendes Komma im letzten Argument, gefolgt von einer eigenen Zeile nur mit der schließenden Klammer. Wenn das Entfernen dieses letzten Kommas eine kompaktere und weiterhin klar lesbare Form innerhalb der maximal erlaubten Zeilenlänge ermöglicht, ist diese Form zu bevorzugen.
+
 Zur Einordnung: In einer Stichprobe des Hugging Face Transformers-Codes liegt der Anteil von Zeilen, die nur aus einer schließenden Klammer bestehen, grob bei 3 %. Ein deutlich höherer Anteil ist in diesem Workspace nicht erwünscht.
 
 Bestehende kompakte Aufruf-Layouts nicht ohne fachlichen Grund aufspreizen. Reine Stil-Umbauten hin zu mehr vertikaler Länge vermeiden.
