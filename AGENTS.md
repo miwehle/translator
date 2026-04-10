@@ -79,6 +79,10 @@ Python-Code standardmäßig kompakt schreiben. Innerhalb der konfigurierten maxi
 
 Funktionsköpfe und besonders Funktionsaufrufe nicht vorschnell vertikal aufbrechen. Ein-Parameter-pro-Zeile-Layouts sind nicht der Default. Sie sind nur sinnvoll, wenn die kompakte Form die Zeilenlänge überschreitet oder fachlich klar schlechter lesbar wäre.
 
+Mehrzeilige Python-Aufrufe sind möglichst kompakt zu schreiben. Zeilen, die nur aus einer schließenden Klammer bestehen, sind im Regelfall zu vermeiden. Funktionsaufrufe und ähnliche Konstrukte sollen erst bis zur maximal erlaubten Zeilenlänge horizontal wachsen, bevor sie vertikal wachsen.
+
+Zur Einordnung: In einer Stichprobe des Hugging Face Transformers-Codes liegt der Anteil von Zeilen, die nur aus einer schließenden Klammer bestehen, grob bei 3 %. Ein deutlich höherer Anteil ist in diesem Workspace nicht erwünscht.
+
 Bestehende kompakte Aufruf-Layouts nicht ohne fachlichen Grund aufspreizen. Reine Stil-Umbauten hin zu mehr vertikaler Länge vermeiden.
 
 Positionale Parameter bevorzugen, wenn der Aufruf dadurch kürzer und trotzdem klar bleibt. Keyword-only-Parameter nur mit klarem Mehrwert für Lesbarkeit, Sicherheit oder Eindeutigkeit. Aufgeblähte Funktionsaufrufe durch unnötige Keywords vermeiden.
