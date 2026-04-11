@@ -5,7 +5,7 @@ Dies ist ein Multi-Ordner-Workspace.
 Zu diesem Workspace gehoeren die Ordner `translator`, `data_preprocessor` und `model_based_curation`.
 
 Wenn in Anfragen `data_preprocessor` erwaehnt wird, ist damit in diesem Workspace der eigenstaendige Workspace-Ordner `data_preprocessor` gemeint oder das darin enthaltene Hauptpaket gleichen Namens, nicht ein Unterordner von `translator`.
-Analog für `model_based_curation`.
+Analog für `model_based_curation` und `lab_infrastructure`.
 
 ## Refactorings
 
