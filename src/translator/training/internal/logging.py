@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import logging
 import time
@@ -8,13 +8,13 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
-from nmt_lab_shared.compute_metrics import (
+from lab_infrastructure.compute_metrics import (
     detect_compute_hardware,
     estimate_compute_units,
     estimate_cost,
     get_gpu_util,
 )
-from nmt_lab_shared.logging import get_logger
+from lab_infrastructure.logging import get_logger
 
 
 @dataclass
@@ -155,3 +155,4 @@ class TrainingLogger:
         self.decoder_token_count = 0
         self.decoder_sequence_count = 0
         return message
+

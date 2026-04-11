@@ -1,4 +1,4 @@
-"""Public Translator API."""
+﻿"""Public Translator API."""
 
 from __future__ import annotations
 
@@ -11,9 +11,9 @@ from pathlib import Path
 from typing import cast
 
 import yaml
-from nmt_lab_shared.compute_metrics import detect_compute_hardware
-from nmt_lab_shared.logging import get_logger
-from nmt_lab_shared.run_config import git_head_commit, write_run_config
+from lab_infrastructure.compute_metrics import detect_compute_hardware
+from lab_infrastructure.logging import get_logger
+from lab_infrastructure.run_config import git_head_commit, write_run_config
 
 from translator.training.dataset import DatasetMetadata, load_arrow_records
 
@@ -189,3 +189,4 @@ def train(
     log_training_finish(summary)
 
     return summary
+

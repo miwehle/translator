@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import os
 import shutil
@@ -7,7 +7,7 @@ from datetime import datetime
 from pathlib import Path
 
 import pytest
-from nmt_lab_shared.logging import close_logger
+from lab_infrastructure.logging import close_logger
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 _PYTEST_RUNS_DIR = _REPO_ROOT / ".local_tmp" / "pytest-fixture-runs"
@@ -49,3 +49,4 @@ def tmp_path(_translator_pytest_run_dir: Path) -> Path:
 def _close_translator_logging_after_test():
     yield
     close_logger("translator")
+

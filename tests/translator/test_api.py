@@ -1,11 +1,11 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import csv
 from pathlib import Path
 
 import pytest
 import yaml
-from nmt_lab_shared.run_config import read_run_config
+from lab_infrastructure.run_config import read_run_config
 
 from tests.translator.training.support import create_valid_mapped_dataset, train_config_for_test
 from translator.api import check_dataset, train
@@ -167,3 +167,4 @@ def test_check_dataset_uses_dataset_manifest_defaults(tmp_path: Path) -> None:
     assert result["tgt_field"] == "tgt_ids"
     assert result["src_pad_idx"] == 0
     assert result["tgt_pad_idx"] == 1
+
