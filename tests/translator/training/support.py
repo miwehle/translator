@@ -18,6 +18,7 @@ def create_valid_mapped_dataset(dataset_dir: Path) -> Path:
         "src_ids": [[10, 100 + (i % 17), 11] for i in range(512)],
         "tgt_ids": [[2, 20 + (i % 9), 3] for i in range(512)],
     }
+    dataset_dir.mkdir(parents=True, exist_ok=True)
     Dataset.from_dict(rows).save_to_disk(str(dataset_dir))
     return dataset_dir
 

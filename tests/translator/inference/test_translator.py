@@ -45,7 +45,7 @@ class _FakeModel:
 class TestTranslator:
     def test_translate_many_restores_training_mode(self) -> None:
         model = _FakeModel()
-        translator = Translator(model, _FakeTokenizer(), torch.device("cpu"), 7)
+        translator = Translator(model, _FakeTokenizer(), torch.device("cpu"), 7, beam=False)
 
         out = translator.translate_many(["Hallo"])
 
