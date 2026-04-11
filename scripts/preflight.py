@@ -4,12 +4,15 @@ import json
 import sys
 from pathlib import Path
 
-import yaml
+from nmt_lab_shared.run_config import read_run_config
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SRC_DIR = REPO_ROOT / "src"
+SHARED_SRC_DIR = REPO_ROOT.parent / "nmt_lab_shared" / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
+if str(SHARED_SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SHARED_SRC_DIR))
 
 
 def main() -> int:
@@ -21,8 +24,7 @@ def main() -> int:
 
     config_path = Path(sys.argv[1])
     try:
-        with config_path.open("r", encoding="utf-8") as f:
-            cfg = yaml.safe_load(f) or {}
+        cfg = read_run_config(config_path)
     except Exception as exc:
         print(f"Failed to load config: {exc}")
         return 1

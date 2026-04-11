@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import csv
 import logging
-import subprocess
 from collections.abc import Sequence
 from dataclasses import asdict, replace
 from datetime import datetime
@@ -12,25 +11,16 @@ from pathlib import Path
 from typing import cast
 
 import yaml
+from nmt_lab_shared.compute_metrics import detect_compute_hardware
+from nmt_lab_shared.logging import get_logger
+from nmt_lab_shared.run_config import git_head_commit, write_run_config
 
 from translator.training.dataset import DatasetMetadata, load_arrow_records
 
-from .shared import Example, configure_translator_logging, detect_hardware_type
+from .shared import Example
 from .training import DataLoaderConfig, Factory, ModelConfig, TrainConfig, Trainer, TrainingSummary, preflight
 
 logger = logging.getLogger(__name__)
-
-
-def _git_head(repo_root: Path) -> str:
-    return subprocess.run(
-        ["git", "rev-parse", "HEAD"], cwd=repo_root, capture_output=True, text=True, check=True
-    ).stdout.strip()
-
-
-def _write_run_config(run_dir: Path, payload: dict[str, object], *, build_commit: str) -> None:
-    (run_dir / "training_config.yaml").write_text(
-        yaml.safe_dump({**payload, "build_commit": build_commit}, sort_keys=True), encoding="utf-8"
-    )
 
 
 def _write_training_summary(summary_path: Path, summary: TrainingSummary) -> None:
@@ -129,21 +119,21 @@ def train(
         run_dir = _next_available_run_dir(train_config.training_runs_dir / train_config.run_name)
         run_dir.mkdir(parents=True, exist_ok=False)
         resolved_train_config = replace(train_config, run_name=run_dir.name)
-        configure_translator_logging(log_path=run_dir / "training.log")
+        get_logger("translator", log_path=run_dir / "training.log", stream=True)
         resolved_repo_root = Path(repo_root)
-        git_commit = _git_head(resolved_repo_root)
-        _write_run_config(
-            run_dir,
+        write_run_config(
+            run_dir / "training_config.yaml",
             {
                 "model_config": (asdict(model_config) if model_config is not None else None),
                 "resume_run": resume_run,
                 "train_config": asdict(resolved_train_config),
                 "data_loader_config": asdict(data_loader_config),
             },
-            build_commit=git_commit,
+            repo_root=resolved_repo_root,
+            git_key_prefix="translator",
         )
 
-        return examples, metadata, git_commit, resolved_train_config
+        return examples, metadata, str(git_head_commit(resolved_repo_root) or ""), resolved_train_config
 
     def load_validation_dataset(
         resolved_train_config: TrainConfig, training_metadata: DatasetMetadata
@@ -159,7 +149,7 @@ def train(
         resolved_device = resolved_train_config.device if resolved_train_config.device is not None else "auto"
         logger.info(
             "Start training hardware=%s run_dir=%s epochs=%s batch_size=%s device=%s",
-            detect_hardware_type(),
+            detect_compute_hardware(),
             resolved_train_config.training_runs_dir / resolved_train_config.run_name,
             resolved_train_config.epochs,
             data_loader_config.batch_size,

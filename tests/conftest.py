@@ -7,8 +7,7 @@ from datetime import datetime
 from pathlib import Path
 
 import pytest
-
-from translator.shared.logging_utils import close_translator_logging
+from nmt_lab_shared.logging import close_logger
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 _PYTEST_RUNS_DIR = _REPO_ROOT / ".local_tmp" / "pytest-fixture-runs"
@@ -49,4 +48,4 @@ def tmp_path(_translator_pytest_run_dir: Path) -> Path:
 @pytest.fixture(autouse=True)
 def _close_translator_logging_after_test():
     yield
-    close_translator_logging()
+    close_logger("translator")

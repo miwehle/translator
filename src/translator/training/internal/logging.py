@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import subprocess
 import time
 import traceback
 from collections.abc import Sequence
@@ -9,22 +8,13 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
-from ...shared import configure_translator_logging, detect_hardware_type
-
-_CU_RATES = {"T4": 1.8, "V100": 5.0, "A100": 12.5, "H100": 22.5, "RTXPRO6000": 22.5, "CPU": 0.5}
-
-
-def _get_gpu_util() -> int | None:
-    try:
-        out = subprocess.check_output(
-            ["nvidia-smi", "--query-gpu=utilization.gpu", "--format=csv,noheader,nounits"], text=True
-        )
-    except (FileNotFoundError, subprocess.CalledProcessError):
-        return None
-    try:
-        return int(out.strip())
-    except ValueError:
-        return None
+from nmt_lab_shared.compute_metrics import (
+    detect_compute_hardware,
+    estimate_compute_units,
+    estimate_cost,
+    get_gpu_util,
+)
+from nmt_lab_shared.logging import get_logger
 
 
 @dataclass
@@ -33,7 +23,7 @@ class TrainingLogger:
     total_steps: int | None = None
     euro_per_cu: float = 0.10
     start_time: datetime = field(default_factory=datetime.now)
-    hardware_type: str = field(default_factory=detect_hardware_type)
+    hardware_type: str = field(default_factory=detect_compute_hardware)
     last_log_time: float = field(default_factory=time.time)
     decoder_token_count: int = 0
     total_decoder_token_count: int = 0
@@ -41,7 +31,7 @@ class TrainingLogger:
     logger: logging.Logger = field(init=False)
 
     def __post_init__(self) -> None:
-        configure_translator_logging(log_path=self.log_path)
+        get_logger("translator", log_path=self.log_path, stream=True)
         self.logger = logging.getLogger("translator.training.trainer")
 
     def add_decoder_tokens(self, count: int, num_sequences: int) -> None:
@@ -60,22 +50,6 @@ class TrainingLogger:
         if self.decoder_sequence_count <= 0:
             return None
         return self.decoder_token_count / self.decoder_sequence_count
-
-    def _estimate_compute_units_used(self) -> float | None:
-        if self.hardware_type not in _CU_RATES:
-            return None
-
-        elapsed_seconds = (datetime.now() - self.start_time).total_seconds()
-        if elapsed_seconds < 0:
-            return None
-
-        elapsed_hours = elapsed_seconds / 3600.0
-        return elapsed_hours * _CU_RATES[self.hardware_type]
-
-    def _estimate_euro_cost(self, used_cu: float | None) -> float | None:
-        if used_cu is None or self.euro_per_cu < 0:
-            return None
-        return used_cu * self.euro_per_cu
 
     def _progress_percent(self, step: int) -> int | None:
         if self.total_steps is None or self.total_steps <= 0:
@@ -114,9 +88,9 @@ class TrainingLogger:
     ) -> str:
         dec_tok_s = self._decoder_tokens_per_second()
         avg_tgt_len = self._average_target_length()
-        gpu_util = _get_gpu_util()
-        used_cu = self._estimate_compute_units_used()
-        used_eur = self._estimate_euro_cost(used_cu)
+        gpu_util = get_gpu_util()
+        used_cu = estimate_compute_units(self.hardware_type, self.start_time)
+        used_eur = estimate_cost(used_cu, self.euro_per_cu)
         progress = self._progress_percent(step)
         gpu_text = f"{gpu_util}%" if gpu_util is not None else "-"
         progress_text = f"{progress}%" if progress is not None else "-"

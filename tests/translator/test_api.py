@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 import yaml
+from nmt_lab_shared.run_config import read_run_config
 
 from tests.translator.training.support import create_valid_mapped_dataset, train_config_for_test
 from translator.api import check_dataset, train
@@ -49,7 +50,7 @@ def test_train_avoids_run_dir_name_collisions(tmp_path: Path, monkeypatch) -> No
     existing_run_dir.mkdir(parents=True)
     (existing_run_dir / "checkpoint.pt").write_text("existing checkpoint", encoding="utf-8")
 
-    monkeypatch.setattr("translator.api._git_head", lambda _: "test-commit")
+    monkeypatch.setattr("translator.api.git_head_commit", lambda _: "test-commit")
 
     summary = train(
         train_config_for_test(
@@ -88,7 +89,7 @@ def test_train_resumes_from_checkpoint(tmp_path: Path, monkeypatch) -> None:
     _write_dataset_manifest(validation_dir)
     run_root = artifacts_dir / "training_runs"
 
-    monkeypatch.setattr("translator.api._git_head", lambda _: "test-commit")
+    monkeypatch.setattr("translator.api.git_head_commit", lambda _: "test-commit")
 
     train(
         train_config_for_test(
@@ -110,7 +111,7 @@ def test_train_resumes_from_checkpoint(tmp_path: Path, monkeypatch) -> None:
 
     second_run_dir = run_root / "run2"
     manifest = yaml.safe_load(second_run_dir.joinpath("checkpoint_manifest.yaml").read_text(encoding="utf-8"))
-    train_cfg = yaml.safe_load(second_run_dir.joinpath("training_config.yaml").read_text(encoding="utf-8"))
+    train_cfg = read_run_config(second_run_dir / "training_config.yaml")
     training_summary = yaml.safe_load(
         second_run_dir.joinpath("training_summary.yaml").read_text(encoding="utf-8")
     )
@@ -142,7 +143,7 @@ def test_train_rejects_incompatible_validation_dataset(tmp_path: Path, monkeypat
     _write_dataset_manifest(dataset_dir)
     _write_dataset_manifest(validation_dir, src_pad_id=999)
 
-    monkeypatch.setattr("translator.api._git_head", lambda _: "test-commit")
+    monkeypatch.setattr("translator.api.git_head_commit", lambda _: "test-commit")
 
     with pytest.raises(ValueError, match="Validation dataset metadata mismatch"):
         train(
