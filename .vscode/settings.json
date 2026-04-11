@@ -15,9 +15,6 @@
   "editor.codeActionsOnSave": {
     "source.organizeImports": "explicit"
   },
-  "[python]": {
-    "editor.defaultFormatter": "charliermarsh.ruff"
-  },
   "ruff.organizeImports": true,
 
   "files.exclude": {
