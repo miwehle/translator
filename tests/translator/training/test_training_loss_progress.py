@@ -15,13 +15,7 @@ from tests.translator.training.support import (
     pad_index_from_records,
     train_config_for_test,
 )
-from translator.training import (
-    DataLoaderConfig,
-    Example,
-    ModelConfig,
-    Trainer,
-    check_dataset,
-)
+from translator.training import DataLoaderConfig, Example, ModelConfig, Trainer, check_dataset
 from translator.training.dataset import load_arrow_records
 from translator.training.internal.factory import Factory
 
@@ -47,24 +41,14 @@ def _parse_losses(stdout_text: str) -> list[float]:
 
 
 def _build_training_log_body(
-    *,
-    dataset_path: Path,
-    train_kwargs: Mapping[str, object],
-    summary: Mapping[str, object],
-    stdout_text: str,
+    *, dataset_path: Path, train_kwargs: Mapping[str, object], summary: Mapping[str, object], stdout_text: str
 ) -> str:
     step_rows: list[tuple[int, int, float]] = []
     for line in stdout_text.splitlines():
         match = STEP_LINE_RE.match(line.strip())
         if match is None:
             continue
-        step_rows.append(
-            (
-                int(match.group("step")),
-                int(match.group("epoch")),
-                float(match.group("loss")),
-            )
-        )
+        step_rows.append((int(match.group("step")), int(match.group("epoch")), float(match.group("loss"))))
 
     lines = [f"dataset_path={dataset_path}", "train_kwargs:"]
     for key in sorted(train_kwargs):
@@ -80,23 +64,15 @@ def _build_training_log_body(
 
 
 def test_trainer_loss_trend_decreases_on_synthetic_smoke_dataset(
-    tmp_path: Path,
-    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     dataset_path = create_valid_mapped_dataset(tmp_path / "valid_training.mapped")
     ds = cast(Iterable[Example], load_arrow_records(dataset_path))
     src_pad_idx = pad_index_from_records(dataset_path, "src_ids")
     tgt_pad_idx = pad_index_from_records(dataset_path, "tgt_ids")
 
-    train_kwargs: dict[str, object] = {
-        "dataset_path": dataset_path,
-        "device": "cpu",
-    }
-    check_result = check_dataset(
-        ds,
-        src_pad_idx=src_pad_idx,
-        tgt_pad_idx=tgt_pad_idx,
-    )
+    train_kwargs: dict[str, object] = {"dataset_path": dataset_path, "device": "cpu"}
+    check_result = check_dataset(ds, src_pad_idx=src_pad_idx, tgt_pad_idx=tgt_pad_idx)
     factory = Factory(
         dataset_metadata=type(
             "_DatasetMetadata",
@@ -115,29 +91,14 @@ def test_trainer_loss_trend_decreases_on_synthetic_smoke_dataset(
         )()
     )
     train_config = train_config_for_test(
-        str(tmp_path),
-        run_name="synthetic_run",
-        device="cpu",
-        seed=7,
-        lr=1e-3,
-        epochs=2,
-        log_every=1,
+        str(tmp_path), run_name="synthetic_run", device="cpu", seed=7, lr=1e-3, epochs=2, log_every=1
     )
     t0 = time.perf_counter()
     out = Trainer(
         factory,
         train_config,
-        DataLoaderConfig(
-            batch_size=32,
-            shuffle=False,
-        ),
-        model_config=ModelConfig(
-            d_model=64,
-            ff_dim=128,
-            num_heads=4,
-            num_layers=2,
-            dropout=0.0,
-        ),
+        DataLoaderConfig(batch_size=32, shuffle=False),
+        model_config=ModelConfig(d_model=64, ff_dim=128, num_heads=4, num_layers=2, dropout=0.0),
     ).train(ds)
     training_duration_seconds = time.perf_counter() - t0
 
@@ -178,16 +139,11 @@ def test_trainer_loss_trend_decreases_on_synthetic_smoke_dataset(
     )
 
 
-#@pytest.mark.slow
+# @pytest.mark.slow
 def test_trainer_loss_trend_decreases_on_real_preprocessed_dataset(
-    tmp_path: Path,
-    capsys: pytest.CaptureFixture[str],
-) -> None:    
-    dataset_path = (
-        Path(__file__).resolve().parents[2]
-        / "testdata"
-        / "europarl_de-en_train_300"
-    )
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    dataset_path = Path(__file__).resolve().parents[2] / "testdata" / "europarl_de-en_train_300"
     if not dataset_path.is_dir():
         pytest.skip(f"Missing test dataset directory: {dataset_path}")
 
@@ -195,15 +151,8 @@ def test_trainer_loss_trend_decreases_on_real_preprocessed_dataset(
     src_pad_idx = pad_index_from_records(dataset_path, "src_ids")
     tgt_pad_idx = pad_index_from_records(dataset_path, "tgt_ids")
 
-    train_kwargs: dict[str, object] = {
-        "dataset_path": dataset_path,
-        "device": "cpu",
-    }
-    check_result = check_dataset(
-        ds,
-        src_pad_idx=src_pad_idx,
-        tgt_pad_idx=tgt_pad_idx,
-    )
+    train_kwargs: dict[str, object] = {"dataset_path": dataset_path, "device": "cpu"}
+    check_result = check_dataset(ds, src_pad_idx=src_pad_idx, tgt_pad_idx=tgt_pad_idx)
     factory = Factory(
         dataset_metadata=type(
             "_DatasetMetadata",
@@ -222,29 +171,14 @@ def test_trainer_loss_trend_decreases_on_real_preprocessed_dataset(
         )()
     )
     train_config = train_config_for_test(
-        str(tmp_path),
-        run_name="real_run",
-        device="cpu",
-        seed=7,
-        lr=1e-3,
-        epochs=4,
-        log_every=1,
+        str(tmp_path), run_name="real_run", device="cpu", seed=7, lr=1e-3, epochs=4, log_every=1
     )
     t0 = time.perf_counter()
     out = Trainer(
         factory,
         train_config,
-        DataLoaderConfig(
-            batch_size=32,
-            shuffle=False,
-        ),
-        model_config=ModelConfig(
-            d_model=64,
-            ff_dim=128,
-            num_heads=4,
-            num_layers=2,
-            dropout=0.0,
-        ),
+        DataLoaderConfig(batch_size=32, shuffle=False),
+        model_config=ModelConfig(d_model=64, ff_dim=128, num_heads=4, num_layers=2, dropout=0.0),
     ).train(ds)
     training_duration_seconds = time.perf_counter() - t0
 

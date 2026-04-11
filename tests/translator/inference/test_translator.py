@@ -37,9 +37,7 @@ class _FakeModel:
         self.training = mode
         return self
 
-    def translate(
-        self, src_ids: list[int], max_len: int, device: torch.device, eos_idx: int
-    ) -> list[int]:
+    def translate(self, src_ids: list[int], max_len: int, device: torch.device, eos_idx: int) -> list[int]:
         self.calls.append((src_ids, max_len, device, eos_idx))
         return [4, eos_idx]
 
@@ -55,18 +53,10 @@ class TestTranslator:
         assert model.training is True
         assert model.calls == [([5, 1], 11, torch.device("cpu"), 9)]
 
-    def test_from_checkpoint_loads_model_and_tokenizer(
-        self, tmp_path: Path, monkeypatch
-    ) -> None:
+    def test_from_checkpoint_loads_model_and_tokenizer(self, tmp_path: Path, monkeypatch) -> None:
         model = Seq2Seq(16, 16, 8, 16, 2, 1, 0, 1, 2, dropout=0.0, max_len=32)
         checkpoint_path = tmp_path / "checkpoint.pt"
-        torch.save(
-            {
-                "model_state_dict": model.state_dict(),
-                "optimizer_state_dict": {},
-            },
-            checkpoint_path,
-        )
+        torch.save({"model_state_dict": model.state_dict(), "optimizer_state_dict": {}}, checkpoint_path)
         (tmp_path / "checkpoint_manifest.yaml").write_text(
             yaml.safe_dump(
                 {

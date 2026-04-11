@@ -6,14 +6,10 @@ import torch.nn.functional as F
 
 
 class SimpleMultiheadSDPAttention(nn.Module):
-    def __init__(
-        self, embed_dim: int, num_heads: int, dropout: float, batch_first: bool = True
-    ):
+    def __init__(self, embed_dim: int, num_heads: int, dropout: float, batch_first: bool = True):
         super().__init__()
         if not batch_first:
-            raise ValueError(
-                "SimpleMultiheadSDPAttention currently supports only batch_first=True"
-            )
+            raise ValueError("SimpleMultiheadSDPAttention currently supports only batch_first=True")
         if embed_dim % num_heads != 0:
             raise ValueError("embed_dim must be divisible by num_heads")
 
@@ -54,10 +50,7 @@ class SimpleMultiheadSDPAttention(nn.Module):
         if is_causal:
             q_len = query.size(1)
             k_len = key.size(1)
-            causal = torch.triu(
-                torch.ones(q_len, k_len, device=query.device, dtype=torch.bool),
-                diagonal=1,
-            )
+            causal = torch.triu(torch.ones(q_len, k_len, device=query.device, dtype=torch.bool), diagonal=1)
             if attn_mask is None:
                 attn_mask = causal
             elif attn_mask.dtype == torch.bool:
@@ -74,30 +67,21 @@ class SimpleMultiheadSDPAttention(nn.Module):
         if attn_mask is not None:
             if attn_mask.dtype == torch.bool:
                 if attn_mask.dim() == 2:
-                    scores = scores.masked_fill(
-                        attn_mask.unsqueeze(0).unsqueeze(0), float("-inf")
-                    )
+                    scores = scores.masked_fill(attn_mask.unsqueeze(0).unsqueeze(0), float("-inf"))
                 elif attn_mask.dim() == 3:
                     scores = scores.masked_fill(attn_mask.unsqueeze(1), float("-inf"))
                 else:
-                    raise ValueError(
-                        "attn_mask with bool dtype must have shape "
-                        "[Lq, Lk] or [B, Lq, Lk]"
-                    )
+                    raise ValueError("attn_mask with bool dtype must have shape " "[Lq, Lk] or [B, Lq, Lk]")
             else:
                 if attn_mask.dim() == 2:
                     scores = scores + attn_mask.unsqueeze(0).unsqueeze(0)
                 elif attn_mask.dim() == 3:
                     scores = scores + attn_mask.unsqueeze(1)
                 else:
-                    raise ValueError(
-                        "attn_mask must have shape [Lq, Lk] or [B, Lq, Lk]"
-                    )
+                    raise ValueError("attn_mask must have shape [Lq, Lk] or [B, Lq, Lk]")
 
         if key_padding_mask is not None:
-            scores = scores.masked_fill(
-                key_padding_mask.unsqueeze(1).unsqueeze(2), float("-inf")
-            )
+            scores = scores.masked_fill(key_padding_mask.unsqueeze(1).unsqueeze(2), float("-inf"))
 
         attn_weights = F.softmax(scores, dim=-1)
         attn_weights = self.attn_dropout(attn_weights)

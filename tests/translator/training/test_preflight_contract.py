@@ -15,10 +15,13 @@ def _write_dataset(tmp_path: Path, rows: list[dict[str, object]]) -> Path:
 
 
 def test_check_dataset_collects_basic_stats(tmp_path: Path):
-    dataset_path = _write_dataset(tmp_path, [
-        {"id": 1, "src_ids": [10, 11], "tgt_ids": [2, 20, 3]},
-        {"id": 2, "src_ids": [12, 13, 14], "tgt_ids": [2, 21, 22, 3]},
-    ])
+    dataset_path = _write_dataset(
+        tmp_path,
+        [
+            {"id": 1, "src_ids": [10, 11], "tgt_ids": [2, 20, 3]},
+            {"id": 2, "src_ids": [12, 13, 14], "tgt_ids": [2, 21, 22, 3]},
+        ],
+    )
     ds = cast(Iterable[Example], load_arrow_records(dataset_path))
 
     out = check_dataset(ds, src_pad_idx=98, tgt_pad_idx=99)
@@ -39,10 +42,10 @@ def test_check_dataset_collects_basic_stats(tmp_path: Path):
 
 
 def test_check_dataset_rejects_duplicate_ids(tmp_path: Path):
-    dataset_path = _write_dataset(tmp_path, [
-        {"id": 1, "src_ids": [1, 2], "tgt_ids": [2, 3]},
-        {"id": 1, "src_ids": [4, 5], "tgt_ids": [2, 3]},
-    ])
+    dataset_path = _write_dataset(
+        tmp_path,
+        [{"id": 1, "src_ids": [1, 2], "tgt_ids": [2, 3]}, {"id": 1, "src_ids": [4, 5], "tgt_ids": [2, 3]}],
+    )
     ds = cast(Iterable[Example], load_arrow_records(dataset_path))
 
     try:
@@ -53,10 +56,13 @@ def test_check_dataset_rejects_duplicate_ids(tmp_path: Path):
 
 
 def test_check_dataset_rejects_inconsistent_tgt_bos(tmp_path: Path):
-    dataset_path = _write_dataset(tmp_path, [
-        {"id": 1, "src_ids": [10, 11], "tgt_ids": [2, 20, 3]},
-        {"id": 2, "src_ids": [12, 13], "tgt_ids": [7, 21, 3]},
-    ])
+    dataset_path = _write_dataset(
+        tmp_path,
+        [
+            {"id": 1, "src_ids": [10, 11], "tgt_ids": [2, 20, 3]},
+            {"id": 2, "src_ids": [12, 13], "tgt_ids": [7, 21, 3]},
+        ],
+    )
     ds = cast(Iterable[Example], load_arrow_records(dataset_path))
 
     try:
@@ -68,10 +74,13 @@ def test_check_dataset_rejects_inconsistent_tgt_bos(tmp_path: Path):
 
 
 def test_check_dataset_rejects_inconsistent_tgt_eos(tmp_path: Path):
-    dataset_path = _write_dataset(tmp_path, [
-        {"id": 1, "src_ids": [10, 11], "tgt_ids": [2, 20, 3]},
-        {"id": 2, "src_ids": [12, 13], "tgt_ids": [2, 21, 8]},
-    ])
+    dataset_path = _write_dataset(
+        tmp_path,
+        [
+            {"id": 1, "src_ids": [10, 11], "tgt_ids": [2, 20, 3]},
+            {"id": 2, "src_ids": [12, 13], "tgt_ids": [2, 21, 8]},
+        ],
+    )
     ds = cast(Iterable[Example], load_arrow_records(dataset_path))
 
     try:
@@ -83,10 +92,13 @@ def test_check_dataset_rejects_inconsistent_tgt_eos(tmp_path: Path):
 
 
 def test_check_dataset_rejects_equal_tgt_bos_and_eos(tmp_path: Path):
-    dataset_path = _write_dataset(tmp_path, [
-        {"id": 1, "src_ids": [10, 11], "tgt_ids": [2, 20, 2]},
-        {"id": 2, "src_ids": [12, 13], "tgt_ids": [2, 21, 2]},
-    ])
+    dataset_path = _write_dataset(
+        tmp_path,
+        [
+            {"id": 1, "src_ids": [10, 11], "tgt_ids": [2, 20, 2]},
+            {"id": 2, "src_ids": [12, 13], "tgt_ids": [2, 21, 2]},
+        ],
+    )
     ds = cast(Iterable[Example], load_arrow_records(dataset_path))
 
     try:
@@ -97,10 +109,13 @@ def test_check_dataset_rejects_equal_tgt_bos_and_eos(tmp_path: Path):
 
 
 def test_check_dataset_rejects_pad_token_in_raw_tgt_sequences(tmp_path: Path):
-    dataset_path = _write_dataset(tmp_path, [
-        {"id": 1, "src_ids": [10, 11], "tgt_ids": [2, 99, 3]},
-        {"id": 2, "src_ids": [12, 13], "tgt_ids": [2, 21, 3]},
-    ])
+    dataset_path = _write_dataset(
+        tmp_path,
+        [
+            {"id": 1, "src_ids": [10, 11], "tgt_ids": [2, 99, 3]},
+            {"id": 2, "src_ids": [12, 13], "tgt_ids": [2, 21, 3]},
+        ],
+    )
     ds = cast(Iterable[Example], load_arrow_records(dataset_path))
 
     try:
@@ -112,10 +127,13 @@ def test_check_dataset_rejects_pad_token_in_raw_tgt_sequences(tmp_path: Path):
 
 
 def test_check_dataset_rejects_pad_token_in_raw_src_sequences(tmp_path: Path):
-    dataset_path = _write_dataset(tmp_path, [
-        {"id": 1, "src_ids": [10, 98], "tgt_ids": [2, 20, 3]},
-        {"id": 2, "src_ids": [12, 13], "tgt_ids": [2, 21, 3]},
-    ])
+    dataset_path = _write_dataset(
+        tmp_path,
+        [
+            {"id": 1, "src_ids": [10, 98], "tgt_ids": [2, 20, 3]},
+            {"id": 2, "src_ids": [12, 13], "tgt_ids": [2, 21, 3]},
+        ],
+    )
     ds = cast(Iterable[Example], load_arrow_records(dataset_path))
 
     try:

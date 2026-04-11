@@ -66,10 +66,9 @@ class Trainer:
         Use `model_config` to train from scratch. Use `resume_run` to resume from a
         previous run.
         """
+
         def validate_dataset_max_seq_len(max_seq_len: int) -> None:
-            configured_max_seq_len = getattr(
-                factory.dataset_metadata, "configured_max_seq_len", None
-            )
+            configured_max_seq_len = getattr(factory.dataset_metadata, "configured_max_seq_len", None)
             if configured_max_seq_len is None or configured_max_seq_len <= max_seq_len:
                 return
             message = (
@@ -80,30 +79,22 @@ class Trainer:
             if train_config.force:
                 logger.warning("%s; continue because force=True.", message)
                 return
-            raise ValueError(
-                f"{message}. Set train_config.force=True to continue anyway."
-            )
+            raise ValueError(f"{message}. Set train_config.force=True to continue anyway.")
 
         self._factory = factory
         self._train_config = train_config
         self._data_loader_config = data_loader_config
 
         if (model_config is None) == (resume_run is None):
-            raise ValueError(
-                "Exactly one of model_config or resume_run must be provided."
-            )
+            raise ValueError("Exactly one of model_config or resume_run must be provided.")
 
         _set_seed(train_config.seed)
         self._device = _resolve_device(train_config.device)
-        self._criterion = nn.CrossEntropyLoss(
-            ignore_index=self._factory.dataset_metadata.tgt_pad_id
-        )
+        self._criterion = nn.CrossEntropyLoss(ignore_index=self._factory.dataset_metadata.tgt_pad_id)
 
         if resume_run is not None:
             loaded = load_checkpoint(
-                train_config.training_runs_dir / resume_run / "checkpoint.pt",
-                self._factory,
-                self._device,
+                train_config.training_runs_dir / resume_run / "checkpoint.pt", self._factory, self._device
             )
             validate_dataset_max_seq_len(loaded.model_config.max_seq_len)
             self._model = loaded.model
@@ -118,12 +109,10 @@ class Trainer:
         self._optimizer = torch.optim.Adam(self._model.parameters(), lr=train_config.lr)
 
     def _loss(self, logits: torch.Tensor, tgt: torch.Tensor) -> torch.Tensor:
-        return self._criterion(logits.reshape(-1, logits.size(-1)),
-                              tgt[:, 1:].reshape(-1))
+        return self._criterion(logits.reshape(-1, logits.size(-1)), tgt[:, 1:].reshape(-1))
 
     def evaluate(self, examples: Iterable[Example] | Sequence[Example]) -> float | None:
-        loader = self._factory.create_data_loader(examples, self._data_loader_config,
-                                                 self._device)
+        loader = self._factory.create_data_loader(examples, self._data_loader_config, self._device)
         self._model.eval()
         loss_sum = 0.0
         token_count = 0
@@ -147,27 +136,24 @@ class Trainer:
         def create_training_observer(
             model: Seq2Seq, device: torch.device, total_steps: int | None
         ) -> TrainingObserver:
-            tokenizer_model_name = getattr(
-                self._factory.dataset_metadata, "tokenizer_model_name", None)
+            tokenizer_model_name = getattr(self._factory.dataset_metadata, "tokenizer_model_name", None)
             if self._train_config.translate_every is None:
                 return TrainingObserver(self._train_config, total_steps=total_steps)
             if tokenizer_model_name is None:
-                raise ValueError(
-                    "Preview translation requires dataset tokenizer_model_name.")
+                raise ValueError("Preview translation requires dataset tokenizer_model_name.")
             tokenizer = create_tokenizer("hf", [], tokenizer_model_name)
             return TrainingObserver(
                 self._train_config,
                 total_steps=total_steps,
                 translator=Translator(
-                    model, tokenizer, device,
-                    getattr(self._factory.dataset_metadata, "tgt_bos_id", None)))
+                    model, tokenizer, device, getattr(self._factory.dataset_metadata, "tgt_bos_id", None)
+                ),
+            )
 
         # main flow
         run_dir = self._train_config.training_runs_dir / self._train_config.run_name
-        loader = self._factory.create_data_loader(
-            examples, self._data_loader_config, self._device)
-        observer = create_training_observer(
-            self._model, self._device, total_steps(loader))
+        loader = self._factory.create_data_loader(examples, self._data_loader_config, self._device)
+        observer = create_training_observer(self._model, self._device, total_steps(loader))
         self._model.train()
 
         for epoch in range(1, self._train_config.epochs + 1):
@@ -180,19 +166,16 @@ class Trainer:
                 loss = self._loss(logits, tgt)
 
                 loss.backward()
-                grad_norm = float(
-                    nn.utils.clip_grad_norm_(self._model.parameters(), 1.0))
+                grad_norm = float(nn.utils.clip_grad_norm_(self._model.parameters(), 1.0))
                 self._optimizer.step()
 
                 # log batch metrics via observer (to keep logging details out of here)
                 observer.on_batch_end(
-                    epoch, loss.item(), grad_norm, batch_ids,
-                    tgt.size(0), tgt_token_count=tgt[:, 1:].numel())
+                    epoch, loss.item(), grad_norm, batch_ids, tgt.size(0), tgt_token_count=tgt[:, 1:].numel()
+                )
 
         checkpoint_file = save_checkpoint(
-            run_dir, self._model, self._optimizer, self._model_config,
-            self._factory.dataset_metadata)
+            run_dir, self._model, self._optimizer, self._model_config, self._factory.dataset_metadata
+        )
 
-        return TrainingSummary(
-            observer.processed_examples, observer.loss_value,
-            str(checkpoint_file), None)
+        return TrainingSummary(observer.processed_examples, observer.loss_value, str(checkpoint_file), None)

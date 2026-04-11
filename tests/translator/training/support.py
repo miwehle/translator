@@ -31,10 +31,7 @@ def pad_index_from_records(dataset_path: Path, field: str) -> int:
         row_map = cast(Mapping[str, object], row)
         values_obj = row_map.get(field)
         if not isinstance(values_obj, list):
-            raise ValueError(
-                f"Expected list[int] in field '{field}', got "
-                f"{type(values_obj).__name__}."
-            )
+            raise ValueError(f"Expected list[int] in field '{field}', got " f"{type(values_obj).__name__}.")
         values = [int(x) for x in values_obj]
         max_token = max(max_token, max(values))
     return max_token + 1
@@ -51,12 +48,7 @@ def train_config_for_test(run_root: str, **overrides: object) -> TrainConfig:
     return TrainConfig(**config)
 
 
-def log(
-    *,
-    module_file: Path,
-    test_name: str,
-    body: str,
-) -> Path:
+def log(*, module_file: Path, test_name: str, body: str) -> Path:
     """Append a test section to the module log in the caller's package-local
     `.log` directory.
 
@@ -79,9 +71,7 @@ def log(
     with log_path.open(mode, encoding="utf-8") as f:
         if mode == "a":
             f.write("\n")
-        f.write(
-            f"=== {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | {test_name} ===\n"
-        )
+        f.write(f"=== {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | {test_name} ===\n")
         f.write(body)
         if not body.endswith("\n"):
             f.write("\n")

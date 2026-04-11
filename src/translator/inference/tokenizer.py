@@ -23,15 +23,11 @@ class TokenizerProtocol(Protocol):
 TOKENIZER_CHOICES = ("hf",)
 
 
-def create_tokenizer(
-    tokenizer: str, texts: list[str], hf_tokenizer_name: str
-) -> TokenizerProtocol:
+def create_tokenizer(tokenizer: str, texts: list[str], hf_tokenizer_name: str) -> TokenizerProtocol:
     del texts
     if tokenizer == "hf":
         return HuggingFaceTokenizerAdapter.from_pretrained(hf_tokenizer_name)
-    raise ValueError(
-        f"Unknown tokenizer={tokenizer!r}. Allowed values: {TOKENIZER_CHOICES}."
-    )
+    raise ValueError(f"Unknown tokenizer={tokenizer!r}. Allowed values: {TOKENIZER_CHOICES}.")
 
 
 class HuggingFaceTokenizerAdapter:

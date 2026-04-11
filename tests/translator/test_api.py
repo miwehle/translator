@@ -6,16 +6,11 @@ from pathlib import Path
 import pytest
 import yaml
 
-from tests.translator.training.support import (
-    create_valid_mapped_dataset,
-    train_config_for_test,
-)
+from tests.translator.training.support import create_valid_mapped_dataset, train_config_for_test
 from translator.api import check_dataset, train
 from translator.training import DataLoaderConfig, ModelConfig
 
-_MODEL_CONFIG = ModelConfig(
-    d_model=32, ff_dim=64, num_heads=4, num_layers=2, dropout=0.0
-)
+_MODEL_CONFIG = ModelConfig(d_model=32, ff_dim=64, num_heads=4, num_layers=2, dropout=0.0)
 
 
 def _write_dataset_manifest(dataset_dir: Path, **overrides: object) -> None:
@@ -38,40 +33,27 @@ def _write_dataset_manifest(dataset_dir: Path, **overrides: object) -> None:
         **overrides,
     }
     (dataset_dir / "dataset_manifest.yaml").write_text(
-        yaml.safe_dump(manifest, sort_keys=False),
-        encoding="utf-8",
+        yaml.safe_dump(manifest, sort_keys=False), encoding="utf-8"
     )
 
 
 def test_train_avoids_run_dir_name_collisions(tmp_path: Path, monkeypatch) -> None:
     artifacts_dir = tmp_path / "artifacts"
-    dataset_dir = create_valid_mapped_dataset(
-        artifacts_dir / "datasets" / "dataset.mapped"
-    )
-    validation_dir = create_valid_mapped_dataset(
-        artifacts_dir / "datasets" / "validation.mapped"
-    )
+    dataset_dir = create_valid_mapped_dataset(artifacts_dir / "datasets" / "dataset.mapped")
+    validation_dir = create_valid_mapped_dataset(artifacts_dir / "datasets" / "validation.mapped")
     _write_dataset_manifest(dataset_dir)
     _write_dataset_manifest(validation_dir)
 
     run_root = artifacts_dir / "training_runs"
     existing_run_dir = run_root / "run1"
     existing_run_dir.mkdir(parents=True)
-    (existing_run_dir / "checkpoint.pt").write_text(
-        "existing checkpoint", encoding="utf-8"
-    )
+    (existing_run_dir / "checkpoint.pt").write_text("existing checkpoint", encoding="utf-8")
 
     monkeypatch.setattr("translator.api._git_head", lambda _: "test-commit")
 
     summary = train(
         train_config_for_test(
-            str(artifacts_dir),
-            run_name="run1",
-            device="cpu",
-            epochs=1,
-            log_every=1000,
-            lr=1e-3,
-            seed=7,
+            str(artifacts_dir), run_name="run1", device="cpu", epochs=1, log_every=1000, lr=1e-3, seed=7
         ),
         DataLoaderConfig(batch_size=32, shuffle=False),
         tmp_path,
@@ -82,14 +64,10 @@ def test_train_avoids_run_dir_name_collisions(tmp_path: Path, monkeypatch) -> No
     training_summary = yaml.safe_load(
         new_run_dir.joinpath("training_summary.yaml").read_text(encoding="utf-8")
     )
-    with run_root.joinpath("checkpoint_register.csv").open(
-        "r", encoding="utf-8", newline=""
-    ) as handle:
+    with run_root.joinpath("checkpoint_register.csv").open("r", encoding="utf-8", newline="") as handle:
         register_rows = list(csv.DictReader(handle))
 
-    assert existing_run_dir.joinpath("checkpoint.pt").read_text(encoding="utf-8") == (
-        "existing checkpoint"
-    )
+    assert existing_run_dir.joinpath("checkpoint.pt").read_text(encoding="utf-8") == ("existing checkpoint")
     assert new_run_dir.is_dir()
     assert new_run_dir.joinpath("training_config.yaml").is_file()
     assert new_run_dir.joinpath("training_summary.yaml").is_file()
@@ -104,12 +82,8 @@ def test_train_avoids_run_dir_name_collisions(tmp_path: Path, monkeypatch) -> No
 
 def test_train_resumes_from_checkpoint(tmp_path: Path, monkeypatch) -> None:
     artifacts_dir = tmp_path / "artifacts"
-    dataset_dir = create_valid_mapped_dataset(
-        artifacts_dir / "datasets" / "dataset.mapped"
-    )
-    validation_dir = create_valid_mapped_dataset(
-        artifacts_dir / "datasets" / "validation.mapped"
-    )
+    dataset_dir = create_valid_mapped_dataset(artifacts_dir / "datasets" / "dataset.mapped")
+    validation_dir = create_valid_mapped_dataset(artifacts_dir / "datasets" / "validation.mapped")
     _write_dataset_manifest(dataset_dir)
     _write_dataset_manifest(validation_dir)
     run_root = artifacts_dir / "training_runs"
@@ -118,13 +92,7 @@ def test_train_resumes_from_checkpoint(tmp_path: Path, monkeypatch) -> None:
 
     train(
         train_config_for_test(
-            str(artifacts_dir),
-            run_name="run1",
-            device="cpu",
-            epochs=1,
-            log_every=1000,
-            lr=1e-3,
-            seed=7,
+            str(artifacts_dir), run_name="run1", device="cpu", epochs=1, log_every=1000, lr=1e-3, seed=7
         ),
         DataLoaderConfig(batch_size=32, shuffle=False),
         tmp_path,
@@ -133,13 +101,7 @@ def test_train_resumes_from_checkpoint(tmp_path: Path, monkeypatch) -> None:
 
     second_summary = train(
         train_config_for_test(
-            str(artifacts_dir),
-            run_name="run2",
-            device="cpu",
-            epochs=1,
-            log_every=1000,
-            lr=5e-4,
-            seed=7,
+            str(artifacts_dir), run_name="run2", device="cpu", epochs=1, log_every=1000, lr=5e-4, seed=7
         ),
         DataLoaderConfig(batch_size=32, shuffle=False),
         tmp_path,
@@ -147,18 +109,12 @@ def test_train_resumes_from_checkpoint(tmp_path: Path, monkeypatch) -> None:
     )
 
     second_run_dir = run_root / "run2"
-    manifest = yaml.safe_load(
-        second_run_dir.joinpath("checkpoint_manifest.yaml").read_text(encoding="utf-8")
-    )
-    train_cfg = yaml.safe_load(
-        second_run_dir.joinpath("training_config.yaml").read_text(encoding="utf-8")
-    )
+    manifest = yaml.safe_load(second_run_dir.joinpath("checkpoint_manifest.yaml").read_text(encoding="utf-8"))
+    train_cfg = yaml.safe_load(second_run_dir.joinpath("training_config.yaml").read_text(encoding="utf-8"))
     training_summary = yaml.safe_load(
         second_run_dir.joinpath("training_summary.yaml").read_text(encoding="utf-8")
     )
-    with run_root.joinpath("checkpoint_register.csv").open(
-        "r", encoding="utf-8", newline=""
-    ) as handle:
+    with run_root.joinpath("checkpoint_register.csv").open("r", encoding="utf-8", newline="") as handle:
         register_rows = list(csv.DictReader(handle))
 
     assert Path(second_summary.checkpoint_path) == second_run_dir / "checkpoint.pt"
@@ -179,17 +135,10 @@ def test_train_resumes_from_checkpoint(tmp_path: Path, monkeypatch) -> None:
     assert register_rows[1]["validation_loss"] == str(second_summary.validation_loss)
 
 
-def test_train_rejects_incompatible_validation_dataset(
-    tmp_path: Path,
-    monkeypatch,
-) -> None:
+def test_train_rejects_incompatible_validation_dataset(tmp_path: Path, monkeypatch) -> None:
     artifacts_dir = tmp_path / "artifacts"
-    dataset_dir = create_valid_mapped_dataset(
-        artifacts_dir / "datasets" / "dataset.mapped"
-    )
-    validation_dir = create_valid_mapped_dataset(
-        artifacts_dir / "datasets" / "validation.mapped"
-    )
+    dataset_dir = create_valid_mapped_dataset(artifacts_dir / "datasets" / "dataset.mapped")
+    validation_dir = create_valid_mapped_dataset(artifacts_dir / "datasets" / "validation.mapped")
     _write_dataset_manifest(dataset_dir)
     _write_dataset_manifest(validation_dir, src_pad_id=999)
 
@@ -198,12 +147,7 @@ def test_train_rejects_incompatible_validation_dataset(
     with pytest.raises(ValueError, match="Validation dataset metadata mismatch"):
         train(
             train_config_for_test(
-                str(artifacts_dir),
-                device="cpu",
-                epochs=1,
-                log_every=1000,
-                lr=1e-3,
-                seed=7,
+                str(artifacts_dir), device="cpu", epochs=1, log_every=1000, lr=1e-3, seed=7
             ),
             DataLoaderConfig(batch_size=32, shuffle=False),
             tmp_path,
@@ -215,9 +159,7 @@ def test_check_dataset_uses_dataset_manifest_defaults(tmp_path: Path) -> None:
     dataset_dir = create_valid_mapped_dataset(tmp_path / "dataset.mapped")
     _write_dataset_manifest(dataset_dir)
 
-    result = check_dataset(
-        dataset_path=dataset_dir, require_unique_ids=True, min_seq_len=2
-    )
+    result = check_dataset(dataset_path=dataset_dir, require_unique_ids=True, min_seq_len=2)
 
     assert result["id_field"] == "id"
     assert result["src_field"] == "src_ids"

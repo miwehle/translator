@@ -3,28 +3,12 @@ import torch.nn as nn
 
 from translator.model.attention import SimpleMultiheadSDPAttention
 from translator.model import Seq2Seq
-from translator.model.factory import (
-    ATTENTION_CHOICES,
-    AttentionProtocol,
-    create_attention,
-)
+from translator.model.factory import ATTENTION_CHOICES, AttentionProtocol, create_attention
 
 
 def _dummy_batch(batch_size: int = 2, src_len: int = 5, tgt_len: int = 6):
-    src = torch.tensor(
-        [
-            [2, 7, 8, 0, 0],
-            [2, 5, 6, 9, 0],
-        ],
-        dtype=torch.long,
-    )[:batch_size, :src_len]
-    tgt = torch.tensor(
-        [
-            [2, 4, 3, 1, 0, 0],
-            [2, 6, 7, 8, 1, 0],
-        ],
-        dtype=torch.long,
-    )[:batch_size, :tgt_len]
+    src = torch.tensor([[2, 7, 8, 0, 0], [2, 5, 6, 9, 0]], dtype=torch.long)[:batch_size, :src_len]
+    tgt = torch.tensor([[2, 4, 3, 1, 0, 0], [2, 6, 7, 8, 1, 0]], dtype=torch.long)[:batch_size, :tgt_len]
     return src, tgt
 
 
@@ -58,9 +42,7 @@ def _copy_torch_mha_weights_to_simple(
     d_model = torch_attn.embed_dim
     with torch.no_grad():
         simple_attn.q_proj.weight.copy_(torch_attn.in_proj_weight[:d_model, :])
-        simple_attn.k_proj.weight.copy_(
-            torch_attn.in_proj_weight[d_model : 2 * d_model, :]
-        )
+        simple_attn.k_proj.weight.copy_(torch_attn.in_proj_weight[d_model : 2 * d_model, :])
         simple_attn.v_proj.weight.copy_(torch_attn.in_proj_weight[2 * d_model :, :])
         simple_attn.q_proj.bias.copy_(torch_attn.in_proj_bias[:d_model])
         simple_attn.k_proj.bias.copy_(torch_attn.in_proj_bias[d_model : 2 * d_model])
@@ -92,20 +74,11 @@ def test_simple_sdp_attention_applies_masks_and_returns_expected_shapes():
     attn_mask = torch.zeros(4, 5, dtype=torch.bool)
     attn_mask[:, -1] = True
     key_padding_mask = torch.tensor(
-        [
-            [False, False, False, False, True],
-            [False, False, False, True, True],
-        ],
-        dtype=torch.bool,
+        [[False, False, False, False, True], [False, False, False, True, True]], dtype=torch.bool
     )
 
     out, weights = attn(
-        query,
-        key,
-        value,
-        attn_mask=attn_mask,
-        key_padding_mask=key_padding_mask,
-        need_weights=True,
+        query, key, value, attn_mask=attn_mask, key_padding_mask=key_padding_mask, need_weights=True
     )
     assert out.shape == (2, 4, 16)
     assert weights is not None
@@ -129,12 +102,8 @@ def test_simple_sdp_is_causal_matches_explicit_causal_mask():
     value = torch.randn(2, 5, 16)
     explicit_causal = torch.triu(torch.ones(5, 5, dtype=torch.bool), diagonal=1)
 
-    out_is_causal, w_is_causal = attn(
-        query, key, value, is_causal=True, need_weights=True
-    )
-    out_explicit, w_explicit = attn(
-        query, key, value, attn_mask=explicit_causal, need_weights=True
-    )
+    out_is_causal, w_is_causal = attn(query, key, value, is_causal=True, need_weights=True)
+    out_explicit, w_explicit = attn(query, key, value, attn_mask=explicit_causal, need_weights=True)
 
     assert torch.allclose(out_is_causal, out_explicit, atol=1e-6, rtol=1e-5)
     assert w_is_causal is not None and w_explicit is not None
@@ -151,8 +120,7 @@ def test_simple_sdp_matches_torch_mha_protocol_behavior():
     attn_mask = torch.zeros(4, 5, dtype=torch.bool)
     attn_mask[:, -1] = True
     key_padding_mask = torch.tensor(
-        [[False, False, False, False, True], [False, False, False, True, True]],
-        dtype=torch.bool,
+        [[False, False, False, False, True], [False, False, False, True, True]], dtype=torch.bool
     )
 
     out_torch, w_torch = torch_attn(
@@ -207,8 +175,7 @@ def test_simple_sdp_matches_torch_mha_with_same_weights_backdoor():
     attn_mask = torch.zeros(4, 5, dtype=torch.bool)
     attn_mask[:, -1] = True
     key_padding_mask = torch.tensor(
-        [[False, False, False, False, True], [False, False, False, True, True]],
-        dtype=torch.bool,
+        [[False, False, False, False, True], [False, False, False, True, True]], dtype=torch.bool
     )
 
     out_torch, w_torch = torch_attn(

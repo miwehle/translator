@@ -34,10 +34,7 @@ class Factory:
     def __init__(self, dataset_metadata: DatasetMetadata) -> None:
         self.dataset_metadata = dataset_metadata
 
-    def _collate_examples(
-        self,
-        batch: list[Example],
-    ) -> tuple[torch.Tensor, torch.Tensor, list[int]]:
+    def _collate_examples(self, batch: list[Example]) -> tuple[torch.Tensor, torch.Tensor, list[int]]:
         normalized = [
             (
                 int(item[self.dataset_metadata.id_field]),
@@ -52,11 +49,7 @@ class Factory:
             pad_idx_tgt=self.dataset_metadata.tgt_pad_id,
         )
 
-    def create_model(
-        self,
-        model_config: ModelConfig,
-        device: torch.device,
-    ) -> Seq2Seq:
+    def create_model(self, model_config: ModelConfig, device: torch.device) -> Seq2Seq:
         return Seq2Seq(
             src_vocab_size=self.dataset_metadata.src_vocab_size,
             tgt_vocab_size=self.dataset_metadata.tgt_vocab_size,

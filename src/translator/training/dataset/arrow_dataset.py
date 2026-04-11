@@ -20,20 +20,14 @@ def load_arrow_records(dataset_path: str | Path):
     return loaded
 
 
-def infer_pad_idx(
-    dataset_path: str | Path,
-    field: str,
-) -> int:
+def infer_pad_idx(dataset_path: str | Path, field: str) -> int:
     records = load_arrow_records(dataset_path)
     max_token = -1
     for row in records:
         item = cast(Mapping[str, Any], row)
         values_obj = item.get(field)
         if not isinstance(values_obj, list):
-            raise ValueError(
-                f"Expected list[int] in field '{field}', got "
-                f"{type(values_obj).__name__}."
-            )
+            raise ValueError(f"Expected list[int] in field '{field}', got " f"{type(values_obj).__name__}.")
         values = [int(x) for x in values_obj]
         if not values:
             raise ValueError(f"Field '{field}' contains an empty sequence.")
@@ -45,9 +39,7 @@ def infer_pad_idx(
 
 
 def collate_fn_prod(
-    batch: list[tuple[int, list[int], list[int]]],
-    pad_idx_src: int,
-    pad_idx_tgt: int,
+    batch: list[tuple[int, list[int], list[int]]], pad_idx_src: int, pad_idx_tgt: int
 ) -> tuple[torch.Tensor, torch.Tensor, list[int]]:
     max_src = max(len(src) for _, src, _ in batch)
     max_tgt = max(len(tgt) for _, _, tgt in batch)

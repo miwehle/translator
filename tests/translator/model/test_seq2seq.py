@@ -34,9 +34,7 @@ class TestSeq2Seq:
 
         model.decode = fake_decode
 
-        out = model.translate_beam(
-            [1, 2], max_len=4, device=torch.device("cpu"), eos_idx=6, beam_width=2
-        )
+        out = model.translate_beam([1, 2], max_len=4, device=torch.device("cpu"), eos_idx=6, beam_width=2)
 
         assert out == [5, 7, 6]
 
@@ -44,9 +42,7 @@ class TestSeq2Seq:
         model = Seq2Seq(8, 8, 4, 8, 2, 1, 0, 1, 2, dropout=0.0, max_len=8)
 
         try:
-            model.translate_beam(
-                [1, 2], max_len=4, device=torch.device("cpu"), eos_idx=6, beam_width=0
-            )
+            model.translate_beam([1, 2], max_len=4, device=torch.device("cpu"), eos_idx=6, beam_width=0)
         except ValueError as exc:
             assert str(exc) == "beam_width must be at least 1."
         else:

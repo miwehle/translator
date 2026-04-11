@@ -60,10 +60,13 @@ def _create_model(
 
 class Translator:
     def __init__(
-        self, model: Seq2Seq, tokenizer: TokenizerProtocol, device: torch.device,
+        self,
+        model: Seq2Seq,
+        tokenizer: TokenizerProtocol,
+        device: torch.device,
         tgt_bos_id: int | None,
         *,
-        beam: bool = True
+        beam: bool = True,
     ) -> None:
         self.model = model
         self.tokenizer = tokenizer
@@ -79,14 +82,11 @@ class Translator:
         manifest = _load_manifest(checkpoint_file)
         checkpoint_tokenizer = manifest["tokenizer"]
         resolved_device = _resolve_device(device)
-        model = _create_model(
-            ModelConfig(**manifest["model_config"]), checkpoint_tokenizer, resolved_device
-        )
+        model = _create_model(ModelConfig(**manifest["model_config"]), checkpoint_tokenizer, resolved_device)
         payload = torch.load(checkpoint_file, map_location=resolved_device)
         model.load_state_dict(payload["model_state_dict"])
         tokenizer = create_tokenizer("hf", [], checkpoint_tokenizer["model_name"])
         return cls(model, tokenizer, resolved_device, int(checkpoint_tokenizer["tgt_bos_id"]))
-
 
     def translate(self, text: str) -> str:
         was_training = self.model.training
@@ -111,7 +111,6 @@ class Translator:
             return self.tokenizer.decode(predicted_ids)
         finally:
             self.model.train(was_training)
-
 
     def translate_many(self, texts: Sequence[str]) -> list[str]:
         return [self.translate(text) for text in texts]

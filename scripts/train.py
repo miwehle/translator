@@ -12,12 +12,7 @@ if str(SRC_DIR) not in sys.path:
 
 
 def main() -> int:
-    from translator import (
-        DataLoaderConfig,
-        ModelConfig,
-        TrainConfig,
-        train,
-    )
+    from translator import DataLoaderConfig, ModelConfig, TrainConfig, train
 
     if len(sys.argv) != 2:
         print("Usage: python scripts/train.py <config-path>")
@@ -32,17 +27,12 @@ def main() -> int:
         return 1
 
     try:
-        model_config = (
-            None if cfg.get("model_config") is None
-            else ModelConfig(**cfg["model_config"])
-        )
+        model_config = None if cfg.get("model_config") is None else ModelConfig(**cfg["model_config"])
         resume_run = cfg.get("resume_run")
 
         train_config = TrainConfig(**(cfg.get("train_config") or {}))
         data_loader_config = DataLoaderConfig(**(cfg.get("data_loader_config") or {}))
-        train(
-            train_config, data_loader_config, REPO_ROOT,
-            model_config=model_config, resume_run=resume_run)
+        train(train_config, data_loader_config, REPO_ROOT, model_config=model_config, resume_run=resume_run)
     except Exception as exc:
         print(f"Training failed: {exc}")
         return 1

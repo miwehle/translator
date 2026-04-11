@@ -60,8 +60,7 @@ def check_dataset(
         tgt = item[tgt_field]
         if not isinstance(src, list) or not isinstance(tgt, list):
             raise ValueError(
-                f"Example id={ex_id} has invalid types: "
-                f"{src_field}/{tgt_field} must be list[int]."
+                f"Example id={ex_id} has invalid types: " f"{src_field}/{tgt_field} must be list[int]."
             )
         if len(src) < min_seq_len or len(tgt) < min_seq_len:
             raise ValueError(
@@ -73,9 +72,7 @@ def check_dataset(
             src_ids = [int(x) for x in src]
             tgt_ids = [int(x) for x in tgt]
         except Exception as exc:
-            raise ValueError(
-                f"Example id={ex_id} contains non-integer token IDs."
-            ) from exc
+            raise ValueError(f"Example id={ex_id} contains non-integer token IDs.") from exc
 
         if require_unique_ids:
             if ex_id in seen_ids:
@@ -158,16 +155,8 @@ def check_dataset(
             f"{_format_example_ids(tgt_pad_example_ids)}."
         )
 
-    resolved_src_pad_idx = (
-        src_pad_idx
-        if src_pad_idx is not None
-        else max_src_token + 1
-    )
-    resolved_tgt_pad_idx = (
-        tgt_pad_idx
-        if tgt_pad_idx is not None
-        else max_tgt_token + 1
-    )
+    resolved_src_pad_idx = src_pad_idx if src_pad_idx is not None else max_src_token + 1
+    resolved_tgt_pad_idx = tgt_pad_idx if tgt_pad_idx is not None else max_tgt_token + 1
     tgt_sos_idx = inferred_bos
     src_vocab_size = max(max_src_token, int(resolved_src_pad_idx)) + 1
     tgt_vocab_size = max(max_tgt_token, int(resolved_tgt_pad_idx), tgt_sos_idx) + 1

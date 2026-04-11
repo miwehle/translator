@@ -10,7 +10,6 @@ import pytest
 
 from translator.shared.logging_utils import close_translator_logging
 
-
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 _PYTEST_RUNS_DIR = _REPO_ROOT / ".local_tmp" / "pytest-fixture-runs"
 

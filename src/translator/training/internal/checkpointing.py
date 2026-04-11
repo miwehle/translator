@@ -29,11 +29,7 @@ def checkpoint_manifest_path(run_dir: str | Path) -> Path:
     return Path(run_dir) / _CHECKPOINT_MANIFEST_FILE_NAME
 
 
-def load(
-    checkpoint_path: str | Path,
-    factory: Any,
-    device: torch.device,
-) -> LoadedCheckpoint:
+def load(checkpoint_path: str | Path, factory: Any, device: torch.device) -> LoadedCheckpoint:
     checkpoint_file = Path(checkpoint_path)
     manifest_path = checkpoint_manifest_path(checkpoint_file.parent)
     manifest = _load_manifest(manifest_path)
@@ -63,10 +59,7 @@ def save(
     manifest_path = checkpoint_manifest_path(run_dir_path)
 
     torch.save(
-        {
-            "model_state_dict": model.state_dict(),
-            "optimizer_state_dict": optimizer.state_dict(),
-        },
+        {"model_state_dict": model.state_dict(), "optimizer_state_dict": optimizer.state_dict()},
         checkpoint_file,
     )
     manifest_path.write_text(
@@ -104,10 +97,7 @@ def _load_manifest(manifest_path: Path) -> dict[str, Any]:
     return manifest
 
 
-def _create_optimizer(
-    model: Seq2Seq,
-    optimizer_manifest: dict[str, Any],
-) -> torch.optim.Optimizer:
+def _create_optimizer(model: Seq2Seq, optimizer_manifest: dict[str, Any]) -> torch.optim.Optimizer:
     optimizer_type = str(optimizer_manifest["type"]).lower()
     if optimizer_type != "adam":
         raise ValueError(f"Unsupported optimizer type in checkpoint: {optimizer_type!r}")
@@ -120,10 +110,7 @@ def _optimizer_type(optimizer: torch.optim.Optimizer) -> str:
     raise ValueError(f"Unsupported optimizer type for checkpoint save: {type(optimizer).__name__}")
 
 
-def _validate_tokenizer_metadata(
-    manifest_tokenizer: dict[str, Any],
-    tokenizer_metadata: Any,
-) -> None:
+def _validate_tokenizer_metadata(manifest_tokenizer: dict[str, Any], tokenizer_metadata: Any) -> None:
     current_tokenizer = {
         "src_vocab_size": int(tokenizer_metadata.src_vocab_size),
         "tgt_vocab_size": int(tokenizer_metadata.tgt_vocab_size),

@@ -7,25 +7,13 @@ from typing import cast
 
 import pytest
 
-from tests.translator.training.support import (
-    create_valid_mapped_dataset,
-    train_config_for_test,
-)
-from translator.training import (
-    Example,
-    ModelConfig,
-    Trainer,
-    check_dataset,
-)
+from tests.translator.training.support import create_valid_mapped_dataset, train_config_for_test
+from translator.training import Example, ModelConfig, Trainer, check_dataset
 from translator.training.dataset import DatasetMetadata, load_arrow_records
 from translator.training.internal.factory import Factory
 
 
-def _create_factory(
-    ds: Iterable[Example],
-    *,
-    configured_max_seq_len: int | None = None,
-) -> Factory:
+def _create_factory(ds: Iterable[Example], *, configured_max_seq_len: int | None = None) -> Factory:
     check_result = check_dataset(ds)
     return Factory(
         dataset_metadata=DatasetMetadata(
@@ -46,12 +34,11 @@ def _create_factory(
             tgt_field=check_result["tgt_field"],
             configured_max_seq_len=configured_max_seq_len,
         )
-)
+    )
 
 
 def _assert_init_handles_configured_seq_len_above_model_limit(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     dataset_path = create_valid_mapped_dataset(tmp_path / "valid_training.mapped")
     ds = cast(Iterable[Example], load_arrow_records(dataset_path))
@@ -60,28 +47,21 @@ def _assert_init_handles_configured_seq_len_above_model_limit(
     warning_messages: list[str] = []
 
     with pytest.raises(ValueError, match="configured_max_seq_len"):
-        Trainer(
-            factory,
-            train_config_for_test(str(tmp_path), device="cpu"),
-            model_config=model_config,
-        )
+        Trainer(factory, train_config_for_test(str(tmp_path), device="cpu"), model_config=model_config)
 
     monkeypatch.setattr(
         "translator.training.trainer.logger.warning",
         lambda message, *args: warning_messages.append(message % args),
     )
     Trainer(
-        factory,
-        train_config_for_test(str(tmp_path), device="cpu", force=True),
-        model_config=model_config,
+        factory, train_config_for_test(str(tmp_path), device="cpu", force=True), model_config=model_config
     )
 
     assert any("configured_max_seq_len" in message for message in warning_messages)
 
 
 def _assert_resume_rejects_configured_seq_len_above_model_limit(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     dataset_path = create_valid_mapped_dataset(tmp_path / "valid_training.mapped")
     ds = cast(Iterable[Example], load_arrow_records(dataset_path))
@@ -89,31 +69,19 @@ def _assert_resume_rejects_configured_seq_len_above_model_limit(
     monkeypatch.setattr(
         "translator.training.trainer.load_checkpoint",
         lambda checkpoint_path, factory, device: SimpleNamespace(
-            model=object(),
-            optimizer=object(),
-            model_config=ModelConfig(max_seq_len=4),
+            model=object(), optimizer=object(), model_config=ModelConfig(max_seq_len=4)
         ),
     )
 
     with pytest.raises(ValueError, match="configured_max_seq_len"):
-        Trainer(
-            factory,
-            train_config_for_test(str(tmp_path), device="cpu"),
-            resume_run="first_run",
-        )
+        Trainer(factory, train_config_for_test(str(tmp_path), device="cpu"), resume_run="first_run")
 
 
 class TestTrainer:
     def test_init_handles_configured_seq_len_above_model_limit(
-        self,
-        tmp_path: Path,
-        monkeypatch: pytest.MonkeyPatch,
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         _assert_init_handles_configured_seq_len_above_model_limit(tmp_path, monkeypatch)
 
-    def test_train_resumes_from_checkpoint(
-        self,
-        tmp_path: Path,
-        monkeypatch: pytest.MonkeyPatch,
-    ) -> None:
+    def test_train_resumes_from_checkpoint(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         _assert_resume_rejects_configured_seq_len_above_model_limit(tmp_path, monkeypatch)

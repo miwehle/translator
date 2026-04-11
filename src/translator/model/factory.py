@@ -11,11 +11,7 @@ class AttentionProtocol(Protocol):
     This keeps custom attention swappable with the PyTorch module.
     """
 
-    def __call__(
-        self,
-        *args: Any,
-        **kwargs: Any,
-    ) -> tuple[torch.Tensor, torch.Tensor | None]: ...
+    def __call__(self, *args: Any, **kwargs: Any) -> tuple[torch.Tensor, torch.Tensor | None]: ...
 
     def forward(
         self,
@@ -35,25 +31,15 @@ class AttentionProtocol(Protocol):
 ATTENTION_CHOICES = ("torch", "simple_sdp")
 
 
-def create_attention(
-    attention: str, d_model: int, num_heads: int, dropout: float
-) -> AttentionProtocol:
+def create_attention(attention: str, d_model: int, num_heads: int, dropout: float) -> AttentionProtocol:
     from .attention import SimpleMultiheadSDPAttention
 
     if attention == "torch":
         return nn.MultiheadAttention(
-            embed_dim=d_model,
-            num_heads=num_heads,
-            dropout=dropout,
-            batch_first=True,
+            embed_dim=d_model, num_heads=num_heads, dropout=dropout, batch_first=True
         )
     if attention == "simple_sdp":
         return SimpleMultiheadSDPAttention(
-            embed_dim=d_model,
-            num_heads=num_heads,
-            dropout=dropout,
-            batch_first=True,
+            embed_dim=d_model, num_heads=num_heads, dropout=dropout, batch_first=True
         )
-    raise ValueError(
-        f"Unknown attention={attention!r}. Allowed values: {ATTENTION_CHOICES}."
-    )
+    raise ValueError(f"Unknown attention={attention!r}. Allowed values: {ATTENTION_CHOICES}.")

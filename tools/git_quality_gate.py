@@ -94,14 +94,7 @@ def changed_python_files_for_push(env: dict[str, str]) -> list[str]:
     else:
         diff_cmd = ["git", "diff-tree", "--no-commit-id", "--name-only", "-r", "HEAD"]
 
-    proc = subprocess.run(
-        diff_cmd,
-        cwd=REPO_ROOT,
-        env=env,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    proc = subprocess.run(diff_cmd, cwd=REPO_ROOT, env=env, capture_output=True, text=True, check=False)
     if proc.returncode != 0:
         return []
 
@@ -125,9 +118,7 @@ def main() -> int:
     if stage == "pre-commit":
         files = staged_python_files(env)
         if not files:
-            print(
-                "[quality-gate] pre-commit: no staged Python files, skipping pyright."
-            )
+            print("[quality-gate] pre-commit: no staged Python files, skipping pyright.")
             return 0
         if run_pyright_for_files(env, files) != 0:
             return 1
@@ -136,10 +127,7 @@ def main() -> int:
     if stage == "pre-push":
         files = changed_python_files_for_push(env)
         if not files:
-            print(
-                "[quality-gate] pre-push: no changed Python files, "
-                "skipping pyright and pytest."
-            )
+            print("[quality-gate] pre-push: no changed Python files, " "skipping pyright and pytest.")
             return 0
         if run_pyright(env) != 0:
             return 1

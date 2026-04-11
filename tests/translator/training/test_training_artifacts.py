@@ -6,17 +6,8 @@ from typing import cast
 
 import pytest
 
-from tests.translator.training.support import (
-    create_valid_mapped_dataset,
-    train_config_for_test,
-)
-from translator.training import (
-    DataLoaderConfig,
-    Example,
-    ModelConfig,
-    Trainer,
-    check_dataset,
-)
+from tests.translator.training.support import create_valid_mapped_dataset, train_config_for_test
+from translator.training import DataLoaderConfig, Example, ModelConfig, Trainer, check_dataset
 from translator.training.dataset import load_arrow_records
 from translator.training.internal.factory import Factory
 
@@ -60,17 +51,8 @@ def test_trainer_writes_checkpoint_and_summary(tmp_path: Path) -> None:
     out = Trainer(
         factory,
         train_config,
-        DataLoaderConfig(
-            batch_size=32,
-            shuffle=False,
-        ),
-        model_config=ModelConfig(
-            d_model=32,
-            ff_dim=64,
-            num_heads=4,
-            num_layers=2,
-            dropout=0.0,
-        ),
+        DataLoaderConfig(batch_size=32, shuffle=False),
+        model_config=ModelConfig(d_model=32, ff_dim=64, num_heads=4, num_layers=2, dropout=0.0),
     ).train(ds)
 
     assert checkpoint_path.is_file()
@@ -81,8 +63,7 @@ def test_trainer_writes_checkpoint_and_summary(tmp_path: Path) -> None:
 
 
 def test_trainer_writes_translation_examples_to_separate_file(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     dataset_path = create_valid_mapped_dataset(tmp_path / "valid_training.mapped")
     ds = cast(Iterable[Example], load_arrow_records(dataset_path))
@@ -119,28 +100,18 @@ def test_trainer_writes_translation_examples_to_separate_file(
             },
         )()
     )
-    monkeypatch.setattr(
-        "translator.training.trainer.create_tokenizer", lambda *args: object()
-    )
+    monkeypatch.setattr("translator.training.trainer.create_tokenizer", lambda *args: object())
     monkeypatch.setattr(
         "translator.training.trainer.Translator",
         lambda *args: type(
-            "_FakeTranslator",
-            (),
-            {"translate_many": lambda self, texts: ["Hello world.", "I like coffee."]},
+            "_FakeTranslator", (), {"translate_many": lambda self, texts: ["Hello world.", "I like coffee."]}
         )(),
     )
     trainer = Trainer(
         factory,
         train_config,
         DataLoaderConfig(batch_size=32, shuffle=False),
-        model_config=ModelConfig(
-            d_model=32,
-            ff_dim=64,
-            num_heads=4,
-            num_layers=2,
-            dropout=0.0,
-        ),
+        model_config=ModelConfig(d_model=32, ff_dim=64, num_heads=4, num_layers=2, dropout=0.0),
     )
     trainer.train(ds)
 
@@ -149,8 +120,7 @@ def test_trainer_writes_translation_examples_to_separate_file(
 
     assert translation_examples_path.is_file()
     assert (
-        translation_examples
-        == "step=1 ep=1 loss=3.4921\n"
+        translation_examples == "step=1 ep=1 loss=3.4921\n"
         "---\n"
         "src: Hallo Welt.\n"
         "pred: Hello world.\n"

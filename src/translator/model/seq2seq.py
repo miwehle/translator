@@ -11,9 +11,7 @@ class PositionalEncoding(nn.Module):
     def __init__(self, d_model: int, max_len: int = 1024):
         super().__init__()
         pos = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
-        div = torch.exp(
-            torch.arange(0, d_model, 2).float() * (-math.log(10000.0) / d_model)
-        )
+        div = torch.exp(torch.arange(0, d_model, 2).float() * (-math.log(10000.0) / d_model))
 
         pe = torch.zeros(max_len, d_model)
         pe[:, 0::2] = torch.sin(pos * div)
@@ -45,9 +43,7 @@ class Seq2Seq(nn.Module):
         if d_model % num_heads != 0:
             raise ValueError("d_model must be divisible by num_heads")
         if attention not in ATTENTION_CHOICES:
-            raise ValueError(
-                f"Unknown attention={attention!r}. Allowed values: {ATTENTION_CHOICES}."
-            )
+            raise ValueError(f"Unknown attention={attention!r}. Allowed values: {ATTENTION_CHOICES}.")
 
         self.src_pad_idx = src_pad_idx
         self.tgt_pad_idx = tgt_pad_idx
@@ -62,11 +58,7 @@ class Seq2Seq(nn.Module):
         self.encoder_layers = nn.ModuleList(
             [
                 EncoderBlock(
-                    d_model=d_model,
-                    num_heads=num_heads,
-                    ff_dim=ff_dim,
-                    dropout=dropout,
-                    attention=attention,
+                    d_model=d_model, num_heads=num_heads, ff_dim=ff_dim, dropout=dropout, attention=attention
                 )
                 for _ in range(num_layers)
             ]
@@ -74,11 +66,7 @@ class Seq2Seq(nn.Module):
         self.decoder_layers = nn.ModuleList(
             [
                 DecoderBlock(
-                    d_model=d_model,
-                    num_heads=num_heads,
-                    ff_dim=ff_dim,
-                    dropout=dropout,
-                    attention=attention,
+                    d_model=d_model, num_heads=num_heads, ff_dim=ff_dim, dropout=dropout, attention=attention
                 )
                 for _ in range(num_layers)
             ]
@@ -89,9 +77,7 @@ class Seq2Seq(nn.Module):
         self.out_proj = nn.Linear(d_model, tgt_vocab_size)
 
     def _causal_mask(self, length: int, device: torch.device) -> torch.Tensor:
-        return torch.triu(
-            torch.ones(length, length, device=device, dtype=torch.bool), diagonal=1
-        )
+        return torch.triu(torch.ones(length, length, device=device, dtype=torch.bool), diagonal=1)
 
     def encode(self, src: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         src_key_padding_mask = src == self.src_pad_idx
@@ -103,10 +89,7 @@ class Seq2Seq(nn.Module):
         return x, src_key_padding_mask
 
     def decode(
-        self,
-        tgt_in: torch.Tensor,
-        memory: torch.Tensor,
-        src_key_padding_mask: torch.Tensor,
+        self, tgt_in: torch.Tensor, memory: torch.Tensor, src_key_padding_mask: torch.Tensor
     ) -> torch.Tensor:
         tgt_key_padding_mask = tgt_in == self.tgt_pad_idx
         tgt_mask = self._causal_mask(tgt_in.size(1), tgt_in.device)
@@ -132,9 +115,7 @@ class Seq2Seq(nn.Module):
         return self.decode(tgt_in, memory, src_key_padding_mask)
 
     @torch.no_grad()
-    def translate(
-        self, src_ids: list[int], max_len: int, device: torch.device, eos_idx: int
-    ) -> list[int]:
+    def translate(self, src_ids: list[int], max_len: int, device: torch.device, eos_idx: int) -> list[int]:
         """Simple inference: greedy argmax decoding only.
 
         This intentionally does not implement beam search or sampling.
@@ -155,8 +136,13 @@ class Seq2Seq(nn.Module):
 
     @torch.no_grad()
     def translate_beam(
-        self, src_ids: list[int], max_len: int, device: torch.device, eos_idx: int,
-        beam_width: int = 4, length_penalty: float = 0.6
+        self,
+        src_ids: list[int],
+        max_len: int,
+        device: torch.device,
+        eos_idx: int,
+        beam_width: int = 4,
+        length_penalty: float = 0.6,
     ) -> list[int]:
         if beam_width < 1:
             raise ValueError("beam_width must be at least 1.")
@@ -196,12 +182,8 @@ class Seq2Seq(nn.Module):
                 break
 
             beams = sorted(
-                candidates,
-                key=lambda candidate: normalized_score(candidate[0], candidate[1]),
-                reverse=True,
+                candidates, key=lambda candidate: normalized_score(candidate[0], candidate[1]), reverse=True
             )[:beam_width]
 
-        best_token_ids, _ = max(
-            beams, key=lambda candidate: normalized_score(candidate[0], candidate[1])
-        )
+        best_token_ids, _ = max(beams, key=lambda candidate: normalized_score(candidate[0], candidate[1]))
         return best_token_ids[1:]
