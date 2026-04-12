@@ -4,8 +4,6 @@ import json
 import sys
 from pathlib import Path
 
-from lab_infrastructure.run_config import read_run_config
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SRC_DIR = REPO_ROOT / "src"
 SHARED_SRC_DIR = REPO_ROOT.parent / "lab_infrastructure" / "src"
@@ -13,6 +11,8 @@ if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 if str(SHARED_SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SHARED_SRC_DIR))
+
+from lab_infrastructure.run_config import read_run_config
 
 
 def main() -> int:
