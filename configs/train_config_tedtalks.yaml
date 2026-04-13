@@ -11,7 +11,7 @@ model_config:
 
 train_config:
   artifacts_dir: /content/drive/MyDrive/nmt_lab/artifacts
-  dataset: iwslt2017_iwslt2017-de-en_train (7)
+  dataset: iwslt2017_iwslt2017-de-en_train (7)/curation/filtered_dataset
   validation_dataset: iwslt2017_iwslt2017-de-en_validation  # optional
   run_name: ttc_lr03
   seed: 42
