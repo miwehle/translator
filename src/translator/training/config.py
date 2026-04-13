@@ -19,7 +19,7 @@ class ModelConfig:
 
 @dataclass(frozen=True, kw_only=True)
 class TrainConfig:
-    artifacts_dir: str
+    artifacts_dir: str = "/content/drive/MyDrive/nmt_lab/artifacts"
     dataset: str
     validation_dataset: str | None = None
     run_name: str = "run1"
