@@ -1,0 +1,10 @@
+checkpoint: ttc10-lr1
+
+dataset:
+  path: IWSLT/iwslt2017
+  config: iwslt2017-de-en
+  split: validation
+
+mapping:
+  src: translation.de
+  ref: translation.en
