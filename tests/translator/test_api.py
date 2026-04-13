@@ -2,13 +2,15 @@ from __future__ import annotations
 
 import csv
 from pathlib import Path
+from typing import cast
 
 import pytest
 import yaml
 from lab_infrastructure.run_config import read_run_config
 
 from tests.translator.training.support import create_valid_mapped_dataset, train_config_for_test
-from translator.api import check_dataset, train
+from translator.api import check_dataset, comet_score, train
+from translator.evaluation import CometScoreConfig
 from translator.training import DataLoaderConfig, ModelConfig
 
 _MODEL_CONFIG = ModelConfig(d_model=32, ff_dim=64, num_heads=4, num_layers=2, dropout=0.0)
@@ -168,3 +170,35 @@ def test_check_dataset_uses_dataset_manifest_defaults(tmp_path: Path) -> None:
     assert result["src_pad_idx"] == 0
     assert result["tgt_pad_idx"] == 1
 
+
+def test_comet_score_uses_convention_checkpoint_path(monkeypatch) -> None:
+    captured: dict[str, object] = {}
+
+    class _FakeScorer:
+        def __init__(self, **kwargs: object) -> None:
+            captured["kwargs"] = kwargs
+
+        def score_checkpoint(self, checkpoint: str | Path) -> float:
+            captured["checkpoint"] = checkpoint
+            return 0.88
+
+    monkeypatch.setattr("translator.evaluation.CometScorer", _FakeScorer)
+
+    score = comet_score(
+        CometScoreConfig(
+            checkpoint="ttc10-lr1",
+            dataset={"path": "IWSLT/iwslt2017", "config": "iwslt2017-de-en", "split": "validation"},
+            mapping={"src": "translation.de", "ref": "translation.en"},
+        )
+    )
+
+    assert score == 0.88
+    expected_checkpoint = Path(
+        "/content/drive/MyDrive/nmt_lab/artifacts/training_runs/ttc10-lr1/checkpoint.pt"
+    )
+    assert Path(captured["checkpoint"]) == expected_checkpoint
+    scorer_kwargs = cast(dict[str, object], captured["kwargs"])
+    assert scorer_kwargs["comet_model"] == "Unbabel/wmt22-comet-da"
+    assert scorer_kwargs["output_path"] is None
+    assert scorer_kwargs["mapping"].src == "translation.de"
+    assert scorer_kwargs["mapping"].ref == "translation.en"

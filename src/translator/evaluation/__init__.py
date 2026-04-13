@@ -1,3 +1,11 @@
-from .comet_scoring import CometScorer, DatasetSpec, comet_score, newstest_adapter, translate
+from .comet_scoring import CometScorer, comet_score, translate
+from .config import CometScoreConfig, DatasetConfig, MappingConfig
 
-__all__ = ["DatasetSpec", "CometScorer", "translate", "comet_score", "newstest_adapter"]
+__all__ = [
+    "CometScoreConfig",
+    "DatasetConfig",
+    "MappingConfig",
+    "CometScorer",
+    "translate",
+    "comet_score",
+]

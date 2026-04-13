@@ -15,10 +15,10 @@ from lab_infrastructure.compute_metrics import detect_compute_hardware
 from lab_infrastructure.logging import get_logger
 from lab_infrastructure.run_config import git_head_commit, write_run_config
 
-from translator.training.dataset import DatasetMetadata, load_arrow_records
-
+from .evaluation.config import CometScoreConfig
 from .shared import Example
 from .training import DataLoaderConfig, Factory, ModelConfig, TrainConfig, Trainer, TrainingSummary, preflight
+from .training.dataset import DatasetMetadata, load_arrow_records
 
 logger = logging.getLogger(__name__)
 
@@ -66,6 +66,20 @@ def check_dataset(
         require_unique_ids=require_unique_ids,
         min_seq_len=min_seq_len,
     )
+
+
+def comet_score(
+    config: CometScoreConfig,
+) -> float:
+    from .evaluation import CometScorer
+
+    scorer = CometScorer(
+        comet_model=config.model,
+        test_dataset=config.dataset,
+        mapping=config.mapping,
+        output_path=config.output_path,
+    )
+    return scorer.score_checkpoint(config.checkpoint_file)
 
 
 def train(
@@ -189,4 +203,3 @@ def train(
     log_training_finish(summary)
 
     return summary
-

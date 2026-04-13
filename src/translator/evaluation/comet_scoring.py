@@ -2,32 +2,22 @@ from __future__ import annotations
 
 import gc
 import json
-from collections.abc import Callable, Iterator
-from dataclasses import dataclass
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import torch
 
-from translator.inference import Translator
+from .config import DatasetConfig, MappingConfig
 
-
-@dataclass(frozen=True)
-class DatasetSpec:
-    path: str
-    config: str | None = None
-    split: str = "test"
-
-
-def newstest_adapter(example: dict[str, Any]) -> dict[str, str]:
-    translation = example["translation"]
-    return {"src": str(translation["de"]), "ref": str(translation["en"])}
+if TYPE_CHECKING:
+    from translator.inference import Translator
 
 
 def translate(
     translator: Translator,
-    test_dataset: DatasetSpec | Any,
-    dataset_adapter: Callable[[dict[str, Any]], dict[str, str]],
+    test_dataset: DatasetConfig | Any,
+    mapping: MappingConfig,
     output_path: str | Path | None = None,
     batch_size: int = 32,
 ) -> Path:
@@ -40,7 +30,7 @@ def translate(
 
     with destination.open("w", encoding="utf-8") as handle:
         for examples in _iter_batches(dataset, batch_size):
-            adapted_examples = [dataset_adapter(example) for example in examples]
+            adapted_examples = [_map_example(example, mapping) for example in examples]
             hypotheses = translator.translate_many([example["src"] for example in adapted_examples])
             for adapted_example, hypothesis in zip(adapted_examples, hypotheses, strict=True):
                 handle.write(
@@ -76,27 +66,29 @@ class CometScorer:
     def __init__(
         self,
         comet_model: str = "Unbabel/wmt22-comet-da",
-        test_dataset: DatasetSpec = DatasetSpec("wmt20", "de-en", "test"),
-        dataset_adapter: Callable[[dict[str, Any]], dict[str, str]] = newstest_adapter,
+        test_dataset: DatasetConfig = DatasetConfig("wmt20", "de-en", "test"),
+        mapping: MappingConfig = MappingConfig(src="translation.de", ref="translation.en"),
         translation_batch_size: int = 32,
         comet_batch_size: int = 8,
         output_path: str | Path | None = None,
     ) -> None:
         self.comet_model = comet_model
         self.test_dataset = test_dataset
-        self.dataset_adapter = dataset_adapter
+        self.mapping = mapping
         self.translation_batch_size = translation_batch_size
         self.comet_batch_size = comet_batch_size
         self.output_path = output_path
 
     def score_checkpoint(self, checkpoint: str | Path) -> float:
+        from translator.inference import Translator
+
         translator = Translator.from_checkpoint(checkpoint)
         uses_cuda = translator.device.type == "cuda"
         try:
             translations_path = translate(
                 translator,
                 self.test_dataset,
-                self.dataset_adapter,
+                self.mapping,
                 output_path=self.output_path,
                 batch_size=self.translation_batch_size,
             )
@@ -108,8 +100,8 @@ class CometScorer:
         return comet_score(self.comet_model, translations_path, batch_size=self.comet_batch_size)
 
 
-def _load_test_dataset(test_dataset: DatasetSpec | Any) -> Any:
-    if isinstance(test_dataset, DatasetSpec):
+def _load_test_dataset(test_dataset: DatasetConfig | Any) -> Any:
+    if isinstance(test_dataset, DatasetConfig):
         from datasets import load_dataset
 
         return load_dataset(test_dataset.path, test_dataset.config, split=test_dataset.split)
@@ -118,6 +110,20 @@ def _load_test_dataset(test_dataset: DatasetSpec | Any) -> Any:
 
 def _default_output_path() -> Path:
     return Path(".local_tmp") / "comet_translations.jsonl"
+
+
+def _map_example(example: dict[str, Any], mapping: MappingConfig) -> dict[str, str]:
+    return {
+        "src": _resolve_mapping_path(example, mapping.src),
+        "ref": _resolve_mapping_path(example, mapping.ref),
+    }
+
+
+def _resolve_mapping_path(example: dict[str, Any], path: str) -> str:
+    current: Any = example
+    for part in path.split("."):
+        current = current[part]
+    return str(current)
 
 
 def _iter_batches(dataset: Any, batch_size: int) -> Iterator[list[dict[str, Any]]]:

@@ -5,7 +5,13 @@ from pathlib import Path
 
 import torch
 
-from translator.evaluation import CometScorer, DatasetSpec, comet_score, newstest_adapter, translate
+from translator.evaluation import (
+    CometScorer,
+    DatasetConfig,
+    MappingConfig,
+    comet_score,
+    translate,
+)
 
 
 class _FakeTranslator:
@@ -33,23 +39,17 @@ class _FakeCometModel:
         return _FakeCometOutput(self.system_score)
 
 
-class TestNewstestAdapter:
-    def test_returns_src_and_ref(self) -> None:
-        adapted = newstest_adapter({"translation": {"de": "Hallo", "en": "Hello"}})
-
-        assert adapted == {"src": "Hallo", "ref": "Hello"}
-
-
 class TestTranslate:
     def test_writes_jsonl_with_src_hyp_ref(self, tmp_path: Path) -> None:
         translator = _FakeTranslator()
         output_path = tmp_path / "translations.jsonl"
+        mapping = MappingConfig(src="translation.de", ref="translation.en")
         dataset = [
             {"translation": {"de": "eins", "en": "one"}},
             {"translation": {"de": "zwei", "en": "two"}},
         ]
 
-        written_path = translate(translator, dataset, newstest_adapter, output_path=output_path, batch_size=2)
+        written_path = translate(translator, dataset, mapping, output_path=output_path, batch_size=2)
 
         assert written_path == output_path
         assert translator.calls == [["eins", "zwei"]]
@@ -60,11 +60,12 @@ class TestTranslate:
 
     def test_uses_default_output_path_when_none(self, tmp_path: Path, monkeypatch) -> None:
         translator = _FakeTranslator()
+        mapping = MappingConfig(src="translation.de", ref="translation.en")
         dataset = [{"translation": {"de": "eins", "en": "one"}}]
         default_path = tmp_path / ".local_tmp" / "comet_translations.jsonl"
         monkeypatch.setattr("translator.evaluation.comet_scoring._default_output_path", lambda: default_path)
 
-        written_path = translate(translator, dataset, newstest_adapter, output_path=None, batch_size=1)
+        written_path = translate(translator, dataset, mapping, output_path=None, batch_size=1)
 
         assert written_path == default_path
         assert default_path.is_file()
@@ -121,14 +122,34 @@ class TestCometScorer:
             cleanup_steps.append("comet_score")
             return 0.42
 
-        monkeypatch.setattr("translator.evaluation.comet_scoring.Translator", _TranslatorFactory)
+        monkeypatch.setattr("translator.inference.Translator", _TranslatorFactory)
         monkeypatch.setattr("translator.evaluation.comet_scoring.translate", fake_translate)
         monkeypatch.setattr("translator.evaluation.comet_scoring.gc.collect", fake_collect)
         monkeypatch.setattr("translator.evaluation.comet_scoring.comet_score", fake_comet_score)
 
-        scorer = CometScorer(test_dataset=DatasetSpec("wmt20"))
+        scorer = CometScorer(
+            test_dataset=DatasetConfig("wmt20"), mapping=MappingConfig("translation.de", "translation.en")
+        )
 
         score = scorer.score_checkpoint("checkpoint.pt")
 
         assert score == 0.42
         assert cleanup_steps == ["gc.collect", "comet_score"]
+
+
+class TestTranslateMapping:
+    def test_maps_src_and_ref_from_mapping_paths(self, tmp_path: Path) -> None:
+        translator = _FakeTranslator()
+        output_path = tmp_path / "translations.jsonl"
+
+        translate(
+            translator,
+            [{"translation": {"de": "Hallo", "en": "Hello"}}],
+            MappingConfig(src="translation.de", ref="translation.en"),
+            output_path=output_path,
+            batch_size=1,
+        )
+
+        assert output_path.read_text(encoding="utf-8").splitlines() == [
+            json.dumps({"src": "Hallo", "hyp": "HALLO", "ref": "Hello"}, ensure_ascii=False)
+        ]

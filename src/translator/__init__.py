@@ -19,14 +19,19 @@ MIT motto "Mens et Manus":
   (https://arxiv.org/abs/1706.03762).
 """
 
-from .api import check_dataset, train
+from .api import check_dataset, comet_score, train
+from .evaluation.config import CometScoreConfig, DatasetConfig, MappingConfig
 from .inference import Translator
 from .training import DataLoaderConfig, ModelConfig, TrainConfig, TrainingSummary
 
 __all__ = [
     "train",
+    "comet_score",
     "check_dataset",
     "Translator",
+    "CometScoreConfig",
+    "DatasetConfig",
+    "MappingConfig",
     "DataLoaderConfig",
     "ModelConfig",
     "TrainConfig",
