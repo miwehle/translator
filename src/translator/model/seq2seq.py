@@ -49,6 +49,7 @@ class Seq2Seq(nn.Module):
         self.tgt_pad_idx = tgt_pad_idx
         self.tgt_sos_idx = tgt_sos_idx
         self.d_model = d_model
+        self.max_len = max_len
 
         self.src_embed = nn.Embedding(src_vocab_size, d_model, padding_idx=src_pad_idx)
         self.tgt_embed = nn.Embedding(tgt_vocab_size, d_model, padding_idx=tgt_pad_idx)
@@ -123,6 +124,7 @@ class Seq2Seq(nn.Module):
         """
         src = torch.tensor([src_ids], dtype=torch.long, device=device)
         memory, src_key_padding_mask = self.encode(src)
+        max_len = min(max_len, self.max_len - 1)
 
         out_ids: list[int] = [self.tgt_sos_idx]
         for _ in range(max_len):
@@ -156,6 +158,7 @@ class Seq2Seq(nn.Module):
 
         src = torch.tensor([src_ids], dtype=torch.long, device=device)
         memory, src_key_padding_mask = self.encode(src)
+        max_len = min(max_len, self.max_len - 1)
         beams: list[tuple[list[int], float]] = [([self.tgt_sos_idx], 0.0)]
 
         for _ in range(max_len):

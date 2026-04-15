@@ -47,3 +47,20 @@ class TestSeq2Seq:
             assert str(exc) == "beam_width must be at least 1."
         else:
             raise AssertionError("Expected ValueError for beam_width < 1.")
+
+    def test_translate_beam_clamps_decode_length_to_model_max_len(self) -> None:
+        model = Seq2Seq(8, 8, 4, 8, 2, 1, 0, 1, 2, dropout=0.0, max_len=4)
+        model.encode = lambda src: (torch.zeros((1, 1, 4)), torch.zeros((1, 1), dtype=torch.bool))
+        observed_lengths: list[int] = []
+
+        def fake_decode(tgt_in: torch.Tensor, *_args) -> torch.Tensor:
+            observed_lengths.append(int(tgt_in.size(1)))
+            logits = torch.full((1, tgt_in.size(1), 8), -1e9, dtype=torch.float32)
+            logits[:, -1, 3] = 0.0
+            return logits
+
+        model.decode = fake_decode
+
+        model.translate_beam([1, 2], max_len=10, device=torch.device("cpu"), eos_idx=7, beam_width=1)
+
+        assert observed_lengths == [1, 2, 3]
