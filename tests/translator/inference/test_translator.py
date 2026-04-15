@@ -28,18 +28,38 @@ class _FakeModel:
     def __init__(self) -> None:
         self.training = True
         self.calls: list[tuple[list[int], int, torch.device, int]] = []
+        self.batch_calls: list[tuple[list[list[int]], int, torch.device, int]] = []
+        self.beam_calls: list[tuple[list[list[int]], int, torch.device, int]] = []
 
-    def eval(self) -> "_FakeModel":
+    def eval(self) -> _FakeModel:
         self.training = False
         return self
 
-    def train(self, mode: bool = True) -> "_FakeModel":
+    def train(self, mode: bool = True) -> _FakeModel:
         self.training = mode
         return self
 
     def translate(self, src_ids: list[int], max_len: int, device: torch.device, eos_idx: int) -> list[int]:
         self.calls.append((src_ids, max_len, device, eos_idx))
         return [4, eos_idx]
+
+    def translate_batch(
+        self, src_ids_batch: list[list[int]], max_len: int, device: torch.device, eos_idx: int
+    ) -> list[list[int]]:
+        self.batch_calls.append((src_ids_batch, max_len, device, eos_idx))
+        return [[4, eos_idx] for _ in src_ids_batch]
+
+    def translate_beam(
+        self, src_ids: list[int], max_len: int, device: torch.device, eos_idx: int
+    ) -> list[int]:
+        self.calls.append((src_ids, max_len, device, eos_idx))
+        return [4, eos_idx]
+
+    def translate_beam_batch(
+        self, src_ids_batch: list[list[int]], max_len: int, device: torch.device, eos_idx: int
+    ) -> list[list[int]]:
+        self.beam_calls.append((src_ids_batch, max_len, device, eos_idx))
+        return [[4, eos_idx] for _ in src_ids_batch]
 
 
 class TestTranslator:
@@ -52,6 +72,28 @@ class TestTranslator:
         assert out == ["Hello"]
         assert model.training is True
         assert model.calls == [([5, 1], 11, torch.device("cpu"), 9)]
+
+    def test_translate_many_uses_batch_path_for_multiple_texts(self) -> None:
+        model = _FakeModel()
+        translator = Translator(model, _FakeTokenizer(), torch.device("cpu"), 7, beam=False)
+
+        out = translator.translate_many(["Hallo", "Hi"])
+
+        assert out == ["Hello", "Hello"]
+        assert model.training is True
+        assert model.calls == []
+        assert model.batch_calls == [([[5, 1], [2, 1]], 11, torch.device("cpu"), 9)]
+
+    def test_translate_many_uses_beam_batch_path_when_beam_enabled(self) -> None:
+        model = _FakeModel()
+        translator = Translator(model, _FakeTokenizer(), torch.device("cpu"), 7, beam=True)
+
+        out = translator.translate_many(["Hallo", "Hi"])
+
+        assert out == ["Hello", "Hello"]
+        assert model.training is True
+        assert model.calls == []
+        assert model.beam_calls == [([[5, 1], [2, 1]], 11, torch.device("cpu"), 9)]
 
     def test_from_checkpoint_loads_model_and_tokenizer(self, tmp_path: Path, monkeypatch) -> None:
         model = Seq2Seq(16, 16, 8, 16, 2, 1, 0, 1, 2, dropout=0.0, max_len=32)

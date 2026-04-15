@@ -190,3 +190,120 @@ class Seq2Seq(nn.Module):
 
         best_token_ids, _ = max(beams, key=lambda candidate: normalized_score(candidate[0], candidate[1]))
         return best_token_ids[1:]
+
+    def _pad_id_batch(self, id_batch: list[list[int]], pad_idx: int, device: torch.device) -> torch.Tensor:
+        max_len = max(len(ids) for ids in id_batch)
+        padded = [ids + [pad_idx] * (max_len - len(ids)) for ids in id_batch]
+        return torch.tensor(padded, dtype=torch.long, device=device)
+
+    @torch.no_grad()
+    def translate_batch(
+        self, src_ids_batch: list[list[int]], max_len: int, device: torch.device, eos_idx: int
+    ) -> list[list[int]]:
+        if not src_ids_batch:
+            return []
+
+        src = self._pad_id_batch(src_ids_batch, self.src_pad_idx, device)
+        memory, src_key_padding_mask = self.encode(src)
+        max_len = min(max_len, self.max_len - 1)
+        eos = torch.tensor(eos_idx, dtype=torch.long, device=device)
+        out_ids = torch.full((len(src_ids_batch), 1), self.tgt_sos_idx, dtype=torch.long, device=device)
+        finished = torch.zeros(len(src_ids_batch), dtype=torch.bool, device=device)
+
+        for _ in range(max_len):
+            logits = self.decode(out_ids, memory, src_key_padding_mask)
+            next_tokens = logits[:, -1, :].argmax(dim=-1)
+            next_tokens = torch.where(finished, eos, next_tokens)
+            out_ids = torch.cat((out_ids, next_tokens.unsqueeze(1)), dim=1)
+            finished |= next_tokens.eq(eos_idx)
+            if bool(finished.all()):
+                break
+
+        decoded: list[list[int]] = []
+        for token_ids in out_ids[:, 1:].tolist():
+            if eos_idx in token_ids:
+                decoded.append(token_ids[: token_ids.index(eos_idx) + 1])
+            else:
+                decoded.append(token_ids)
+        return decoded
+
+    @torch.no_grad()
+    def translate_beam_batch(
+        self,
+        src_ids_batch: list[list[int]],
+        max_len: int,
+        device: torch.device,
+        eos_idx: int,
+        beam_width: int = 4,
+        length_penalty: float = 0.6,
+    ) -> list[list[int]]:
+        if beam_width < 1:
+            raise ValueError("beam_width must be at least 1.")
+        if length_penalty < 0:
+            raise ValueError("length_penalty must be non-negative.")
+        if not src_ids_batch:
+            return []
+
+        def normalized_score(token_ids: list[int], score: float) -> float:
+            length = max(len(token_ids) - 1, 1)
+            penalty = ((5 + length) / 6) ** length_penalty
+            return score / penalty
+
+        src = self._pad_id_batch(src_ids_batch, self.src_pad_idx, device)
+        memory, src_key_padding_mask = self.encode(src)
+        max_len = min(max_len, self.max_len - 1)
+        beams_by_example: list[list[tuple[list[int], float]]] = [
+            [([self.tgt_sos_idx], 0.0)] for _ in src_ids_batch
+        ]
+
+        for _ in range(max_len):
+            candidates_by_example: list[list[tuple[list[int], float]]] = [[] for _ in src_ids_batch]
+            active_example_indices: list[int] = []
+            active_scores: list[float] = []
+            active_token_ids: list[list[int]] = []
+            all_finished = True
+
+            for example_index, beams in enumerate(beams_by_example):
+                for token_ids, score in beams:
+                    if token_ids[-1] == eos_idx:
+                        candidates_by_example[example_index].append((token_ids, score))
+                        continue
+                    all_finished = False
+                    active_example_indices.append(example_index)
+                    active_scores.append(score)
+                    active_token_ids.append(token_ids)
+
+            if all_finished:
+                break
+
+            tgt_in = self._pad_id_batch(active_token_ids, self.tgt_pad_idx, device)
+            active_memory = memory[active_example_indices]
+            active_src_key_padding_mask = src_key_padding_mask[active_example_indices]
+            logits = self.decode(tgt_in, active_memory, active_src_key_padding_mask)
+            lengths = [len(token_ids) for token_ids in active_token_ids]
+
+            for row_index, (example_index, token_ids, score, length) in enumerate(
+                zip(active_example_indices, active_token_ids, active_scores, lengths, strict=True)
+            ):
+                log_probs = torch.log_softmax(logits[row_index, length - 1, :], dim=-1)
+                top_log_probs, top_token_ids = torch.topk(log_probs, beam_width, dim=-1)
+                for next_log_prob, next_token_id in zip(
+                    top_log_probs.tolist(), top_token_ids.tolist(), strict=True
+                ):
+                    candidates_by_example[example_index].append(
+                        (token_ids + [int(next_token_id)], score + float(next_log_prob))
+                    )
+
+            beams_by_example = [
+                sorted(
+                    candidates,
+                    key=lambda candidate: normalized_score(candidate[0], candidate[1]),
+                    reverse=True,
+                )[:beam_width]
+                for candidates in candidates_by_example
+            ]
+
+        return [
+            max(beams, key=lambda candidate: normalized_score(candidate[0], candidate[1]))[0][1:]
+            for beams in beams_by_example
+        ]

@@ -64,3 +64,68 @@ class TestSeq2Seq:
         model.translate_beam([1, 2], max_len=10, device=torch.device("cpu"), eos_idx=7, beam_width=1)
 
         assert observed_lengths == [1, 2, 3]
+
+    def test_translate_batch_returns_decode_ready_ids_without_initial_tgt_sos(self) -> None:
+        model = Seq2Seq(8, 8, 4, 8, 2, 1, 0, 1, 2, dropout=0.0, max_len=8)
+        model.encode = lambda src: (
+            torch.zeros((src.size(0), src.size(1), 4)),
+            torch.zeros((src.size(0), src.size(1)), dtype=torch.bool),
+        )
+        step1 = torch.full((2, 1, 8), -1e9)
+        step1[0, 0, 4] = 5.0
+        step1[1, 0, 3] = 3.0
+        step2 = torch.full((2, 2, 8), -1e9)
+        step2[0, 1, 6] = 6.0
+        step2[1, 1, 5] = 7.0
+        logits = [
+            step1,
+            step2,
+        ]
+        model.decode = lambda *args: logits.pop(0)
+
+        out = model.translate_batch([[1, 2], [3]], max_len=2, device=torch.device("cpu"), eos_idx=6)
+
+        assert out == [[4, 6], [3, 5]]
+
+    def test_translate_beam_batch_returns_best_decode_ready_ids_without_initial_tgt_sos(self) -> None:
+        model = Seq2Seq(8, 8, 4, 8, 2, 1, 0, 1, 2, dropout=0.0, max_len=8)
+        model.encode = lambda src: (
+            torch.zeros((src.size(0), src.size(1), 4)),
+            torch.zeros((src.size(0), src.size(1)), dtype=torch.bool),
+        )
+        first_step = torch.full((2, 1, 8), -1e9)
+        first_step[0, 0, 5] = 5.0
+        first_step[0, 0, 4] = 4.0
+        first_step[1, 0, 4] = 6.0
+        first_step[1, 0, 3] = 3.0
+        second_step = torch.full((4, 2, 8), -1e9)
+        second_step[0, 1, 7] = 4.0
+        second_step[0, 1, 6] = 1.0
+        second_step[1, 1, 6] = 5.0
+        second_step[1, 1, 7] = 1.0
+        second_step[2, 1, 6] = 5.0
+        second_step[2, 1, 7] = 1.0
+        second_step[3, 1, 7] = 5.0
+        second_step[3, 1, 6] = 2.0
+        third_step = torch.full((2, 3, 8), -1e9)
+        third_step[0, 2, 6] = 5.0
+        third_step[0, 2, 7] = 1.0
+        third_step[1, 2, 6] = 2.0
+        third_step[1, 2, 7] = 1.0
+        decode_outputs = {
+            ((2,), (2,)): first_step,
+            ((2, 5), (2, 4), (2, 4), (2, 3)): second_step,
+            ((2, 5, 7), (2, 3, 7)): third_step,
+        }
+
+        def fake_decode(tgt_in: torch.Tensor, *_args) -> torch.Tensor:
+            sequences = tuple(tuple(row[: int((row != 1).sum())].tolist()) for row in tgt_in)
+            return decode_outputs[sequences]
+
+        model.decode = fake_decode
+
+        out = model.translate_beam_batch(
+            [[1, 2], [3, 4]], max_len=4, device=torch.device("cpu"), eos_idx=6, beam_width=2
+        )
+
+        assert out == [[5, 7, 6], [4, 6]]

@@ -77,7 +77,7 @@ class Translator:
     @classmethod
     def from_checkpoint(
         cls, checkpoint_path: str | Path, device: str | torch.device | None = None
-    ) -> "Translator":
+    ) -> Translator:
         checkpoint_file = Path(checkpoint_path)
         manifest = _load_manifest(checkpoint_file)
         checkpoint_tokenizer = manifest["tokenizer"]
@@ -113,4 +113,31 @@ class Translator:
             self.model.train(was_training)
 
     def translate_many(self, texts: Sequence[str]) -> list[str]:
-        return [self.translate(text) for text in texts]
+        if not texts:
+            return []
+        if len(texts) == 1:
+            return [self.translate(texts[0])]
+
+        was_training = self.model.training
+        try:
+            self.model.eval()
+
+            eos_idx = self.tokenizer.eos_token_id
+            if eos_idx is None:
+                raise ValueError("Tokenizer has no eos_token_id for translation.")
+
+            encoded_source_ids_batch = [self.tokenizer.encode(text) for text in texts]
+            max_len = max(
+                _estimate_target_token_count(len(encoded_source_ids))
+                for encoded_source_ids in encoded_source_ids_batch
+            )
+            translate_fn = self.model.translate_beam_batch if self.beam else self.model.translate_batch
+            predicted_ids_batch = translate_fn(
+                encoded_source_ids_batch,
+                max_len=max_len,
+                device=self.device,
+                eos_idx=eos_idx,
+            )
+            return [self.tokenizer.decode(predicted_ids) for predicted_ids in predicted_ids_batch]
+        finally:
+            self.model.train(was_training)
