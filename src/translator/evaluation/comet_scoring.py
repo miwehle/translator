@@ -104,7 +104,12 @@ def _load_test_dataset(test_dataset: DatasetConfig | Any) -> Any:
     if isinstance(test_dataset, DatasetConfig):
         from datasets import load_dataset
 
-        return load_dataset(test_dataset.path, test_dataset.config, split=test_dataset.split)
+        return load_dataset(
+            path=test_dataset.path,
+            name=test_dataset.name,
+            split=test_dataset.split,
+            data_files=test_dataset.data_files,
+        )
     return test_dataset
 
 

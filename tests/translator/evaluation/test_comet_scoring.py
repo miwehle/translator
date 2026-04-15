@@ -12,6 +12,7 @@ from translator.evaluation import (
     comet_score,
     translate,
 )
+from translator.evaluation.comet_scoring import _load_test_dataset
 
 
 class _FakeTranslator:
@@ -135,6 +136,33 @@ class TestCometScorer:
 
         assert score == 0.42
         assert cleanup_steps == ["gc.collect", "comet_score"]
+
+
+class TestLoadTestDataset:
+    def test_passes_name_and_data_files_to_load_dataset(self, monkeypatch) -> None:
+        captured: dict[str, object] = {}
+
+        def fake_load_dataset(*, path: str, name: str | None, split: str, data_files: str | None) -> list[object]:
+            captured["path"] = path
+            captured["name"] = name
+            captured["split"] = split
+            captured["data_files"] = data_files
+            return []
+
+        monkeypatch.setitem(
+            __import__("sys").modules,
+            "datasets",
+            type("DatasetsModule", (), {"load_dataset": staticmethod(fake_load_dataset)}),
+        )
+
+        dataset = DatasetConfig("json", split="train", data_files="/content/drive/MyDrive/filtered.jsonl")
+        assert _load_test_dataset(dataset) == []
+        assert captured == {
+            "path": "json",
+            "name": None,
+            "split": "train",
+            "data_files": "/content/drive/MyDrive/filtered.jsonl",
+        }
 
 
 class TestTranslateMapping:

@@ -187,7 +187,7 @@ def test_comet_score_uses_convention_checkpoint_path(monkeypatch) -> None:
     score = comet_score(
         CometScoreConfig(
             checkpoint="ttc10-lr1",
-            dataset={"path": "IWSLT/iwslt2017", "config": "iwslt2017-de-en", "split": "validation"},
+            dataset={"path": "IWSLT/iwslt2017", "name": "iwslt2017-de-en", "split": "validation"},
             mapping={"src": "translation.de", "ref": "translation.en"},
         )
     )

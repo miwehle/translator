@@ -7,8 +7,9 @@ from pathlib import Path
 @dataclass(frozen=True)
 class DatasetConfig:
     path: str
-    config: str | None = None
+    name: str | None = None
     split: str = "test"
+    data_files: str | None = None
 
 
 @dataclass(frozen=True)
