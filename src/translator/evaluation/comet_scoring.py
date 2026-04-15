@@ -2,16 +2,21 @@ from __future__ import annotations
 
 import gc
 import json
+import logging
 from collections.abc import Iterator
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import torch
+from lab_infrastructure.logging import get_logger
 
 from .config import DatasetConfig, MappingConfig
 
 if TYPE_CHECKING:
     from translator.inference import Translator
+
+
+logger = logging.getLogger("translator.evaluation.comet_scoring")
 
 
 def translate(
@@ -24,12 +29,23 @@ def translate(
     if batch_size <= 0:
         raise ValueError("batch_size must be positive.")
 
+    get_logger("translator", stream=True)
     dataset = _load_test_dataset(test_dataset)
     destination = _default_output_path() if output_path is None else Path(output_path)
     destination.parent.mkdir(parents=True, exist_ok=True)
+    total_examples = len(dataset) if hasattr(dataset, "__len__") else None
+    total_batches = (
+        None if total_examples is None else max(1, (total_examples + batch_size - 1) // batch_size)
+    )
+    logger.info(
+        "Start translation examples=%s batch_size=%s output_path=%s",
+        total_examples if total_examples is not None else "-",
+        batch_size,
+        destination,
+    )
 
     with destination.open("w", encoding="utf-8") as handle:
-        for examples in _iter_batches(dataset, batch_size):
+        for batch_index, examples in enumerate(_iter_batches(dataset, batch_size), start=1):
             adapted_examples = [_map_example(example, mapping) for example in examples]
             hypotheses = translator.translate_many([example["src"] for example in adapted_examples])
             for adapted_example, hypothesis in zip(adapted_examples, hypotheses, strict=True):
@@ -40,6 +56,19 @@ def translate(
                     )
                     + "\n"
                 )
+            if _should_log_progress(batch_index, total_batches):
+                translated_examples = batch_index * batch_size if total_examples is None else min(
+                    total_examples, batch_index * batch_size
+                )
+                logger.info(
+                    "Translation progress batches=%s/%s examples=%s/%s",
+                    batch_index,
+                    total_batches if total_batches is not None else "-",
+                    translated_examples,
+                    total_examples if total_examples is not None else "-",
+                )
+
+    logger.info("Finished translation output_path=%s", destination)
 
     return destination
 
@@ -48,6 +77,7 @@ def comet_score(comet_model: str, translations_path: str | Path, batch_size: int
     if batch_size <= 0:
         raise ValueError("batch_size must be positive.")
 
+    get_logger("translator", stream=True)
     from comet import download_model, load_from_checkpoint
 
     records = []
@@ -56,9 +86,14 @@ def comet_score(comet_model: str, translations_path: str | Path, batch_size: int
             record = json.loads(line)
             records.append({"src": record["src"], "mt": record["hyp"], "ref": record["ref"]})
 
+    logger.info(
+        "Load COMET model model=%s records=%s batch_size=%s", comet_model, len(records), batch_size
+    )
     model_path = download_model(comet_model)
     model = load_from_checkpoint(model_path)
+    logger.info("Run COMET prediction model=%s records=%s", comet_model, len(records))
     output = model.predict(records, batch_size=batch_size, gpus=1 if torch.cuda.is_available() else 0)
+    logger.info("Finished COMET prediction model=%s score=%.6f", comet_model, float(output.system_score))
     return float(output.system_score)
 
 
@@ -140,3 +175,13 @@ def _iter_batches(dataset: Any, batch_size: int) -> Iterator[list[dict[str, Any]
             batch = []
     if batch:
         yield batch
+
+
+def _should_log_progress(batch_index: int, total_batches: int | None) -> bool:
+    if batch_index == 1:
+        return True
+    if total_batches is None:
+        return batch_index % 10 == 0
+    if batch_index == total_batches:
+        return True
+    return batch_index % max(1, total_batches // 10) == 0

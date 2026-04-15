@@ -142,7 +142,9 @@ class TestLoadTestDataset:
     def test_passes_name_and_data_files_to_load_dataset(self, monkeypatch) -> None:
         captured: dict[str, object] = {}
 
-        def fake_load_dataset(*, path: str, name: str | None, split: str, data_files: str | None) -> list[object]:
+        def fake_load_dataset(
+            *, path: str, name: str | None, split: str, data_files: str | None
+        ) -> list[object]:
             captured["path"] = path
             captured["name"] = name
             captured["split"] = split
