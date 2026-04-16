@@ -184,6 +184,47 @@ class TestCometScorer:
             json.dumps({"score": 0.7, "src": "zwei", "hyp": "two", "ref": "two"}),
         ]
 
+    def test_score_checkpoint_writes_comet_scores_jsonl_with_utf8_text(self, tmp_path: Path, monkeypatch) -> None:
+        checkpoint_path = tmp_path / "checkpoint.pt"
+        translator = _FakeTranslator()
+        translations_path = tmp_path / "translations.jsonl"
+        translations_path.write_text(
+            json.dumps({"src": "Sie wächst", "hyp": "She grows", "ref": "She grows"}, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+        fake_model = _FakeCometModel(0.75, scores=[0.8])
+
+        class _TranslatorFactory:
+            @staticmethod
+            def from_checkpoint(checkpoint: str | Path) -> _FakeTranslator:
+                del checkpoint
+                return translator
+
+        monkeypatch.setattr("translator.inference.Translator", _TranslatorFactory)
+        monkeypatch.setattr("translator.evaluation.comet_scoring.translate", lambda *args, **kwargs: translations_path)
+        monkeypatch.setitem(
+            __import__("sys").modules,
+            "comet",
+            type(
+                "CometModule",
+                (),
+                {
+                    "download_model": staticmethod(lambda model: f"downloaded::{model}"),
+                    "load_from_checkpoint": staticmethod(lambda path: fake_model),
+                },
+            ),
+        )
+
+        scorer = CometScorer(
+            test_dataset=DatasetConfig("wmt20"), mapping=MappingConfig("translation.de", "translation.en")
+        )
+
+        scorer.score_checkpoint(checkpoint_path)
+
+        assert checkpoint_path.with_name("comet_scores.jsonl").read_text(encoding="utf-8").splitlines() == [
+            json.dumps({"score": 0.8, "src": "Sie wächst", "hyp": "She grows", "ref": "She grows"}, ensure_ascii=False)
+        ]
+
     def test_score_checkpoint_releases_translator_before_comet(self, monkeypatch) -> None:
         cleanup_steps: list[str] = []
         translator = _FakeTranslator()

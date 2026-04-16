@@ -174,7 +174,10 @@ def _write_scored_translations(
     with destination.open("w", encoding="utf-8") as handle:
         for record, score in scored_records:
             handle.write(
-                json.dumps({"score": float(score), "src": record["src"], "hyp": record["mt"], "ref": record["ref"]})
+                json.dumps(
+                    {"score": float(score), "src": record["src"], "hyp": record["mt"], "ref": record["ref"]},
+                    ensure_ascii=False,
+                )
                 + "\n"
             )
 
