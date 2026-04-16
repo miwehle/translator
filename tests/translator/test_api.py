@@ -173,6 +173,7 @@ def test_check_dataset_uses_dataset_manifest_defaults(tmp_path: Path) -> None:
 
 def test_comet_score_uses_convention_checkpoint_path(monkeypatch) -> None:
     captured: dict[str, object] = {}
+    checkpoint_dir = Path("/content/drive/MyDrive/nmt_lab/artifacts/training_runs/ttc10-lr1")
 
     class _FakeScorer:
         def __init__(self, **kwargs: object) -> None:
@@ -183,6 +184,15 @@ def test_comet_score_uses_convention_checkpoint_path(monkeypatch) -> None:
             return 0.88
 
     monkeypatch.setattr("translator.evaluation.CometScorer", _FakeScorer)
+    monkeypatch.setattr(Path, "mkdir", lambda self, parents=False, exist_ok=False: None)
+
+    written_files: dict[Path, str] = {}
+
+    def fake_write_text(self: Path, data: str, encoding: str | None = None) -> int:
+        written_files[self] = data
+        return len(data)
+
+    monkeypatch.setattr(Path, "write_text", fake_write_text)
 
     score = comet_score(
         CometScoreConfig(
@@ -193,12 +203,21 @@ def test_comet_score_uses_convention_checkpoint_path(monkeypatch) -> None:
     )
 
     assert score == 0.88
-    expected_checkpoint = Path(
-        "/content/drive/MyDrive/nmt_lab/artifacts/training_runs/ttc10-lr1/checkpoint.pt"
-    )
+    expected_checkpoint = checkpoint_dir / "checkpoint.pt"
     assert Path(captured["checkpoint"]) == expected_checkpoint
     scorer_kwargs = cast(dict[str, object], captured["kwargs"])
     assert scorer_kwargs["comet_model"] == "Unbabel/wmt22-comet-da"
     assert scorer_kwargs["output_path"] is None
     assert scorer_kwargs["mapping"].src == "translation.de"
     assert scorer_kwargs["mapping"].ref == "translation.en"
+    comet_score_summary = yaml.safe_load(written_files[checkpoint_dir / "comet_score.yaml"])
+    assert comet_score_summary == {
+        "score": 0.88,
+        "config": {
+            "checkpoint": "ttc10-lr1",
+            "dataset": {"path": "IWSLT/iwslt2017", "name": "iwslt2017-de-en", "split": "validation", "data_files": None},
+            "mapping": {"src": "translation.de", "ref": "translation.en"},
+            "model": "Unbabel/wmt22-comet-da",
+            "output_path": None,
+        },
+    }
