@@ -28,6 +28,11 @@ def _write_training_summary(summary_path: Path, summary: TrainingSummary) -> Non
     summary_path.write_text(yaml.safe_dump(asdict(summary), sort_keys=True), encoding="utf-8")
 
 
+def _write_comet_score(summary_path: Path, score: float, config: CometScoreConfig) -> None:
+    summary_path.parent.mkdir(parents=True, exist_ok=True)
+    summary_path.write_text(yaml.safe_dump({"score": score, "config": asdict(config)}, sort_keys=False), encoding="utf-8")
+
+
 def _next_available_run_dir(base_dir: Path) -> Path:
     if not base_dir.exists():
         return base_dir
@@ -79,7 +84,9 @@ def comet_score(
         mapping=config.mapping,
         output_path=config.output_path,
     )
-    return scorer.score_checkpoint(config.checkpoint_file)
+    score = scorer.score_checkpoint(config.checkpoint_file)
+    _write_comet_score(config.checkpoint_file.parent / "comet_score.yaml", score, config)
+    return score
 
 
 def train(
