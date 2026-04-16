@@ -73,7 +73,13 @@ def translate(
     return destination
 
 
-def comet_score(comet_model: str, translations_path: str | Path, batch_size: int = 8) -> float:
+def comet_score(
+    comet_model: str,
+    translations_path: str | Path,
+    *,
+    batch_size: int = 8,
+    scores_output_path: str | Path | None = None,
+) -> float:
     if batch_size <= 0:
         raise ValueError("batch_size must be positive.")
 
@@ -93,6 +99,8 @@ def comet_score(comet_model: str, translations_path: str | Path, batch_size: int
     model = load_from_checkpoint(model_path)
     logger.info("Run COMET prediction model=%s records=%s", comet_model, len(records))
     output = model.predict(records, batch_size=batch_size, gpus=1 if torch.cuda.is_available() else 0)
+    if scores_output_path is not None:
+        _write_scored_translations(scores_output_path, records, output.scores)
     logger.info("Finished COMET prediction model=%s score=%.6f", comet_model, float(output.system_score))
     return float(output.system_score)
 
@@ -132,7 +140,12 @@ class CometScorer:
             gc.collect()
             if uses_cuda:
                 torch.cuda.empty_cache()
-        return comet_score(self.comet_model, translations_path, batch_size=self.comet_batch_size)
+        return comet_score(
+            self.comet_model,
+            translations_path,
+            batch_size=self.comet_batch_size,
+            scores_output_path=Path(checkpoint).with_name("comet_scores.jsonl"),
+        )
 
 
 def _load_test_dataset(test_dataset: DatasetConfig | Any) -> Any:
@@ -150,6 +163,20 @@ def _load_test_dataset(test_dataset: DatasetConfig | Any) -> Any:
 
 def _default_output_path() -> Path:
     return Path(".local_tmp") / "comet_translations.jsonl"
+
+
+def _write_scored_translations(
+    scores_output_path: str | Path, records: list[dict[str, str]], scores: list[float]
+) -> None:
+    destination = Path(scores_output_path)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    scored_records = sorted(zip(records, scores, strict=True), key=lambda item: item[1], reverse=True)
+    with destination.open("w", encoding="utf-8") as handle:
+        for record, score in scored_records:
+            handle.write(
+                json.dumps({"score": float(score), "src": record["src"], "hyp": record["mt"], "ref": record["ref"]})
+                + "\n"
+            )
 
 
 def _map_example(example: dict[str, Any], mapping: MappingConfig) -> dict[str, str]:

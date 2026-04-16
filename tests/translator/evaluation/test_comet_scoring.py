@@ -26,18 +26,20 @@ class _FakeTranslator:
 
 
 class _FakeCometOutput:
-    def __init__(self, system_score: float) -> None:
+    def __init__(self, system_score: float, scores: list[float]) -> None:
         self.system_score = system_score
+        self.scores = scores
 
 
 class _FakeCometModel:
-    def __init__(self, system_score: float) -> None:
+    def __init__(self, system_score: float, scores: list[float] | None = None) -> None:
         self.system_score = system_score
+        self.scores = [system_score] if scores is None else scores
         self.calls: list[tuple[list[dict[str, str]], int, int]] = []
 
     def predict(self, data: list[dict[str, str]], batch_size: int, gpus: int) -> _FakeCometOutput:
         self.calls.append((data, batch_size, gpus))
-        return _FakeCometOutput(self.system_score)
+        return _FakeCometOutput(self.system_score, self.scores)
 
 
 class TestTranslate:
@@ -98,8 +100,90 @@ class TestCometScore:
         assert score == 0.75
         assert fake_model.calls == [([{"src": "eins", "mt": "one", "ref": "one"}], 4, 0)]
 
+    def test_writes_per_example_scores_jsonl(self, tmp_path: Path, monkeypatch) -> None:
+        translations_path = tmp_path / "translations.jsonl"
+        translations_path.write_text(
+            "\n".join(
+                [
+                    json.dumps({"src": "eins", "hyp": "one", "ref": "one"}),
+                    json.dumps({"src": "zwei", "hyp": "two", "ref": "two"}),
+                ]
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        fake_model = _FakeCometModel(0.75, scores=[0.8, 0.7])
+        monkeypatch.setitem(
+            __import__("sys").modules,
+            "comet",
+            type(
+                "CometModule",
+                (),
+                {
+                    "download_model": staticmethod(lambda model: f"downloaded::{model}"),
+                    "load_from_checkpoint": staticmethod(lambda path: fake_model),
+                },
+            ),
+        )
+
+        score = comet_score("Unbabel/wmt22-comet-da", translations_path, batch_size=4)
+
+        assert score == 0.75
+        assert fake_model.calls == [
+            ([{"src": "eins", "mt": "one", "ref": "one"}, {"src": "zwei", "mt": "two", "ref": "two"}], 4, 0)
+        ]
+
 
 class TestCometScorer:
+    def test_score_checkpoint_writes_comet_scores_jsonl(self, tmp_path: Path, monkeypatch) -> None:
+        checkpoint_path = tmp_path / "checkpoint.pt"
+        translator = _FakeTranslator()
+        translations_path = tmp_path / "translations.jsonl"
+        translations_path.write_text(
+            "\n".join(
+                [
+                    json.dumps({"src": "eins", "hyp": "one", "ref": "one"}),
+                    json.dumps({"src": "zwei", "hyp": "two", "ref": "two"}),
+                ]
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        fake_model = _FakeCometModel(0.75, scores=[0.8, 0.7])
+
+        class _TranslatorFactory:
+            @staticmethod
+            def from_checkpoint(checkpoint: str | Path) -> _FakeTranslator:
+                del checkpoint
+                return translator
+
+        monkeypatch.setattr("translator.inference.Translator", _TranslatorFactory)
+        monkeypatch.setattr("translator.evaluation.comet_scoring.translate", lambda *args, **kwargs: translations_path)
+        monkeypatch.setitem(
+            __import__("sys").modules,
+            "comet",
+            type(
+                "CometModule",
+                (),
+                {
+                    "download_model": staticmethod(lambda model: f"downloaded::{model}"),
+                    "load_from_checkpoint": staticmethod(lambda path: fake_model),
+                },
+            ),
+        )
+
+        scorer = CometScorer(
+            test_dataset=DatasetConfig("wmt20"), mapping=MappingConfig("translation.de", "translation.en")
+        )
+
+        score = scorer.score_checkpoint(checkpoint_path)
+
+        assert score == 0.75
+        assert checkpoint_path.with_name("comet_scores.jsonl").read_text(encoding="utf-8").splitlines() == [
+            json.dumps({"score": 0.8, "src": "eins", "hyp": "one", "ref": "one"}),
+            json.dumps({"score": 0.7, "src": "zwei", "hyp": "two", "ref": "two"}),
+        ]
+
     def test_score_checkpoint_releases_translator_before_comet(self, monkeypatch) -> None:
         cleanup_steps: list[str] = []
         translator = _FakeTranslator()
@@ -118,8 +202,10 @@ class TestCometScorer:
             cleanup_steps.append("gc.collect")
             return 0
 
-        def fake_comet_score(model: str, path: str | Path, batch_size: int) -> float:
-            del model, path, batch_size
+        def fake_comet_score(
+            model: str, path: str | Path, *, batch_size: int, scores_output_path: str | Path | None = None
+        ) -> float:
+            del model, path, batch_size, scores_output_path
             cleanup_steps.append("comet_score")
             return 0.42
 
