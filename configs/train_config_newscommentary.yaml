@@ -1,11 +1,20 @@
-resume_run: 2eu_10tt_1eu_5tt
+model_config:
+  d_model: 256
+  ff_dim: 1024
+  num_heads: 8
+  num_layers: 4
+  dropout: 0.1
+  max_seq_len: 250
+  attention: torch
+
+#resume_run: 2eu_10tt_1eu_5tt
 
 train_config:
-  dataset: news_commentary_de-en_train (5)
+  dataset: news_commentary_de-en_train (5)/curation/filtered_dataset
   #validation_dataset: # optional
-  run_name: 2eu_10tt_1eu_5tt_5nc
+  run_name: ncc5-lr2
   seed: 42
-  lr: 0.0003
+  lr: 0.002
   epochs: 5
   log_every: 100
   translate_every: 5000
