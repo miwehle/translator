@@ -8,6 +8,18 @@ import torch
 
 
 def load_arrow_records(dataset_path: str | Path):
+
+    """Load an Arrow dataset from disk via `datasets.load_from_disk`.
+
+    The returned Hugging Face `Dataset` is not an eagerly materialized Python list
+    of all examples. In our setup, the underlying Arrow data is memory-mapped, so
+    large datasets do not have to reside fully in main memory at once.
+
+    References:
+    https://huggingface.co/docs/datasets/main/package_reference/loading_methods
+    https://huggingface.co/docs/datasets/v2.2.0/about_arrow
+    """
+
     from datasets import load_from_disk
     from datasets.dataset_dict import DatasetDict
 
