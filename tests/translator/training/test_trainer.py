@@ -85,3 +85,45 @@ class TestTrainer:
 
     def test_train_resumes_from_checkpoint(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         _assert_resume_rejects_configured_seq_len_above_model_limit(tmp_path, monkeypatch)
+
+    def test_train_runs_periodic_evaluation(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        dataset_path = create_valid_mapped_dataset(tmp_path / "valid_training.mapped")
+        ds = cast(Iterable[Example], load_arrow_records(dataset_path))
+        factory = _create_factory(ds)
+        train_config = train_config_for_test(
+            str(tmp_path), device="cpu", epochs=1, log_every=1000, eval_every=4, seed=7
+        )
+        trainer = Trainer(factory, train_config, model_config=ModelConfig(d_model=32, ff_dim=64, num_heads=4, num_layers=2))
+        evaluate_call_count = 0
+        observed_eval_steps: list[int] = []
+
+        def fake_evaluate(examples: Iterable[Example]) -> float:
+            nonlocal evaluate_call_count
+            evaluate_call_count += 1
+            return 0.25
+
+        monkeypatch.setattr(trainer, "evaluate", fake_evaluate)
+        monkeypatch.setattr(
+            "translator.training.internal.training_observer.TrainingObserver.on_evaluation",
+            lambda self, step, epoch, eval_loss: observed_eval_steps.append(step),
+        )
+
+        summary = trainer.train(ds, ds)
+
+        assert summary.num_examples == len(ds)
+        assert evaluate_call_count == 2
+        assert observed_eval_steps == [4, 8]
+
+    def test_evaluate_restores_training_mode(self, tmp_path: Path) -> None:
+        dataset_path = create_valid_mapped_dataset(tmp_path / "valid_training.mapped")
+        ds = cast(Iterable[Example], load_arrow_records(dataset_path))
+        trainer = Trainer(
+            _create_factory(ds),
+            train_config_for_test(str(tmp_path), device="cpu", seed=7),
+            model_config=ModelConfig(d_model=32, ff_dim=64, num_heads=4, num_layers=2),
+        )
+
+        trainer._model.train()
+        trainer.evaluate(ds)
+
+        assert trainer._model.training is True

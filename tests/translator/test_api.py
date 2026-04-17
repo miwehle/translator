@@ -158,6 +158,31 @@ def test_train_rejects_incompatible_validation_dataset(tmp_path: Path, monkeypat
         )
 
 
+def test_train_rejects_eval_every_without_validation_dataset(tmp_path: Path, monkeypatch) -> None:
+    artifacts_dir = tmp_path / "artifacts"
+    dataset_dir = create_valid_mapped_dataset(artifacts_dir / "datasets" / "dataset.mapped")
+    _write_dataset_manifest(dataset_dir)
+
+    monkeypatch.setattr("translator.api.git_head_commit", lambda _: "test-commit")
+
+    with pytest.raises(ValueError, match="eval_every requires validation_dataset"):
+        train(
+            train_config_for_test(
+                str(artifacts_dir),
+                device="cpu",
+                epochs=1,
+                log_every=1000,
+                lr=1e-3,
+                seed=7,
+                validation_dataset=None,
+                eval_every=10,
+            ),
+            DataLoaderConfig(batch_size=32, shuffle=False),
+            tmp_path,
+            model_config=_MODEL_CONFIG,
+        )
+
+
 def test_check_dataset_uses_dataset_manifest_defaults(tmp_path: Path) -> None:
     dataset_dir = create_valid_mapped_dataset(tmp_path / "dataset.mapped")
     _write_dataset_manifest(dataset_dir)

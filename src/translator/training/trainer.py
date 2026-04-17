@@ -113,21 +113,30 @@ class Trainer:
 
     def evaluate(self, examples: Iterable[Example] | Sequence[Example]) -> float | None:
         loader = self._factory.create_data_loader(examples, self._data_loader_config, self._device)
+        was_training = self._model.training
         self._model.eval()
         loss_sum = 0.0
         token_count = 0
-        with torch.no_grad():
-            for src, tgt, _ in loader:
-                src = src.to(self._device)
-                tgt = tgt.to(self._device)
-                logits = self._model(src, tgt)
-                loss = self._loss(logits, tgt)
-                valid_tokens = int((tgt[:, 1:] != self._model.tgt_pad_idx).sum())
-                loss_sum += loss.item() * valid_tokens
-                token_count += valid_tokens
+        try:
+            with torch.no_grad():
+                for src, tgt, _ in loader:
+                    src = src.to(self._device)
+                    tgt = tgt.to(self._device)
+                    logits = self._model(src, tgt)
+                    loss = self._loss(logits, tgt)
+                    valid_tokens = int((tgt[:, 1:] != self._model.tgt_pad_idx).sum())
+                    loss_sum += loss.item() * valid_tokens
+                    token_count += valid_tokens
+        finally:
+            if was_training:
+                self._model.train()
         return None if token_count == 0 else loss_sum / token_count
 
-    def train(self, examples: Iterable[Example] | Sequence[Example]) -> TrainingSummary:
+    def train(
+        self,
+        examples: Iterable[Example] | Sequence[Example],
+        validation_examples: Iterable[Example] | Sequence[Example] | None = None,
+    ) -> TrainingSummary:
         def total_steps(loader: object) -> int | None:
             if not hasattr(loader, "__len__"):
                 return None
@@ -173,6 +182,12 @@ class Trainer:
                 observer.on_batch_end(
                     epoch, loss.item(), grad_norm, batch_ids, tgt.size(0), tgt_token_count=tgt[:, 1:].numel()
                 )
+                if (
+                    validation_examples is not None
+                    and self._train_config.eval_every is not None
+                    and observer.global_step % self._train_config.eval_every == 0
+                ):
+                    observer.on_evaluation(observer.global_step, epoch, self.evaluate(validation_examples))
 
         checkpoint_file = save_checkpoint(
             run_dir, self._model, self._optimizer, self._model_config, self._factory.dataset_metadata
