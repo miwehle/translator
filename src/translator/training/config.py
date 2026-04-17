@@ -22,7 +22,7 @@ class TrainConfig:
     artifacts_dir: str = "/content/drive/MyDrive/nmt_lab/artifacts"
     dataset: str
     validation_dataset: str | None = None
-    eval_every: int | None = None
+    evaluate_every: int | None = None
     run_name: str = "run1"
     force: bool = False
     device: str | torch.device | None = None

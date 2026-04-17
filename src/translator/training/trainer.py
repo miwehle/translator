@@ -85,8 +85,8 @@ class Trainer:
         self._train_config = train_config
         self._data_loader_config = data_loader_config
 
-        if train_config.eval_every is not None and train_config.validation_dataset is None:
-            raise ValueError("eval_every requires validation_dataset.")
+        if train_config.evaluate_every is not None and train_config.validation_dataset is None:
+            raise ValueError("evaluate_every requires validation_dataset.")
 
         if (model_config is None) == (resume_run is None):
             raise ValueError("Exactly one of model_config or resume_run must be provided.")
@@ -115,7 +115,9 @@ class Trainer:
         return self._criterion(logits.reshape(-1, logits.size(-1)), tgt[:, 1:].reshape(-1))
 
     def _should_evaluate(self, step: int) -> bool:
-        return self._train_config.eval_every is not None and step % self._train_config.eval_every == 0
+        return (
+            self._train_config.evaluate_every is not None and step % self._train_config.evaluate_every == 0
+        )
 
     def evaluate(self, examples: Iterable[Example] | Sequence[Example]) -> float:
         loader = self._factory.create_data_loader(examples, self._data_loader_config, self._device)
@@ -168,8 +170,8 @@ class Trainer:
             )
 
         # main flow
-        if self._train_config.eval_every is not None and validation_examples is None:
-            raise ValueError("eval_every requires validation_examples.")
+        if self._train_config.evaluate_every is not None and validation_examples is None:
+            raise ValueError("evaluate_every requires validation_examples.")
         run_dir = self._train_config.training_runs_dir / self._train_config.run_name
         loader = self._factory.create_data_loader(examples, self._data_loader_config, self._device)
         observer = create_training_observer(self._model, self._device, total_steps(loader))
