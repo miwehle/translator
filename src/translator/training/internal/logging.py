@@ -2,14 +2,13 @@ from __future__ import annotations
 
 import logging
 import sys
-import time
 import traceback
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
+from time import perf_counter, time
 
-from lab_infrastructure.clock import Clock, get_clock, lap, stop
 from lab_infrastructure.compute_metrics import (
     detect_compute_hardware,
     estimate_compute_units,
@@ -25,15 +24,17 @@ class TrainingLogger:
     euro_per_cu: float = 0.10
     start_time: datetime = field(default_factory=datetime.now)
     hardware_type: str = field(default_factory=detect_compute_hardware)
-    last_log_time: float = field(default_factory=time.time)
+    last_log_time: float = field(default_factory=time)
     decoder_token_count: int = 0
     total_decoder_token_count: int = 0
     decoder_sequence_count: int = 0
     logger: logging.Logger = field(init=False)
     metrics_path: Path = field(init=False)
     metrics_handle: object = field(init=False)
-    metrics_clock: Clock = field(init=False)
     metric_row_count: int = 0
+    metrics_file_time_s: float = 0.0
+    metrics_stdout_time_s: float = 0.0
+    diagnostic_log_time_s: float = 0.0
 
     _COLS = (
         ("TIME", 19),
@@ -63,7 +64,6 @@ class TrainingLogger:
         )
         self.metrics_path.parent.mkdir(parents=True, exist_ok=True)
         self.metrics_handle = self.metrics_path.open("a", encoding="utf-8")
-        self.metrics_clock = get_clock(f"training_metrics_io:{id(self)}")
 
     @classmethod
     def _format_header(cls) -> str:
@@ -80,7 +80,7 @@ class TrainingLogger:
         self.decoder_sequence_count += max(0, num_sequences)
 
     def _decoder_tokens_per_second(self) -> float | None:
-        elapsed_seconds = time.time() - self.last_log_time
+        elapsed_seconds = time() - self.last_log_time
         if elapsed_seconds <= 0:
             return None
         return self.decoder_token_count / elapsed_seconds
@@ -114,12 +114,14 @@ class TrainingLogger:
         return f"{value / scale:.{decimals}f}"
 
     def _write_metrics_line(self, line: str) -> None:
+        t0 = perf_counter()
         self.metrics_handle.write(line + "\n")
         self.metrics_handle.flush()
-        lap(self.metrics_clock, "metrics_file")
+        self.metrics_file_time_s += perf_counter() - t0
+        t0 = perf_counter()
         sys.stdout.write(line + "\n")
         sys.stdout.flush()
-        lap(self.metrics_clock, "metrics_stdout")
+        self.metrics_stdout_time_s += perf_counter() - t0
 
     def _write_metrics_row(self, values: dict[str, str]) -> None:
         if self.metric_row_count == 0 or self.metric_row_count % 10 == 0:
@@ -136,8 +138,9 @@ class TrainingLogger:
         self.metric_row_count += 1
 
     def _log_diagnostics(self, level: int, message: str, *args: object) -> None:
+        t0 = perf_counter()
         self.logger.log(level, message, *args)
-        lap(self.metrics_clock, "diagnostic_log")
+        self.diagnostic_log_time_s += perf_counter() - t0
 
     def _build_metrics_row(
         self,
@@ -223,23 +226,23 @@ class TrainingLogger:
         message = " ".join(f"{key}={value}" for key, value in row.items() if value)
         if event_type == "SPIKE":
             self._log_diagnostics(level, "%s batch_ids=%s", message, batch_ids)
-        self.last_log_time = time.time()
+        self.last_log_time = time()
         self.decoder_token_count = 0
         self.decoder_sequence_count = 0
         return message
 
     def close(self) -> None:
-        total_time = stop(self.metrics_clock, "close") or 0.0
-        lap_times = self.metrics_clock.lap_times
+        t0 = perf_counter()
+        if getattr(self, "metrics_handle", None) is not None and not self.metrics_handle.closed:
+            self.metrics_handle.close()
+        close_time_s = perf_counter() - t0
         self.logger.info(
             "TRAINING_METRICS_IO rows=%s total_s=%.3f file_s=%.3f stdout_s=%.3f diagnostic_s=%.3f close_s=%.3f",
             self.metric_row_count,
-            total_time,
-            lap_times.get("metrics_file", 0.0),
-            lap_times.get("metrics_stdout", 0.0),
-            lap_times.get("diagnostic_log", 0.0),
-            lap_times.get("close", 0.0),
+            self.metrics_file_time_s + self.metrics_stdout_time_s + self.diagnostic_log_time_s + close_time_s,
+            self.metrics_file_time_s,
+            self.metrics_stdout_time_s,
+            self.diagnostic_log_time_s,
+            close_time_s,
         )
-        if getattr(self, "metrics_handle", None) is not None and not self.metrics_handle.closed:
-            self.metrics_handle.close()
 
