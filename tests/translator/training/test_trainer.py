@@ -86,6 +86,17 @@ class TestTrainer:
     def test_train_resumes_from_checkpoint(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         _assert_resume_rejects_configured_seq_len_above_model_limit(tmp_path, monkeypatch)
 
+    def test_init_rejects_eval_every_without_validation_dataset(self, tmp_path: Path) -> None:
+        dataset_path = create_valid_mapped_dataset(tmp_path / "valid_training.mapped")
+        ds = cast(Iterable[Example], load_arrow_records(dataset_path))
+
+        with pytest.raises(ValueError, match="eval_every requires validation_dataset"):
+            Trainer(
+                _create_factory(ds),
+                train_config_for_test(str(tmp_path), device="cpu", eval_every=10, validation_dataset=None),
+                model_config=ModelConfig(d_model=32, ff_dim=64, num_heads=4, num_layers=2),
+            )
+
     def test_train_runs_periodic_evaluation(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         dataset_path = create_valid_mapped_dataset(tmp_path / "valid_training.mapped")
         ds = cast(Iterable[Example], load_arrow_records(dataset_path))
@@ -127,3 +138,15 @@ class TestTrainer:
         trainer.evaluate(ds)
 
         assert trainer._model.training is True
+
+    def test_train_rejects_missing_validation_examples_for_eval(self, tmp_path: Path) -> None:
+        dataset_path = create_valid_mapped_dataset(tmp_path / "valid_training.mapped")
+        ds = cast(Iterable[Example], load_arrow_records(dataset_path))
+        trainer = Trainer(
+            _create_factory(ds),
+            train_config_for_test(str(tmp_path), device="cpu", eval_every=10),
+            model_config=ModelConfig(d_model=32, ff_dim=64, num_heads=4, num_layers=2),
+        )
+
+        with pytest.raises(ValueError, match="eval_every requires validation_examples"):
+            trainer.train(ds)

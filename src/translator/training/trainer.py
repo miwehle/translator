@@ -85,6 +85,9 @@ class Trainer:
         self._train_config = train_config
         self._data_loader_config = data_loader_config
 
+        if train_config.eval_every is not None and train_config.validation_dataset is None:
+            raise ValueError("eval_every requires validation_dataset.")
+
         if (model_config is None) == (resume_run is None):
             raise ValueError("Exactly one of model_config or resume_run must be provided.")
 
@@ -111,16 +114,10 @@ class Trainer:
     def _loss(self, logits: torch.Tensor, tgt: torch.Tensor) -> torch.Tensor:
         return self._criterion(logits.reshape(-1, logits.size(-1)), tgt[:, 1:].reshape(-1))
 
-    def _should_evaluate(
-        self, step: int, validation_examples: Iterable[Example] | Sequence[Example] | None
-    ) -> bool:
-        return (
-            validation_examples is not None
-            and self._train_config.eval_every is not None
-            and step % self._train_config.eval_every == 0
-        )
+    def _should_evaluate(self, step: int) -> bool:
+        return self._train_config.eval_every is not None and step % self._train_config.eval_every == 0
 
-    def evaluate(self, examples: Iterable[Example] | Sequence[Example]) -> float | None:
+    def evaluate(self, examples: Iterable[Example] | Sequence[Example]) -> float:
         loader = self._factory.create_data_loader(examples, self._data_loader_config, self._device)
         was_training = self._model.training
         self._model.eval()
@@ -139,7 +136,9 @@ class Trainer:
         finally:
             if was_training:
                 self._model.train()
-        return None if token_count == 0 else loss_sum / token_count
+        if token_count == 0:
+            raise ValueError("Evaluation dataset contains no valid target tokens.")
+        return loss_sum / token_count
 
     def train(
         self,
@@ -169,6 +168,8 @@ class Trainer:
             )
 
         # main flow
+        if self._train_config.eval_every is not None and validation_examples is None:
+            raise ValueError("eval_every requires validation_examples.")
         run_dir = self._train_config.training_runs_dir / self._train_config.run_name
         loader = self._factory.create_data_loader(examples, self._data_loader_config, self._device)
         observer = create_training_observer(self._model, self._device, total_steps(loader))
@@ -193,8 +194,8 @@ class Trainer:
                 )
 
                 # evaluate
-                if self._should_evaluate(observer.global_step, validation_examples):
-                    observer.on_evaluation(observer.global_step, epoch, self.evaluate(validation_examples))
+                if self._should_evaluate(observer.global_step):
+                    observer.on_evaluation(observer.global_step, epoch, self.evaluate(validation_examples))  # type: ignore[arg-type]
 
         checkpoint_file = save_checkpoint(
             run_dir, self._model, self._optimizer, self._model_config, self._factory.dataset_metadata
