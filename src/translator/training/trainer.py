@@ -111,6 +111,15 @@ class Trainer:
     def _loss(self, logits: torch.Tensor, tgt: torch.Tensor) -> torch.Tensor:
         return self._criterion(logits.reshape(-1, logits.size(-1)), tgt[:, 1:].reshape(-1))
 
+    def _should_evaluate(
+        self, step: int, validation_examples: Iterable[Example] | Sequence[Example] | None
+    ) -> bool:
+        return (
+            validation_examples is not None
+            and self._train_config.eval_every is not None
+            and step % self._train_config.eval_every == 0
+        )
+
     def evaluate(self, examples: Iterable[Example] | Sequence[Example]) -> float | None:
         loader = self._factory.create_data_loader(examples, self._data_loader_config, self._device)
         was_training = self._model.training
@@ -182,11 +191,9 @@ class Trainer:
                 observer.on_batch_end(
                     epoch, loss.item(), grad_norm, batch_ids, tgt.size(0), tgt_token_count=tgt[:, 1:].numel()
                 )
-                if (
-                    validation_examples is not None
-                    and self._train_config.eval_every is not None
-                    and observer.global_step % self._train_config.eval_every == 0
-                ):
+
+                # evaluate
+                if self._should_evaluate(observer.global_step, validation_examples):
                     observer.on_evaluation(observer.global_step, epoch, self.evaluate(validation_examples))
 
         checkpoint_file = save_checkpoint(
