@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
+from lab_infrastructure.clock import Clock, get_clock, lap, stop
 from lab_infrastructure.compute_metrics import (
     detect_compute_hardware,
     estimate_compute_units,
@@ -31,6 +32,7 @@ class TrainingLogger:
     logger: logging.Logger = field(init=False)
     metrics_path: Path = field(init=False)
     metrics_handle: object = field(init=False)
+    metrics_clock: Clock = field(init=False)
     metric_row_count: int = 0
 
     _COLS = (
@@ -61,6 +63,7 @@ class TrainingLogger:
         )
         self.metrics_path.parent.mkdir(parents=True, exist_ok=True)
         self.metrics_handle = self.metrics_path.open("a", encoding="utf-8")
+        self.metrics_clock = get_clock(f"training_metrics_io:{id(self)}")
 
     @classmethod
     def _format_header(cls) -> str:
@@ -113,8 +116,10 @@ class TrainingLogger:
     def _write_metrics_line(self, line: str) -> None:
         self.metrics_handle.write(line + "\n")
         self.metrics_handle.flush()
+        lap(self.metrics_clock, "metrics_file")
         sys.stdout.write(line + "\n")
         sys.stdout.flush()
+        lap(self.metrics_clock, "metrics_stdout")
 
     def _write_metrics_row(self, values: dict[str, str]) -> None:
         if self.metric_row_count == 0 or self.metric_row_count % 10 == 0:
@@ -129,6 +134,10 @@ class TrainingLogger:
                 cells.append(self._format_cell(value, width))
         self._write_metrics_line(" ".join(cells))
         self.metric_row_count += 1
+
+    def _log_diagnostics(self, level: int, message: str, *args: object) -> None:
+        self.logger.log(level, message, *args)
+        lap(self.metrics_clock, "diagnostic_log")
 
     def _build_metrics_row(
         self,
@@ -172,7 +181,7 @@ class TrainingLogger:
     def log_translation_failure(self, step: int, epoch: int, exc: Exception) -> None:
         cause = exc.__cause__
         traceback_text = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__)).strip()
-        self.logger.log(
+        self._log_diagnostics(
             logging.WARNING,
             (
                 f"TRANSLATE_FAILED step={step} ep={epoch} "
@@ -211,7 +220,7 @@ class TrainingLogger:
         self._write_metrics_row(row)
         message = " ".join(f"{key}={value}" for key, value in row.items() if value)
         if event_type == "SPIKE":
-            self.logger.log(level, "%s batch_ids=%s", message, batch_ids)
+            self._log_diagnostics(level, "%s batch_ids=%s", message, batch_ids)
         self.last_log_time = time.time()
         self.decoder_token_count = 0
         self.decoder_sequence_count = 0
@@ -231,6 +240,17 @@ class TrainingLogger:
         )
 
     def close(self) -> None:
+        total_time = stop(self.metrics_clock, "close") or 0.0
+        lap_times = self.metrics_clock.lap_times
+        self.logger.info(
+            "TRAINING_METRICS_IO rows=%s total_s=%.3f file_s=%.3f stdout_s=%.3f diagnostic_s=%.3f close_s=%.3f",
+            self.metric_row_count,
+            total_time,
+            lap_times.get("metrics_file", 0.0),
+            lap_times.get("metrics_stdout", 0.0),
+            lap_times.get("diagnostic_log", 0.0),
+            lap_times.get("close", 0.0),
+        )
         if getattr(self, "metrics_handle", None) is not None and not self.metrics_handle.closed:
             self.metrics_handle.close()
 
