@@ -86,7 +86,13 @@ def test_trainer_loss_trend_decreases_on_synthetic_smoke_dataset(
         )()
     )
     train_config = train_config_for_test(
-        str(tmp_path), run_name="synthetic_run", device="cpu", seed=7, lr=1e-3, epochs=2, log_every=1
+        str(tmp_path),
+        run_name="synthetic_run",
+        device="cpu",
+        seed=7,
+        lr=1e-3,
+        epochs=2,
+        log_every=1,
     )
     t0 = time.perf_counter()
     out = Trainer(
@@ -166,7 +172,13 @@ def test_trainer_loss_trend_decreases_on_real_preprocessed_dataset(
         )()
     )
     train_config = train_config_for_test(
-        str(tmp_path), run_name="real_run", device="cpu", seed=7, lr=1e-3, epochs=4, log_every=1
+        str(tmp_path),
+        run_name="real_run",
+        device="cpu",
+        seed=7,
+        lr=1e-3,
+        epochs=4,
+        log_every=1,
     )
     t0 = time.perf_counter()
     out = Trainer(

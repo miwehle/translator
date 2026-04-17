@@ -29,7 +29,7 @@ class TrainConfig:
     seed: int = 42
     lr: float = 3e-4
     epochs: int = 1
-    log_every: int = 50
+    log_every: int = 100
     translate_every: int | None = None
     translate_examples: tuple[str, ...] = ()
     spike_window: int = 100
