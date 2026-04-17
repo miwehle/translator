@@ -175,28 +175,30 @@ class Trainer:
         loader = self._factory.create_data_loader(examples, self._data_loader_config, self._device)
         observer = create_training_observer(self._model, self._device, total_steps(loader))
         self._model.train()
+        try:
+            for epoch in range(1, self._train_config.epochs + 1):
+                for src, tgt, batch_ids in loader:
+                    src = src.to(self._device)
+                    tgt = tgt.to(self._device)
 
-        for epoch in range(1, self._train_config.epochs + 1):
-            for src, tgt, batch_ids in loader:
-                src = src.to(self._device)
-                tgt = tgt.to(self._device)
+                    self._optimizer.zero_grad()
+                    logits = self._model(src, tgt)
+                    loss = self._loss(logits, tgt)
 
-                self._optimizer.zero_grad()
-                logits = self._model(src, tgt)
-                loss = self._loss(logits, tgt)
+                    loss.backward()
+                    grad_norm = float(nn.utils.clip_grad_norm_(self._model.parameters(), 1.0))
+                    self._optimizer.step()
 
-                loss.backward()
-                grad_norm = float(nn.utils.clip_grad_norm_(self._model.parameters(), 1.0))
-                self._optimizer.step()
+                    # log batch metrics via observer (to keep logging details out of here)
+                    observer.on_batch_end(
+                        epoch, loss.item(), grad_norm, batch_ids, tgt.size(0), tgt_token_count=tgt[:, 1:].numel()
+                    )
 
-                # log batch metrics via observer (to keep logging details out of here)
-                observer.on_batch_end(
-                    epoch, loss.item(), grad_norm, batch_ids, tgt.size(0), tgt_token_count=tgt[:, 1:].numel()
-                )
-
-                # validate
-                if self._should_validate(observer.global_step):
-                    observer.on_validation(observer.global_step, epoch, self.validate(validation_examples))  # type: ignore[arg-type]
+                    # validate
+                    if self._should_validate(observer.global_step):
+                        observer.on_validation(observer.global_step, epoch, self.validate(validation_examples))  # type: ignore[arg-type]
+        finally:
+            observer.training_logger.close()
 
         checkpoint_file = save_checkpoint(
             run_dir, self._model, self._optimizer, self._model_config, self._factory.dataset_metadata

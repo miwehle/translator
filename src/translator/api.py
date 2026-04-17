@@ -140,7 +140,7 @@ def train(
         run_dir = _next_available_run_dir(train_config.training_runs_dir / train_config.run_name)
         run_dir.mkdir(parents=True, exist_ok=False)
         resolved_train_config = replace(train_config, run_name=run_dir.name)
-        get_logger("translator", log_path=run_dir / "training.log", stream=True)
+        get_logger("translator", log_path=run_dir / "training.log", stream=False)
         resolved_repo_root = Path(repo_root)
         write_run_config(
             run_dir / "training_config.yaml",

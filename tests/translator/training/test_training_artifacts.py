@@ -19,6 +19,7 @@ def test_trainer_writes_checkpoint_and_summary(tmp_path: Path) -> None:
     checkpoint_path = run_dir / "checkpoint.pt"
     checkpoint_manifest_path = run_dir / "checkpoint_manifest.yaml"
     log_path = run_dir / "training.log"
+    metrics_log_path = run_dir / "training_metrics.log"
     translation_examples_path = run_dir / "translation_examples.txt"
     train_config = train_config_for_test(
         str(tmp_path / "test_run_root"),
@@ -58,6 +59,7 @@ def test_trainer_writes_checkpoint_and_summary(tmp_path: Path) -> None:
     assert checkpoint_path.is_file()
     assert checkpoint_manifest_path.is_file()
     assert log_path.is_file()
+    assert metrics_log_path.is_file()
     assert not translation_examples_path.exists()
     assert out.checkpoint_path == str(checkpoint_path)
 
@@ -69,6 +71,7 @@ def test_trainer_writes_translation_examples_to_separate_file(
     ds = cast(Iterable[Example], load_arrow_records(dataset_path))
     run_dir = tmp_path / "test_run_root" / "training_runs" / "artifacts_run"
     log_path = run_dir / "training.log"
+    metrics_log_path = run_dir / "training_metrics.log"
     translation_examples_path = run_dir / "translation_examples.txt"
     train_config = train_config_for_test(
         str(tmp_path / "test_run_root"),
@@ -117,6 +120,7 @@ def test_trainer_writes_translation_examples_to_separate_file(
 
     translation_examples = translation_examples_path.read_text(encoding="utf-8")
     training_log = log_path.read_text(encoding="utf-8")
+    metrics_log = metrics_log_path.read_text(encoding="utf-8")
 
     assert translation_examples_path.is_file()
     assert (
@@ -130,3 +134,4 @@ def test_trainer_writes_translation_examples_to_separate_file(
     )
     assert "src: Hallo Welt." not in training_log
     assert "src: Ich mag Kaffee." not in training_log
+    assert "TRAIN" in metrics_log

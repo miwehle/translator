@@ -19,21 +19,16 @@ from translator.training import DataLoaderConfig, Example, ModelConfig, Trainer,
 from translator.training.dataset import load_arrow_records
 from translator.training.internal.factory import Factory
 
-LOSS_LINE_RE = re.compile(r"\bloss=(?P<loss>\d+(?:\.\d+)?)\b")
 STEP_LINE_RE = re.compile(
-    r"^(?:\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(?:,\d{3})? "
-    r"(?:INFO|WARNING|ERROR) \[[^\]]+\] )?"
-    r"(?:SPIKE )?(?:prog=[^\s]+\s+)?step=(?P<step>\d+)\s+ep=(?P<epoch>\d+)\s+"
-    r"loss=(?P<loss>\d+(?:\.\d+)?)\b"
+    r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\s+(?:TRAIN|SPIKE)\s+\S+\s+"
+    r"(?P<step>\d+)\s+(?P<epoch>\d+)\s+(?P<loss>\d+(?:\.\d+)?)\b"
 )
 
 
 def _parse_losses(stdout_text: str) -> list[float]:
     losses: list[float] = []
     for line in stdout_text.splitlines():
-        if STEP_LINE_RE.match(line) is None:
-            continue
-        match = LOSS_LINE_RE.search(line)
+        match = STEP_LINE_RE.match(line)
         if match is None:
             continue
         losses.append(float(match.group("loss")))

@@ -92,4 +92,4 @@ class TrainingObserver:
                 self.training_logger.log_translation_failure(self.global_step, epoch, exc)
 
     def on_validation(self, step: int, epoch: int, validation_loss: float) -> None:
-        self.training_logger.logger.info("VAL step=%s ep=%s validation_loss=%.3f", step, epoch, validation_loss)
+        self.training_logger.log_validation(step, epoch, validation_loss)

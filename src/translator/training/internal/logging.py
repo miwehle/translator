@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import sys
 import time
 import traceback
 from collections.abc import Sequence
@@ -11,7 +12,6 @@ from pathlib import Path
 from lab_infrastructure.compute_metrics import (
     detect_compute_hardware,
     estimate_compute_units,
-    estimate_cost,
     get_gpu_util,
 )
 from lab_infrastructure.logging import get_logger
@@ -29,10 +29,46 @@ class TrainingLogger:
     total_decoder_token_count: int = 0
     decoder_sequence_count: int = 0
     logger: logging.Logger = field(init=False)
+    metrics_path: Path = field(init=False)
+    metrics_handle: object = field(init=False)
+    metric_row_count: int = 0
+
+    _COLS = (
+        ("TIME", 19),
+        ("TYPE", 5),
+        ("PROG", 4),
+        ("STEP", 6),
+        ("EP", 3),
+        ("LOSS", 7),
+        ("MLOSS", 7),
+        ("VLOSS", 7),
+        ("GRAD", 7),
+        ("LR", 8),
+        ("MTOK", 5),
+        ("KTOK_S", 6),
+        ("LEN", 5),
+        ("GPU", 4),
+        ("CU", 5),
+    )
 
     def __post_init__(self) -> None:
-        get_logger("translator", log_path=self.log_path, stream=True)
+        get_logger("translator", log_path=self.log_path, stream=False)
         self.logger = logging.getLogger("translator.training.trainer")
+        self.metrics_path = (
+            Path(self.log_path).with_name("training_metrics.log")
+            if self.log_path is not None
+            else Path("training_metrics.log")
+        )
+        self.metrics_path.parent.mkdir(parents=True, exist_ok=True)
+        self.metrics_handle = self.metrics_path.open("a", encoding="utf-8")
+
+    @classmethod
+    def _format_header(cls) -> str:
+        return " ".join(name.ljust(width) for name, width in cls._COLS)
+
+    @classmethod
+    def _format_cell(cls, value: str, width: int) -> str:
+        return value.rjust(width) if value else " " * width
 
     def add_decoder_tokens(self, count: int, num_sequences: int) -> None:
         positive_count = max(0, count)
@@ -59,11 +95,11 @@ class TrainingLogger:
     @staticmethod
     def _format_float(value: float | None, decimals: int = 2) -> str:
         if value is None:
-            return "-"
+            return ""
         return f"{value:.{decimals}f}"
 
     @staticmethod
-    def _format_metric(value: object, unknown: str = "-") -> str:
+    def _format_metric(value: object, unknown: str = "") -> str:
         if value is None:
             return unknown
         return str(value)
@@ -71,45 +107,67 @@ class TrainingLogger:
     @staticmethod
     def _format_scaled(value: float | int | None, *, scale: float, decimals: int = 1) -> str:
         if value is None:
-            return "-"
+            return ""
         return f"{value / scale:.{decimals}f}"
 
-    def _build_message(
+    def _write_metrics_line(self, line: str) -> None:
+        self.metrics_handle.write(line + "\n")
+        self.metrics_handle.flush()
+        sys.stdout.write(line + "\n")
+        sys.stdout.flush()
+
+    def _write_metrics_row(self, values: dict[str, str]) -> None:
+        if self.metric_row_count == 0 or self.metric_row_count % 10 == 0:
+            self._write_metrics_line(self._format_header())
+
+        cells = []
+        for name, width in self._COLS:
+            value = values.get(name, "")
+            if name in {"TIME", "TYPE"}:
+                cells.append(value.ljust(width))
+            else:
+                cells.append(self._format_cell(value, width))
+        self._write_metrics_line(" ".join(cells))
+        self.metric_row_count += 1
+
+    def _build_metrics_row(
         self,
         *,
-        label: str | None,
+        event_type: str,
         step: int,
         epoch: int,
-        loss: float,
+        loss: float | None = None,
         median_loss: float | None,
+        validation_loss: float | None = None,
         grad_norm: float | None,
         lr: float | None,
-        batch_ids: Sequence[int] | None,
-    ) -> str:
+    ) -> dict[str, str]:
         dec_tok_s = self._decoder_tokens_per_second()
         avg_tgt_len = self._average_target_length()
         gpu_util = get_gpu_util()
         used_cu = estimate_compute_units(self.hardware_type, self.start_time)
-        used_eur = estimate_cost(used_cu, self.euro_per_cu)
         progress = self._progress_percent(step)
-        gpu_text = f"{gpu_util}%" if gpu_util is not None else "-"
-        progress_text = f"{progress}%" if progress is not None else "-"
+        gpu_text = f"{gpu_util}%" if gpu_util is not None else ""
+        progress_text = f"{progress}%" if progress is not None else ""
         total_mtok = self._format_scaled(self.total_decoder_token_count, scale=1_000_000)
         ktok_s = self._format_scaled(dec_tok_s, scale=1_000)
-        prefix = f"{label} " if label else ""
-        batch_ids_text = f" batch_ids={batch_ids}" if batch_ids is not None else ""
-
-        return (
-            f"{prefix}prog={progress_text} step={step} ep={epoch} loss={loss:.3f} "
-            f"med={self._format_float(median_loss, decimals=3)} "
-            f"grad={self._format_float(grad_norm, decimals=3)} "
-            f"lr={self._format_metric(lr) if lr is not None else '-'} "
-            f"mtok={total_mtok} "
-            f"ktok_s={ktok_s} "
-            f"len={self._format_float(avg_tgt_len, decimals=1)} "
-            f"gpu={gpu_text} cu={self._format_float(used_cu, decimals=2)} "
-            f"eur={self._format_float(used_eur, decimals=2)}{batch_ids_text}"
-        )
+        return {
+            "TIME": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "TYPE": event_type,
+            "PROG": progress_text,
+            "STEP": str(step),
+            "EP": str(epoch),
+            "LOSS": self._format_float(loss, decimals=4),
+            "MLOSS": self._format_float(median_loss, decimals=4),
+            "VLOSS": self._format_float(validation_loss, decimals=4),
+            "GRAD": self._format_float(grad_norm, decimals=4),
+            "LR": self._format_float(lr, decimals=5),
+            "MTOK": total_mtok,
+            "KTOK_S": ktok_s,
+            "LEN": self._format_float(avg_tgt_len, decimals=1),
+            "GPU": gpu_text,
+            "CU": self._format_float(used_cu, decimals=2),
+        }
 
     def log_translation_failure(self, step: int, epoch: int, exc: Exception) -> None:
         cause = exc.__cause__
@@ -140,19 +198,39 @@ class TrainingLogger:
         lr: float | None = None,
         batch_ids: Sequence[int] | None = None,
     ) -> str:
-        message = self._build_message(
-            label=label,
+        event_type = "SPIKE" if label == "SPIKE" else "TRAIN"
+        row = self._build_metrics_row(
+            event_type=event_type,
             step=step,
             epoch=epoch,
             loss=loss,
             median_loss=median_loss,
             grad_norm=grad_norm,
             lr=lr,
-            batch_ids=batch_ids,
         )
-        self.logger.log(level, message)
+        self._write_metrics_row(row)
+        message = " ".join(f"{key}={value}" for key, value in row.items() if value)
+        if event_type == "SPIKE":
+            self.logger.log(level, "%s batch_ids=%s", message, batch_ids)
         self.last_log_time = time.time()
         self.decoder_token_count = 0
         self.decoder_sequence_count = 0
         return message
+
+    def log_validation(self, step: int, epoch: int, validation_loss: float) -> None:
+        self._write_metrics_row(
+            self._build_metrics_row(
+                event_type="VAL",
+                step=step,
+                epoch=epoch,
+                median_loss=None,
+                validation_loss=validation_loss,
+                grad_norm=None,
+                lr=None,
+            )
+        )
+
+    def close(self) -> None:
+        if getattr(self, "metrics_handle", None) is not None and not self.metrics_handle.closed:
+            self.metrics_handle.close()
 
