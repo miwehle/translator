@@ -91,5 +91,5 @@ class TrainingObserver:
             except Exception as exc:
                 self.training_logger.log_translation_failure(self.global_step, epoch, exc)
 
-    def on_evaluation(self, step: int, epoch: int, eval_loss: float) -> None:
+    def on_validation(self, step: int, epoch: int, validation_loss: float) -> None:
         self.training_logger.logger.info("EVAL step=%s ep=%s validation_loss=%.3f", step, epoch, eval_loss)

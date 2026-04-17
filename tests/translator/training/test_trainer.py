@@ -86,14 +86,14 @@ class TestTrainer:
     def test_train_resumes_from_checkpoint(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         _assert_resume_rejects_configured_seq_len_above_model_limit(tmp_path, monkeypatch)
 
-    def test_init_rejects_evaluate_every_without_validation_dataset(self, tmp_path: Path) -> None:
+    def test_init_rejects_validate_every_without_validation_dataset(self, tmp_path: Path) -> None:
         dataset_path = create_valid_mapped_dataset(tmp_path / "valid_training.mapped")
         ds = cast(Iterable[Example], load_arrow_records(dataset_path))
 
-        with pytest.raises(ValueError, match="evaluate_every requires validation_dataset"):
+        with pytest.raises(ValueError, match="validate_every requires validation_dataset"):
             Trainer(
                 _create_factory(ds),
-                train_config_for_test(str(tmp_path), device="cpu", evaluate_every=10, validation_dataset=None),
+                train_config_for_test(str(tmp_path), device="cpu", validate_every=10, validation_dataset=None),
                 model_config=ModelConfig(d_model=32, ff_dim=64, num_heads=4, num_layers=2),
             )
 
@@ -102,20 +102,20 @@ class TestTrainer:
         ds = cast(Iterable[Example], load_arrow_records(dataset_path))
         factory = _create_factory(ds)
         train_config = train_config_for_test(
-            str(tmp_path), device="cpu", epochs=1, log_every=1000, evaluate_every=4, seed=7
+            str(tmp_path), device="cpu", epochs=1, log_every=1000, validate_every=4, seed=7
         )
         trainer = Trainer(factory, train_config, model_config=ModelConfig(d_model=32, ff_dim=64, num_heads=4, num_layers=2))
         evaluate_call_count = 0
         observed_eval_steps: list[int] = []
 
-        def fake_evaluate(examples: Iterable[Example]) -> float:
+        def fake_validate(examples: Iterable[Example]) -> float:
             nonlocal evaluate_call_count
             evaluate_call_count += 1
             return 0.25
 
-        monkeypatch.setattr(trainer, "evaluate", fake_evaluate)
+        monkeypatch.setattr(trainer, "validate", fake_validate)
         monkeypatch.setattr(
-            "translator.training.internal.training_observer.TrainingObserver.on_evaluation",
+            "translator.training.internal.training_observer.TrainingObserver.on_validation",
             lambda self, step, epoch, eval_loss: observed_eval_steps.append(step),
         )
 
@@ -135,7 +135,7 @@ class TestTrainer:
         )
 
         trainer._model.train()
-        trainer.evaluate(ds)
+        trainer.validate(ds)
 
         assert trainer._model.training is True
 
@@ -144,9 +144,9 @@ class TestTrainer:
         ds = cast(Iterable[Example], load_arrow_records(dataset_path))
         trainer = Trainer(
             _create_factory(ds),
-            train_config_for_test(str(tmp_path), device="cpu", evaluate_every=10),
+            train_config_for_test(str(tmp_path), device="cpu", validate_every=10),
             model_config=ModelConfig(d_model=32, ff_dim=64, num_heads=4, num_layers=2),
         )
 
-        with pytest.raises(ValueError, match="evaluate_every requires validation_examples"):
+        with pytest.raises(ValueError, match="validate_every requires validation_examples"):
             trainer.train(ds)

@@ -185,8 +185,8 @@ def train(
     # main flow
     examples, metadata, git_commit, resolved_train_config = prepare_training()
     validation_examples = None
-    if resolved_train_config.evaluate_every is not None and resolved_train_config.validation_dataset is None:
-        raise ValueError("evaluate_every requires validation_dataset.")
+    if resolved_train_config.validate_every is not None and resolved_train_config.validation_dataset is None:
+        raise ValueError("validate_every requires validation_dataset.")
     if resolved_train_config.validation_dataset is not None:
         validation_examples = load_validation_dataset(resolved_train_config, metadata)
     log_training_start(resolved_train_config)
@@ -203,7 +203,7 @@ def train(
 
     # evaluate
     if validation_examples is not None:
-        validation_loss = trainer.evaluate(validation_examples)
+        validation_loss = trainer.validate(validation_examples)
         summary = replace(summary, validation_loss=validation_loss)
 
     summary_path = (
