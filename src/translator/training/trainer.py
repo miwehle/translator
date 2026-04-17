@@ -11,7 +11,7 @@ from __future__ import annotations
 import logging
 import random
 from collections.abc import Iterable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import torch
 import torch.nn as nn
@@ -118,7 +118,8 @@ class Trainer:
         return self._train_config.validate_every is not None and step % self._train_config.validate_every == 0
 
     def validate(self, examples: Iterable[Example] | Sequence[Example]) -> float:
-        loader = self._factory.create_data_loader(examples, self._data_loader_config, self._device)
+        cfg = replace(self._data_loader_config, shuffle=False)
+        loader = self._factory.create_data_loader(examples, cfg, self._device)
         was_training = self._model.training
         self._model.eval()
         loss_sum = 0.0
