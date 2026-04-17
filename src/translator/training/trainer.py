@@ -115,7 +115,7 @@ class Trainer:
         return self._criterion(logits.reshape(-1, logits.size(-1)), tgt[:, 1:].reshape(-1))
 
     def _should_validate(self, step: int) -> bool:
-        return self._train_config.validate_every is not None and step % self._train_config.validate_every == 0
+        return self._train_config.validate_every is not None and (step + 1) % self._train_config.validate_every == 0
 
     def validate(self, examples: Iterable[Example] | Sequence[Example]) -> float:
         cfg = replace(self._data_loader_config, shuffle=False)
@@ -189,14 +189,23 @@ class Trainer:
                     grad_norm = float(nn.utils.clip_grad_norm_(self._model.parameters(), 1.0))
                     self._optimizer.step()
 
-                    # log batch metrics via observer (to keep logging details out of here)
-                    observer.on_batch_end(
-                        epoch, loss.item(), grad_norm, batch_ids, tgt.size(0), tgt_token_count=tgt[:, 1:].numel()
+                    # validate
+                    validation_loss = (
+                        self.validate(validation_examples)  # type: ignore[arg-type]
+                        if self._should_validate(observer.global_step)
+                        else None
                     )
 
-                    # validate
-                    if self._should_validate(observer.global_step):
-                        observer.on_validation(observer.global_step, epoch, self.validate(validation_examples))  # type: ignore[arg-type]
+                    # log batch metrics via observer (to keep logging details out of here)
+                    observer.on_batch_end(
+                        epoch,
+                        loss.item(),
+                        validation_loss,
+                        grad_norm,
+                        batch_ids,
+                        tgt.size(0),
+                        tgt_token_count=tgt[:, 1:].numel(),
+                    )
         finally:
             observer.training_logger.close()
 

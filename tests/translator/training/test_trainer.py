@@ -114,10 +114,26 @@ class TestTrainer:
             return 0.25
 
         monkeypatch.setattr(trainer, "validate", fake_validate)
-        monkeypatch.setattr(
-            "translator.training.internal.training_observer.TrainingObserver.on_validation",
-            lambda self, step, epoch, eval_loss: observed_eval_steps.append(step),
-        )
+
+        def fake_log(
+            self,
+            step: int,
+            epoch: int,
+            loss: float,
+            median_loss: float | None,
+            *,
+            validation_loss: float | None = None,
+            label: str | None = None,
+            level: int = 20,
+            grad_norm: float | None = None,
+            lr: float | None = None,
+            batch_ids: object | None = None,
+        ) -> str:
+            if validation_loss is not None:
+                observed_eval_steps.append(step)
+            return ""
+
+        monkeypatch.setattr("translator.training.internal.logging.TrainingLogger.log", fake_log)
 
         summary = trainer.train(ds, ds)
 

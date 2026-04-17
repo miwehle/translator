@@ -201,6 +201,7 @@ class TrainingLogger:
         loss: float,
         median_loss: float | None,
         *,
+        validation_loss: float | None = None,
         label: str | None = None,
         level: int = logging.INFO,
         grad_norm: float | None = None,
@@ -214,6 +215,7 @@ class TrainingLogger:
             epoch=epoch,
             loss=loss,
             median_loss=median_loss,
+            validation_loss=validation_loss,
             grad_norm=grad_norm,
             lr=lr,
         )
@@ -225,19 +227,6 @@ class TrainingLogger:
         self.decoder_token_count = 0
         self.decoder_sequence_count = 0
         return message
-
-    def log_validation(self, step: int, epoch: int, validation_loss: float) -> None:
-        self._write_metrics_row(
-            self._build_metrics_row(
-                event_type="VAL",
-                step=step,
-                epoch=epoch,
-                median_loss=None,
-                validation_loss=validation_loss,
-                grad_norm=None,
-                lr=None,
-            )
-        )
 
     def close(self) -> None:
         total_time = stop(self.metrics_clock, "close") or 0.0

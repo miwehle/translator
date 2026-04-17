@@ -43,6 +43,7 @@ class TrainingObserver:
         self,
         epoch: int,
         loss_value: float,
+        validation_loss: float | None,
         grad_norm: float,
         batch_ids: Sequence[int],
         tgt_size: int,
@@ -69,9 +70,15 @@ class TrainingObserver:
             )
 
         # log training progress
-        if self.global_step == 1 or self.global_step % self.train_config.log_every == 0:
+        if self.global_step == 1 or self.global_step % self.train_config.log_every == 0 or validation_loss is not None:
             self.training_logger.log(
-                self.global_step, epoch, loss_value, median_loss, grad_norm=grad_norm, lr=self.train_config.lr
+                self.global_step,
+                epoch,
+                loss_value,
+                median_loss,
+                validation_loss=validation_loss,
+                grad_norm=grad_norm,
+                lr=self.train_config.lr,
             )
         
         # translate preview examples
@@ -90,6 +97,3 @@ class TrainingObserver:
                 )
             except Exception as exc:
                 self.training_logger.log_translation_failure(self.global_step, epoch, exc)
-
-    def on_validation(self, step: int, epoch: int, validation_loss: float) -> None:
-        self.training_logger.log_validation(step, epoch, validation_loss)
