@@ -56,6 +56,7 @@ class TrainingObserver:
         self.loss_history.append(loss_value)
         self.training_logger.add_decoder_tokens(tgt_token_count, tgt_size)
 
+        # warn on loss spike
         if is_spike:
             self.training_logger.log(
                 self.global_step,
@@ -67,10 +68,13 @@ class TrainingObserver:
                 batch_ids=batch_ids,
             )
 
+        # log training progress
         if self.global_step == 1 or self.global_step % self.train_config.log_every == 0:
             self.training_logger.log(
                 self.global_step, epoch, loss_value, median_loss, grad_norm=grad_norm, lr=self.train_config.lr
             )
+        
+        # translate preview examples
         if (
             self.train_config.translate_every is not None
             and self.translator is not None
