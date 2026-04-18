@@ -10,10 +10,10 @@ model_config:
 #resume_run: europarl
 
 train_config:
-  dataset: europarl_de-en_train (8)/curation/filtered_dataset
-  validation_dataset: europarl_de-en_diy-validation
+  dataset: europarl_de-en_train (8)/curation/curated_dataset
+  validation_dataset: europarl_de-en_train (8)/curation/curated_dataset_split-validation
   validate_every: 1000
-  run_name: val__1euc_lr1
+  run_name: val2__1euc_lr1
   seed: 42
   lr: 0.002
   epochs: 1
