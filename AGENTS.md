@@ -52,6 +52,16 @@ Provisorische Workarounds, Debug-Helfer und asymmetrische Zwischenloesungen sind
 5.7 Der Modulname soll nicht in der Testfunktion wiederholt werden.  
 5.8 Der Klassenname soll nicht in der Testmethode wiederholt werden, wenn die Testklasse ihn schon trägt.
 
+### 6 DRY auch im Testcode
+6.1 Das DRY-Prinzip gilt im gesamten Workspace ausdruecklich auch fuer Testcode.
+6.2 Wissensduplikation ist in Testcode ebenso zu vermeiden wie in Production-Code.
+6.3 Wenn mehrere Tests denselben fachlichen Begriff, denselben Pfadbaustein, dieselbe Benennung, denselben Config-Wert oder dasselbe Setup wiederholen, ist eine kleine gemeinsame Test-Hilfe, Konstante oder Fixture zu bevorzugen.
+6.4 Fachlich benannte Literale wie Pfade, Verzeichnisnamen, Dateinamen und Config-Werte sollen im Testcode nach Moeglichkeit nur an einer Stelle definiert werden (`Single Source of Truth`).
+6.5 Tests sollen primaer das Verhalten der oeffentlichen API absichern. Interne Verdrahtung, Pfadableitungen und Implementierungsdetails sollen nicht redundant in vielen Tests nachgebaut werden.
+6.6 Solche Details gehoeren, wenn fachlich relevant, in kleine und gezielte Tests des zustaendigen Moduls.
+6.7 Wenn eine kleine produktive Umbenennung oder lokale interne Aenderung viele Testanpassungen ausloest, ist das als `Fragile/Brittle Test`-Smell zu behandeln.
+6.8 Vor weiterem Ausbau des Testcodes ist dann kurz zu pruefen, ob `Extract Helper`, kleine Fixtures oder benannte Konstanten die Duplikation verringern und die Kopplung an Implementierungsdetails reduzieren.
+
 ### Nutzen und Zweck
 - Die 1:1-Zuordnung schafft Ordnung im Testcode. Sie macht klar, wo welcher Test zu erwarten ist und was getestet ist und was nicht.
 - Das Regelwerk lenkt Testaufwand auf die öffentliche API. So wächst der Testcode nicht ungeordnet entlang interner Implementierungsdetails.
