@@ -1,10 +1,10 @@
 checkpoint: ttc10-lr1
 
-dataset:
+dataset_config:
   path: json
   data_files: /content/drive/MyDrive/nmt_lab/artifacts/datasets/iwslt2017_iwslt2017-de-en_validation_staging/iwslt2017_filtered.jsonl
   split: train
 
-mapping:
+mapping_config:
   src: translation.de
   ref: translation.en

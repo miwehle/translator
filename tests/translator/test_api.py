@@ -222,8 +222,8 @@ def test_comet_score_uses_convention_checkpoint_path(monkeypatch) -> None:
     score = comet_score(
         CometScoreConfig(
             checkpoint="ttc10-lr1",
-            dataset={"path": "IWSLT/iwslt2017", "name": "iwslt2017-de-en", "split": "validation"},
-            mapping={"src": "translation.de", "ref": "translation.en"},
+            dataset_config={"path": "IWSLT/iwslt2017", "name": "iwslt2017-de-en", "split": "validation"},
+            mapping_config={"src": "translation.de", "ref": "translation.en"},
         )
     )
 
@@ -240,8 +240,13 @@ def test_comet_score_uses_convention_checkpoint_path(monkeypatch) -> None:
         "score": 0.88,
         "config": {
             "checkpoint": "ttc10-lr1",
-            "dataset": {"path": "IWSLT/iwslt2017", "name": "iwslt2017-de-en", "split": "validation", "data_files": None},
-            "mapping": {"src": "translation.de", "ref": "translation.en"},
+            "dataset_config": {
+                "path": "IWSLT/iwslt2017",
+                "name": "iwslt2017-de-en",
+                "split": "validation",
+                "data_files": None,
+            },
+            "mapping_config": {"src": "translation.de", "ref": "translation.en"},
             "model": "Unbabel/wmt22-comet-da",
             "output_path": None,
         },

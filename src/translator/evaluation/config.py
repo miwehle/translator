@@ -21,16 +21,16 @@ class MappingConfig:
 @dataclass(frozen=True, kw_only=True)
 class CometScoreConfig:
     checkpoint: str
-    dataset: DatasetConfig
-    mapping: MappingConfig
+    dataset_config: DatasetConfig
+    mapping_config: MappingConfig
     model: str = "Unbabel/wmt22-comet-da"
     output_path: str | None = None
 
     def __post_init__(self) -> None:
-        if not isinstance(self.dataset, DatasetConfig):
-            object.__setattr__(self, "dataset", DatasetConfig(**self.dataset))
-        if not isinstance(self.mapping, MappingConfig):
-            object.__setattr__(self, "mapping", MappingConfig(**self.mapping))
+        if not isinstance(self.dataset_config, DatasetConfig):
+            object.__setattr__(self, "dataset_config", DatasetConfig(**self.dataset_config))
+        if not isinstance(self.mapping_config, MappingConfig):
+            object.__setattr__(self, "mapping_config", MappingConfig(**self.mapping_config))
 
     @property
     def checkpoint_file(self) -> Path:

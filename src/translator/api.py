@@ -80,8 +80,8 @@ def comet_score(
 
     scorer = CometScorer(
         comet_model=config.model,
-        test_dataset=config.dataset,
-        mapping=config.mapping,
+        test_dataset=config.dataset_config,
+        mapping=config.mapping_config,
         output_path=config.output_path,
     )
     score = scorer.score_checkpoint(config.checkpoint_file)
