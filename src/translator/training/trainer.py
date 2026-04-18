@@ -207,7 +207,7 @@ class Trainer:
                         tgt_token_count=tgt[:, 1:].numel(),
                     )
         finally:
-            observer.training_logger.close()
+            observer.close()
 
         checkpoint_file = save_checkpoint(
             run_dir, self._model, self._optimizer, self._model_config, self._factory.dataset_metadata

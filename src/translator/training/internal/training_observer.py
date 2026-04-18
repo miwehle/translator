@@ -8,6 +8,7 @@ from statistics import median
 from ...inference import Translator
 from ..config import TrainConfig
 from .logging import TrainingLogger
+from .tensorboard_logger import TensorBoardLogger
 
 
 class TrainingObserver:
@@ -18,6 +19,7 @@ class TrainingObserver:
         run_dir.mkdir(parents=True, exist_ok=True)
         self.train_config = train_config
         self.training_logger = TrainingLogger(run_dir / "training.log", total_steps=total_steps)
+        self.tensorboard_logger = TensorBoardLogger(run_dir) if train_config.enable_tensorboard else None
         self.translation_examples_path = run_dir / "translation_examples.txt"
         self.translate_examples = list(train_config.translate_examples)
         self.translator = translator
@@ -80,7 +82,9 @@ class TrainingObserver:
                 grad_norm=grad_norm,
                 lr=self.train_config.lr,
             )
-        
+        if self.tensorboard_logger is not None:
+            self.tensorboard_logger.log_scalars(self.global_step, loss=loss_value, validation_loss=validation_loss)
+
         # translate preview examples
         if (
             self.train_config.translate_every is not None
@@ -97,3 +101,8 @@ class TrainingObserver:
                 )
             except Exception as exc:
                 self.training_logger.log_translation_failure(self.global_step, epoch, exc)
+
+    def close(self) -> None:
+        if self.tensorboard_logger is not None:
+            self.tensorboard_logger.close()
+        self.training_logger.close()

@@ -135,3 +135,68 @@ def test_trainer_writes_translation_examples_to_separate_file(
     assert "src: Hallo Welt." not in training_log
     assert "src: Ich mag Kaffee." not in training_log
     assert "TRAIN" in metrics_log
+
+
+def test_trainer_writes_tensorboard_events_when_enabled(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    dataset_path = create_valid_mapped_dataset(tmp_path / "valid_training.mapped")
+    ds = cast(Iterable[Example], load_arrow_records(dataset_path))
+    run_dir = tmp_path / "test_run_root" / "training_runs" / "artifacts_run"
+    tensorboard_dir = run_dir / "tensorboard"
+    logged_scalars: list[tuple[int, float, float | None]] = []
+    closed = False
+
+    class _FakeTensorBoardLogger:
+        def __init__(self, run_dir: Path) -> None:
+            self.log_dir = run_dir / "tensorboard"
+            self.log_dir.mkdir(parents=True, exist_ok=True)
+            (self.log_dir / "events.out.tfevents.test").write_text("", encoding="utf-8")
+
+        def log_scalars(self, step: int, *, loss: float, validation_loss: float | None = None) -> None:
+            logged_scalars.append((step, loss, validation_loss))
+
+        def close(self) -> None:
+            nonlocal closed
+            closed = True
+
+    monkeypatch.setattr("translator.training.internal.training_observer.TensorBoardLogger", _FakeTensorBoardLogger)
+    train_config = train_config_for_test(
+        str(tmp_path / "test_run_root"),
+        seed=7,
+        device="cpu",
+        lr=1e-3,
+        epochs=1,
+        log_every=1000,
+        run_name="artifacts_run",
+        enable_tensorboard=True,
+        validate_every=4,
+    )
+    check_result = check_dataset(ds)
+    factory = Factory(
+        dataset_metadata=type(
+            "_DatasetMetadata",
+            (),
+            {
+                "src_vocab_size": check_result["src_vocab_size"],
+                "tgt_vocab_size": check_result["tgt_vocab_size"],
+                "src_pad_id": check_result["src_pad_idx"],
+                "tgt_pad_id": check_result["tgt_pad_idx"],
+                "tgt_bos_id": check_result["tgt_sos_idx"],
+                "tokenizer_model_name": "test-tokenizer",
+                "id_field": check_result["id_field"],
+                "src_field": check_result["src_field"],
+                "tgt_field": check_result["tgt_field"],
+            },
+        )()
+    )
+    Trainer(
+        factory,
+        train_config,
+        DataLoaderConfig(batch_size=32, shuffle=False),
+        model_config=ModelConfig(d_model=32, ff_dim=64, num_heads=4, num_layers=2, dropout=0.0),
+    ).train(ds, ds)
+
+    assert tensorboard_dir.is_dir()
+    assert list(tensorboard_dir.glob("events.out.tfevents.*"))
+    assert logged_scalars
+    assert any(validation_loss is not None for _, _, validation_loss in logged_scalars)
+    assert closed is True

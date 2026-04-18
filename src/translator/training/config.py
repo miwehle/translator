@@ -23,6 +23,7 @@ class TrainConfig:
     dataset: str
     validation_dataset: str | None = None
     validate_every: int | None = None
+    enable_tensorboard: bool = False
     run_name: str = "run1"
     force: bool = False
     device: str | torch.device | None = None
