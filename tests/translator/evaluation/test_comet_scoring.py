@@ -266,7 +266,7 @@ class TestCometScorer:
 
 
 class TestLoadTestDataset:
-    def test_passes_name_and_data_files_to_load_dataset(self, monkeypatch) -> None:
+    def test_passes_name_and_data_files_to_load_dataset(self, tmp_path: Path, monkeypatch) -> None:
         captured: dict[str, object] = {}
 
         def fake_load_dataset(
@@ -284,13 +284,14 @@ class TestLoadTestDataset:
             type("DatasetsModule", (), {"load_dataset": staticmethod(fake_load_dataset)}),
         )
 
-        dataset = DatasetConfig("json", split="train", data_files="/content/drive/MyDrive/filtered.jsonl")
+        datasets_dir = tmp_path / "artifacts" / "datasets"
+        dataset = DatasetConfig(path="json", split="train", data_files="iwslt2017/filtered.jsonl", datasets_dir=str(datasets_dir))
         assert _load_test_dataset(dataset) == []
         assert captured == {
             "path": "json",
             "name": None,
             "split": "train",
-            "data_files": "/content/drive/MyDrive/filtered.jsonl",
+            "data_files": str(datasets_dir / "iwslt2017/filtered.jsonl"),
         }
 
 

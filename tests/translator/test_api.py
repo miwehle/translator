@@ -237,6 +237,7 @@ def test_comet_score_uses_convention_checkpoint_path(tmp_path: Path, monkeypatch
         "config": {
             "checkpoint": "ttc10-lr1",
             "dataset_config": {
+                "datasets_dir": "/content/drive/MyDrive/nmt_lab/artifacts/datasets",
                 "path": "IWSLT/iwslt2017",
                 "name": "iwslt2017-de-en",
                 "split": "validation",

@@ -10,6 +10,7 @@ class DatasetConfig:
     name: str | None = None
     split: str = "test"
     data_files: str | None = None
+    datasets_dir: str = "/content/drive/MyDrive/nmt_lab/artifacts/datasets"
 
 
 @dataclass(frozen=True)
@@ -34,6 +35,4 @@ class CometScoreConfig:
 
     @property
     def checkpoint_file(self) -> Path:
-        return (
-            Path("/content/drive/MyDrive/nmt_lab/artifacts/training_runs") / self.checkpoint / "checkpoint.pt"
-        )
+        return Path("/content/drive/MyDrive/nmt_lab/artifacts/training_runs") / self.checkpoint / "checkpoint.pt"

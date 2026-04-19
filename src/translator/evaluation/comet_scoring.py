@@ -109,7 +109,7 @@ class CometScorer:
     def __init__(
         self,
         comet_model: str = "Unbabel/wmt22-comet-da",
-        test_dataset: DatasetConfig = DatasetConfig("wmt20", "de-en", "test"),
+        test_dataset: DatasetConfig = DatasetConfig(path="wmt20", name="de-en", split="test"),
         mapping: MappingConfig = MappingConfig(src="translation.de", ref="translation.en"),
         translation_batch_size: int = 32,
         comet_batch_size: int = 8,
@@ -152,11 +152,12 @@ def _load_test_dataset(test_dataset: DatasetConfig | Any) -> Any:
     if isinstance(test_dataset, DatasetConfig):
         from datasets import load_dataset
 
+        data_files = None if test_dataset.data_files is None else str(Path(test_dataset.datasets_dir) / test_dataset.data_files)
         return load_dataset(
             path=test_dataset.path,
             name=test_dataset.name,
             split=test_dataset.split,
-            data_files=test_dataset.data_files,
+            data_files=data_files,
         )
     return test_dataset
 

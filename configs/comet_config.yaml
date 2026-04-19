@@ -1,8 +1,9 @@
-checkpoint: ttc10-lr1
+# ttc10-lr1
+checkpoint: val4__1euc-lr2_2euc-lr2_1euc-lr2_1euc-lr2
 
 dataset_config:
   path: json
-  data_files: /content/drive/MyDrive/nmt_lab/artifacts/datasets/iwslt2017_iwslt2017-de-en_validation_staging/iwslt2017_filtered.jsonl
+  data_files: iwslt2017_iwslt2017-de-en_validation_staging/iwslt2017_filtered.jsonl
   split: train
 
 mapping_config:
