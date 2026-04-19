@@ -9,7 +9,7 @@ class DatasetConfig:
     path: str
     name: str | None = None
     split: str = "test"
-    data_files: str | None = None
+    data_file: str | None = None
     datasets_dir: str = "/content/drive/MyDrive/nmt_lab/artifacts/datasets"
 
 

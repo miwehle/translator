@@ -241,7 +241,7 @@ def test_comet_score_uses_convention_checkpoint_path(tmp_path: Path, monkeypatch
                 "path": "IWSLT/iwslt2017",
                 "name": "iwslt2017-de-en",
                 "split": "validation",
-                "data_files": None,
+                "data_file": None,
             },
             "mapping_config": {"src": "translation.de", "ref": "translation.en"},
             "model": "Unbabel/wmt22-comet-da",

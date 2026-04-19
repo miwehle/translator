@@ -3,7 +3,7 @@ checkpoint: val4__1euc-lr2_2euc-lr2_1euc-lr2_1euc-lr2
 
 dataset_config:
   path: json
-  data_files: iwslt2017_iwslt2017-de-en_validation_staging/iwslt2017_filtered.jsonl
+  data_file: iwslt2017_iwslt2017-de-en_validation_staging/iwslt2017_filtered.jsonl
   split: train
 
 mapping_config:

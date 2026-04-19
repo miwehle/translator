@@ -152,7 +152,7 @@ def _load_test_dataset(test_dataset: DatasetConfig | Any) -> Any:
     if isinstance(test_dataset, DatasetConfig):
         from datasets import load_dataset
 
-        data_files = None if test_dataset.data_files is None else str(Path(test_dataset.datasets_dir) / test_dataset.data_files)
+        data_files = None if test_dataset.data_file is None else str(Path(test_dataset.datasets_dir) / test_dataset.data_file)
         return load_dataset(
             path=test_dataset.path,
             name=test_dataset.name,
