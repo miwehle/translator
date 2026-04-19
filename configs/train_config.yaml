@@ -7,15 +7,19 @@ model_config:
   max_seq_len: 250
   attention: torch
 
-#resume_run: 2eu_10tt_1eu_5tt
+#resume_run: europarl
 
 train_config:
-  dataset: news_commentary_de-en_train (5)/curation/filtered_dataset
-  #validation_dataset: # optional
-  run_name: ncc5-lr2
+  # europarl_de-en_train (8), iwslt2017_iwslt2017-de-en_train (7), news_commentary_de-en_train (5) 
+  dataset: europarl_de-en_train (8)/curation/curated_dataset
+  # iwslt2017_iwslt2017-de-en_validation
+  validation_dataset: europarl_de-en_train (8)/curation/curated_dataset_split-validation
+  validate_every: 1000
+  run_name: val4__1euc_lr1 #
+  lr: 0.002                #
+  epochs: 1
+  enable_tensorboard: true                #
   seed: 42
-  lr: 0.002
-  epochs: 5
   log_every: 100
   translate_every: 5000
   translate_examples:
