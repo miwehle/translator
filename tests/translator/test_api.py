@@ -68,7 +68,7 @@ def test_train_avoids_run_dir_name_collisions(tmp_path: Path, monkeypatch) -> No
         new_run_dir.joinpath("training_summary.yaml").read_text(encoding="utf-8")
     )
     with run_root.joinpath("checkpoint_register.csv").open("r", encoding="utf-8", newline="") as handle:
-        register_rows = list(csv.DictReader(handle))
+        register_rows = list(csv.DictReader(handle, delimiter=";"))
 
     assert existing_run_dir.joinpath("checkpoint.pt").read_text(encoding="utf-8") == ("existing checkpoint")
     assert new_run_dir.is_dir()
@@ -80,7 +80,7 @@ def test_train_avoids_run_dir_name_collisions(tmp_path: Path, monkeypatch) -> No
     assert Path(summary.checkpoint_path) == new_run_dir / "checkpoint.pt"
     assert summary.validation_loss is not None
     assert training_summary["validation_loss"] == summary.validation_loss
-    assert register_rows[0]["validation_loss"] == str(summary.validation_loss)
+    assert register_rows[0]["validation_loss"] == str(summary.validation_loss).replace(".", ",")
 
 
 def test_train_resumes_from_checkpoint(tmp_path: Path, monkeypatch) -> None:
@@ -118,7 +118,7 @@ def test_train_resumes_from_checkpoint(tmp_path: Path, monkeypatch) -> None:
         second_run_dir.joinpath("training_summary.yaml").read_text(encoding="utf-8")
     )
     with run_root.joinpath("checkpoint_register.csv").open("r", encoding="utf-8", newline="") as handle:
-        register_rows = list(csv.DictReader(handle))
+        register_rows = list(csv.DictReader(handle, delimiter=";"))
 
     assert Path(second_summary.checkpoint_path) == second_run_dir / "checkpoint.pt"
     assert manifest["optimizer"]["type"] == "adam"
@@ -135,7 +135,7 @@ def test_train_resumes_from_checkpoint(tmp_path: Path, monkeypatch) -> None:
     assert register_rows[1]["dataset_path"] == "dataset.mapped"
     assert register_rows[1]["git_commit"] == "test-commit"
     assert register_rows[1]["output_ckpt"] == "run2"
-    assert register_rows[1]["validation_loss"] == str(second_summary.validation_loss)
+    assert register_rows[1]["validation_loss"] == str(second_summary.validation_loss).replace(".", ",")
 
 
 def test_train_rejects_incompatible_validation_dataset(tmp_path: Path, monkeypatch) -> None:
@@ -196,9 +196,10 @@ def test_check_dataset_uses_dataset_manifest_defaults(tmp_path: Path) -> None:
     assert result["tgt_pad_idx"] == 1
 
 
-def test_comet_score_uses_convention_checkpoint_path(monkeypatch) -> None:
+def test_comet_score_uses_convention_checkpoint_path(tmp_path: Path, monkeypatch) -> None:
     captured: dict[str, object] = {}
-    checkpoint_dir = Path("/content/drive/MyDrive/nmt_lab/artifacts/training_runs/ttc10-lr1")
+    checkpoint_dir = tmp_path / "training_runs" / "ttc10-lr1"
+    checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
     class _FakeScorer:
         def __init__(self, **kwargs: object) -> None:
@@ -209,15 +210,7 @@ def test_comet_score_uses_convention_checkpoint_path(monkeypatch) -> None:
             return 0.88
 
     monkeypatch.setattr("translator.evaluation.CometScorer", _FakeScorer)
-    monkeypatch.setattr(Path, "mkdir", lambda self, parents=False, exist_ok=False: None)
-
-    written_files: dict[Path, str] = {}
-
-    def fake_write_text(self: Path, data: str, encoding: str | None = None) -> int:
-        written_files[self] = data
-        return len(data)
-
-    monkeypatch.setattr(Path, "write_text", fake_write_text)
+    monkeypatch.setattr(CometScoreConfig, "checkpoint_file", property(lambda self: checkpoint_dir / "checkpoint.pt"))
 
     score = comet_score(
         CometScoreConfig(
@@ -235,7 +228,10 @@ def test_comet_score_uses_convention_checkpoint_path(monkeypatch) -> None:
     assert scorer_kwargs["output_path"] is None
     assert scorer_kwargs["mapping"].src == "translation.de"
     assert scorer_kwargs["mapping"].ref == "translation.en"
-    comet_score_summary = yaml.safe_load(written_files[checkpoint_dir / "comet_score.yaml"])
+    comet_score_summary = yaml.safe_load((checkpoint_dir / "comet_score.yaml").read_text(encoding="utf-8"))
+    with checkpoint_dir.parent.joinpath("comet_score_register.csv").open("r", encoding="utf-8", newline="") as handle:
+        register_rows = list(csv.DictReader(handle, delimiter=";"))
+
     assert comet_score_summary == {
         "score": 0.88,
         "config": {
@@ -251,3 +247,12 @@ def test_comet_score_uses_convention_checkpoint_path(monkeypatch) -> None:
             "output_path": None,
         },
     }
+    assert register_rows == [
+        {
+            "timestamp": register_rows[0]["timestamp"],
+            "checkpoint": "ttc10-lr1",
+            "eval_dataset": "IWSLT/iwslt2017",
+            "comet_model": "Unbabel/wmt22-comet-da",
+            "comet_score": "0,88",
+        }
+    ]

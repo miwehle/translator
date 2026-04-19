@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-import csv
 import logging
 from collections.abc import Sequence
 from dataclasses import asdict, replace
-from datetime import datetime
 from pathlib import Path
 from typing import cast
 
@@ -16,6 +14,7 @@ from lab_infrastructure.logging import get_logger
 from lab_infrastructure.run_config import git_head_commit, write_run_config
 
 from .evaluation.config import CometScoreConfig
+from .registers import append_checkpoint_register, append_comet_score_register
 from .shared import Example
 from .training import DataLoaderConfig, Factory, ModelConfig, TrainConfig, Trainer, TrainingSummary, preflight
 from .training.dataset import DatasetMetadata, load_arrow_records
@@ -86,6 +85,13 @@ def comet_score(
     )
     score = scorer.score_checkpoint(config.checkpoint_file)
     _write_comet_score(config.checkpoint_file.parent / "comet_score.yaml", score, config)
+    append_comet_score_register(
+        config.checkpoint_file.parent.parent,
+        checkpoint=config.checkpoint,
+        eval_dataset=config.dataset_config.path,
+        comet_model=config.model,
+        comet_score=score,
+    )
     return score
 
 
@@ -102,34 +108,6 @@ def train(
     Use `model_config` to start a new run from scratch. Use `resume_run` to
     continue a previous run from its checkpoint.
     """
-
-    def append_checkpoint_register(output_run: str, validation_loss: float | None) -> None:
-        register_path = train_config.training_runs_dir / "checkpoint_register.csv"
-        write_header = not register_path.exists()
-        with register_path.open("a", encoding="utf-8", newline="") as handle:
-            writer = csv.DictWriter(
-                handle,
-                fieldnames=[
-                    "timestamp",
-                    "input_ckpt",
-                    "dataset_path",
-                    "git_commit",
-                    "output_ckpt",
-                    "validation_loss",
-                ],
-            )
-            if write_header:
-                writer.writeheader()
-            writer.writerow(
-                {
-                    "timestamp": datetime.now().isoformat(timespec="seconds"),
-                    "input_ckpt": resume_run or "",
-                    "dataset_path": Path(train_config.dataset).name,
-                    "git_commit": git_commit[:20],
-                    "output_ckpt": output_run,
-                    "validation_loss": ("" if validation_loss is None else validation_loss),
-                }
-            )
 
     def prepare_training():
         logger.info("Prepare training")
@@ -210,7 +188,14 @@ def train(
         resolved_train_config.training_runs_dir / resolved_train_config.run_name / "training_summary.yaml"
     )
     _write_training_summary(summary_path, summary)
-    append_checkpoint_register(resolved_train_config.run_name, summary.validation_loss)
+    append_checkpoint_register(
+        train_config.training_runs_dir,
+        checkpoint=resume_run or "",
+        dataset_path=Path(train_config.dataset).name,
+        git_commit=git_commit,
+        output_ckpt=resolved_train_config.run_name,
+        validation_loss=summary.validation_loss,
+    )
     log_training_finish(summary)
 
     return summary
