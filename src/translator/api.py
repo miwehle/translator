@@ -88,7 +88,7 @@ def comet_score(
     append_comet_score_register(
         config.checkpoint_file.parent.parent,
         checkpoint=config.checkpoint,
-        eval_dataset=config.dataset_config.path,
+        eval_dataset=config.dataset_config.data_file or config.dataset_config.path,
         comet_model=config.model,
         comet_score=score,
     )

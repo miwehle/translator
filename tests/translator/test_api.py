@@ -215,7 +215,12 @@ def test_comet_score_uses_convention_checkpoint_path(tmp_path: Path, monkeypatch
     score = comet_score(
         CometScoreConfig(
             checkpoint="ttc10-lr1",
-            dataset_config={"path": "IWSLT/iwslt2017", "name": "iwslt2017-de-en", "split": "validation"},
+            dataset_config={
+                "path": "IWSLT/iwslt2017",
+                "name": "iwslt2017-de-en",
+                "split": "validation",
+                "data_file": "europarl_de-en_train (8)/curation/split-validation.jsonl",
+            },
             mapping_config={"src": "translation.de", "ref": "translation.en"},
         )
     )
@@ -241,7 +246,7 @@ def test_comet_score_uses_convention_checkpoint_path(tmp_path: Path, monkeypatch
                 "path": "IWSLT/iwslt2017",
                 "name": "iwslt2017-de-en",
                 "split": "validation",
-                "data_file": None,
+                "data_file": "europarl_de-en_train (8)/curation/split-validation.jsonl",
             },
             "mapping_config": {"src": "translation.de", "ref": "translation.en"},
             "model": "Unbabel/wmt22-comet-da",
@@ -252,7 +257,7 @@ def test_comet_score_uses_convention_checkpoint_path(tmp_path: Path, monkeypatch
         {
             "timestamp": register_rows[0]["timestamp"],
             "checkpoint": "ttc10-lr1",
-            "eval_dataset": "IWSLT/iwslt2017",
+            "eval_dataset": "europarl_de-en_train (8)/curation/split-validation.jsonl",
             "comet_model": "Unbabel/wmt22-comet-da",
             "comet_score": "0,88",
         }

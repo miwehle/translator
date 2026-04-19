@@ -4,9 +4,9 @@ checkpoint: val4__1euc-lr2_2euc-lr2_1euc-lr2_1euc-lr2
 dataset_config:
   path: json
   # iwslt2017_iwslt2017-de-en_validation_staging/iwslt2017_filtered.jsonl
-  data_file: europarl_de-en_train (8)\curation\split-validation.jsonl
+  data_file: europarl_de-en_train (8)/curation/split-validation.jsonl
   split: train
 
 mapping_config:
-  src: translation.de
-  ref: translation.en
+  src: src # translation.de
+  ref: ref # translation.en
