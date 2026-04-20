@@ -85,7 +85,8 @@ def test_train_avoids_run_dir_name_collisions(tmp_path: Path, monkeypatch) -> No
 
 def test_train_resumes_from_checkpoint(tmp_path: Path, monkeypatch) -> None:
     artifacts_dir = tmp_path / "artifacts"
-    dataset_dir = create_valid_mapped_dataset(artifacts_dir / "datasets" / "dataset.mapped")
+    dataset_name = "source/curation/dataset.mapped"
+    dataset_dir = create_valid_mapped_dataset(artifacts_dir / "datasets" / dataset_name)
     validation_dir = create_valid_mapped_dataset(artifacts_dir / "datasets" / "validation.mapped")
     _write_dataset_manifest(dataset_dir)
     _write_dataset_manifest(validation_dir)
@@ -95,7 +96,14 @@ def test_train_resumes_from_checkpoint(tmp_path: Path, monkeypatch) -> None:
 
     train(
         train_config_for_test(
-            str(artifacts_dir), run_name="run1", device="cpu", epochs=1, log_every=1000, lr=1e-3, seed=7
+            str(artifacts_dir),
+            dataset=dataset_name,
+            run_name="run1",
+            device="cpu",
+            epochs=1,
+            log_every=1000,
+            lr=1e-3,
+            seed=7,
         ),
         DataLoaderConfig(batch_size=32, shuffle=False),
         tmp_path,
@@ -104,7 +112,14 @@ def test_train_resumes_from_checkpoint(tmp_path: Path, monkeypatch) -> None:
 
     second_summary = train(
         train_config_for_test(
-            str(artifacts_dir), run_name="run2", device="cpu", epochs=1, log_every=1000, lr=5e-4, seed=7
+            str(artifacts_dir),
+            dataset=dataset_name,
+            run_name="run2",
+            device="cpu",
+            epochs=1,
+            log_every=1000,
+            lr=5e-4,
+            seed=7,
         ),
         DataLoaderConfig(batch_size=32, shuffle=False),
         tmp_path,
@@ -132,7 +147,7 @@ def test_train_resumes_from_checkpoint(tmp_path: Path, monkeypatch) -> None:
     assert training_summary["validation_loss"] == second_summary.validation_loss
     assert len(register_rows) == 2
     assert register_rows[1]["input_ckpt"] == "run1"
-    assert register_rows[1]["dataset_path"] == "dataset.mapped"
+    assert register_rows[1]["dataset_path"] == dataset_name
     assert register_rows[1]["git_commit"] == "test-commit"
     assert register_rows[1]["output_ckpt"] == "run2"
     assert register_rows[1]["validation_loss"] == str(second_summary.validation_loss).replace(".", ",")

@@ -191,7 +191,7 @@ def train(
     append_checkpoint_register(
         train_config.training_runs_dir,
         checkpoint=resume_run or "",
-        dataset_path=Path(train_config.dataset).name,
+        dataset_path=train_config.dataset,
         git_commit=git_commit,
         output_ckpt=resolved_train_config.run_name,
         validation_loss=summary.validation_loss,
