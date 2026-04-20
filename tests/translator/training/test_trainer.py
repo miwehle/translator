@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from contextlib import nullcontext
 from pathlib import Path
 from types import SimpleNamespace
 from typing import cast
 
 import pytest
+import torch
 
 from tests.translator.training.support import create_valid_mapped_dataset, train_config_for_test
 from translator.training import Example, ModelConfig, Trainer, check_dataset
@@ -166,3 +168,27 @@ class TestTrainer:
 
         with pytest.raises(ValueError, match="validate_every requires validation_examples"):
             trainer.train(ds)
+
+    def test_autocast_context_uses_bf16_only_on_cuda_when_enabled(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        dataset_path = create_valid_mapped_dataset(tmp_path / "valid_training.mapped")
+        ds = cast(Iterable[Example], load_arrow_records(dataset_path))
+        trainer = Trainer(
+            _create_factory(ds),
+            train_config_for_test(str(tmp_path), device="cpu", use_bf16=True),
+            model_config=ModelConfig(d_model=32, ff_dim=64, num_heads=4, num_layers=2),
+        )
+        trainer._device = torch.device("cuda")
+        seen_kwargs: dict[str, object] = {}
+
+        def fake_autocast(*, device_type: str, dtype: object):
+            seen_kwargs.update(device_type=device_type, dtype=dtype)
+            return nullcontext()
+
+        monkeypatch.setattr("translator.training.trainer.torch.autocast", fake_autocast)
+
+        with trainer._autocast_context():
+            pass
+
+        assert seen_kwargs == {"device_type": "cuda", "dtype": torch.bfloat16}

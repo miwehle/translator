@@ -11,6 +11,7 @@ from __future__ import annotations
 import logging
 import random
 from collections.abc import Iterable, Sequence
+from contextlib import nullcontext
 from dataclasses import dataclass, replace
 
 import torch
@@ -117,6 +118,10 @@ class Trainer:
     def _should_validate(self, step: int) -> bool:
         return self._train_config.validate_every is not None and (step + 1) % self._train_config.validate_every == 0
 
+    def _autocast_context(self):
+        use_bf16 = self._train_config.use_bf16 and self._device.type == "cuda"
+        return torch.autocast(device_type="cuda", dtype=torch.bfloat16) if use_bf16 else nullcontext()
+
     def validate(self, examples: Iterable[Example] | Sequence[Example]) -> float:
         cfg = replace(self._data_loader_config, shuffle=False)
         loader = self._factory.create_data_loader(examples, cfg, self._device)
@@ -129,8 +134,9 @@ class Trainer:
                 for src, tgt, _ in loader:
                     src = src.to(self._device)
                     tgt = tgt.to(self._device)
-                    logits = self._model(src, tgt)
-                    loss = self._loss(logits, tgt)
+                    with self._autocast_context():
+                        logits = self._model(src, tgt)
+                        loss = self._loss(logits, tgt)
                     valid_tokens = int((tgt[:, 1:] != self._model.tgt_pad_idx).sum())
                     loss_sum += loss.item() * valid_tokens
                     token_count += valid_tokens
@@ -182,8 +188,9 @@ class Trainer:
                     tgt = tgt.to(self._device)
 
                     self._optimizer.zero_grad()
-                    logits = self._model(src, tgt)
-                    loss = self._loss(logits, tgt)
+                    with self._autocast_context():
+                        logits = self._model(src, tgt)
+                        loss = self._loss(logits, tgt)
 
                     loss.backward()
                     grad_norm = float(nn.utils.clip_grad_norm_(self._model.parameters(), 1.0))
