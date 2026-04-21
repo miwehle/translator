@@ -7,7 +7,7 @@ model_config:
   max_seq_len: 250
   attention: torch
 
-#resume_run: europarl
+#resume_run: val4__1euc-lr2_2euc-lr2_1euc-lr2_1euc-lr2_2euc-lr05_1euc-lr05
 
 train_config:
   # europarl_de-en_train (8), iwslt2017_iwslt2017-de-en_train (7), news_commentary_de-en_train (5) 
@@ -15,10 +15,12 @@ train_config:
   # iwslt2017_iwslt2017-de-en_validation
   validation_dataset: europarl_de-en_train (8)/curation/curated_dataset_split-validation
   validate_every: 1000
-  run_name: val4__1euc_lr1
-  lr: 0.002
+  # val4__1euc-lr2_2euc-lr2_1euc-lr2_1euc-lr2_2euc-lr05_1euc-lr05_1euc-lr05
+  run_name: TODO 
+  lr: 0.0005
   epochs: 1
   ##########
+  use_bf16: true
   enable_tensorboard: true
   seed: 42
   log_every: 100
