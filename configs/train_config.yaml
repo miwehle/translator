@@ -15,10 +15,11 @@ train_config:
   # iwslt2017_iwslt2017-de-en_validation
   validation_dataset: europarl_de-en_train (8)/curation/curated_dataset_split-validation
   validate_every: 1000
-  run_name: val4__1euc_lr1 #
-  lr: 0.002                #
+  run_name: val4__1euc_lr1
+  lr: 0.002
   epochs: 1
-  enable_tensorboard: true                #
+  ##########
+  enable_tensorboard: true
   seed: 42
   log_every: 100
   translate_every: 5000
