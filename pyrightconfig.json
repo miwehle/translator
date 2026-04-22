@@ -1,19 +1,11 @@
 {
+  "extends": "../pyrightconfig.json",
   "include": ["src", "tests", "scripts"],
-  "exclude": [
-    "**/__pycache__",
-    ".local_tmp",
-    "checkpoints",
-    "pytest-cache-files-*"
-  ],
+  "exclude": ["checkpoints"],
   "executionEnvironments": [
     {
       "root": ".",
-      "extraPaths": ["src"]
+      "extraPaths": ["src", "../lab_infrastructure/src", "../data_preprocessor/src", "../model_based_curation/src"]
     }
-  ],
-  "typeCheckingMode": "basic",
-  "reportMissingImports": "none",
-  "reportMissingTypeStubs": "none",
-  "pythonVersion": "3.13"
+  ]
 }
