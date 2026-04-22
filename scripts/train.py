@@ -24,12 +24,12 @@ def main() -> int:
     try:
         cfg = read_run_config(Path(sys.argv[1]))
         model_cfg = cfg.get("model_config")
-        model_config = None if model_cfg is None else ModelConfig(**model_cfg)
+        model_config = None if model_cfg is None else ModelConfig(**model_cfg)  # type: ignore[reportCallIssue]
         resume_run = cfg.get("resume_run")
 
-        train_config = TrainConfig(**(cfg.get("train_config") or {}))
-        data_loader_config = DataLoaderConfig(**(cfg.get("data_loader_config") or {}))
-        train(train_config, data_loader_config, REPO_ROOT, model_config=model_config, resume_run=resume_run)
+        train_config = TrainConfig(**(cfg.get("train_config") or {}))  # type: ignore[reportCallIssue]
+        data_loader_config = DataLoaderConfig(**(cfg.get("data_loader_config") or {}))  # type: ignore[reportCallIssue]
+        train(train_config, data_loader_config, REPO_ROOT, model_config=model_config, resume_run=resume_run)  # type: ignore[reportArgumentType]
     except Exception as exc:
         print(f"Training failed: {exc}")
         return 1

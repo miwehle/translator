@@ -22,7 +22,7 @@ def main() -> int:
         return 1
 
     try:
-        print(comet_score(CometScoreConfig(**read_run_config(Path(sys.argv[1])))))
+        print(comet_score(CometScoreConfig(**read_run_config(Path(sys.argv[1])))))  # type: ignore[reportArgumentType]
     except Exception as exc:
         print(f"COMET scoring failed: {exc}")
         return 1

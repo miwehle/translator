@@ -30,7 +30,7 @@ def main() -> int:
         return 1
 
     try:
-        result = check_dataset(dataset_path=Path(cfg["dataset_path"]), **(cfg.get("preflight_config") or {}))
+        result = check_dataset(dataset_path=Path(cfg["dataset_path"]), **(cfg.get("preflight_config") or {}))  # type: ignore[reportCallIssue, reportArgumentType]
     except Exception as exc:
         print(f"Preflight check failed: {exc}")
         return 1
