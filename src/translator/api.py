@@ -16,7 +16,8 @@ from lab_infrastructure.run_config import git_head_commit, write_run_config
 from .evaluation.config import CometScoreConfig
 from .registers import append_checkpoint_register, append_comet_score_register
 from .shared import Example
-from .training import DataLoaderConfig, Factory, ModelConfig, TrainConfig, Trainer, TrainingSummary, preflight
+from .training import Factory, PreflightConfig, Trainer, TrainingSummary, TrainRunConfig, preflight
+from .training.config import TrainConfig
 from .training.dataset import DatasetMetadata, load_arrow_records
 
 logger = logging.getLogger(__name__)
@@ -29,7 +30,9 @@ def _write_training_summary(summary_path: Path, summary: TrainingSummary) -> Non
 
 def _write_comet_score(summary_path: Path, score: float, config: CometScoreConfig) -> None:
     summary_path.parent.mkdir(parents=True, exist_ok=True)
-    summary_path.write_text(yaml.safe_dump({"score": score, "config": asdict(config)}, sort_keys=False), encoding="utf-8")
+    summary_path.write_text(
+        yaml.safe_dump({"score": score, "config": asdict(config)}, sort_keys=False), encoding="utf-8"
+    )
 
 
 def _next_available_run_dir(base_dir: Path) -> Path:
@@ -44,6 +47,10 @@ def _next_available_run_dir(base_dir: Path) -> Path:
         i += 1
 
 
+def _repo_root() -> Path:
+    return Path(__file__).resolve().parents[2]
+
+
 def _load_dataset(dataset_path: str | Path) -> tuple[Path, Sequence[Example], DatasetMetadata]:
     dataset_dir = Path(dataset_path)
     if not dataset_dir.exists():
@@ -55,10 +62,8 @@ def _load_dataset(dataset_path: str | Path) -> tuple[Path, Sequence[Example], Da
     return dataset_dir, examples, metadata
 
 
-def check_dataset(
-    *, dataset_path: str | Path, require_unique_ids: bool, min_seq_len: int
-) -> dict[str, object]:
-    _, examples, metadata = _load_dataset(dataset_path)
+def check_dataset(config: PreflightConfig) -> dict[str, object]:
+    _, examples, metadata = _load_dataset(config.dataset_path)
 
     return preflight.check_dataset(
         examples,
@@ -67,8 +72,8 @@ def check_dataset(
         tgt_field=metadata.tgt_field,
         src_pad_idx=metadata.src_pad_id,
         tgt_pad_idx=metadata.tgt_pad_id,
-        require_unique_ids=require_unique_ids,
-        min_seq_len=min_seq_len,
+        require_unique_ids=config.require_unique_ids,
+        min_seq_len=config.min_seq_len,
     )
 
 
@@ -95,38 +100,33 @@ def comet_score(
     return score
 
 
-def train(
-    train_config: TrainConfig,
-    data_loader_config: DataLoaderConfig,
-    repo_root: str | Path,
-    *,
-    model_config: ModelConfig | None = None,
-    resume_run: str | None = None,
-) -> TrainingSummary:
-    """Train the translator on `train_config.dataset`.
+def train(config: TrainRunConfig) -> TrainingSummary:
+    """Train the translator on `config.train_config.dataset`.
 
-    Use `model_config` to start a new run from scratch. Use `resume_run` to
+    Use `config.model_config` to start a new run from scratch. Use `config.resume_run` to
     continue a previous run from its checkpoint.
     """
 
     def prepare_training():
         logger.info("Prepare training")
-        dataset_path = train_config.datasets_dir / train_config.dataset
+        dataset_path = config.train_config.datasets_dir / config.train_config.dataset
         _, examples, metadata = _load_dataset(dataset_path)
 
         # Avoid overwriting earlier runs by picking the next free run directory.
-        run_dir = _next_available_run_dir(train_config.training_runs_dir / train_config.run_name)
+        run_dir = _next_available_run_dir(
+            config.train_config.training_runs_dir / config.train_config.run_name
+        )
         run_dir.mkdir(parents=True, exist_ok=False)
-        resolved_train_config = replace(train_config, run_name=run_dir.name)
+        resolved_train_config = replace(config.train_config, run_name=run_dir.name)
         get_logger("translator", log_path=run_dir / "training.log", stream=False)
-        resolved_repo_root = Path(repo_root)
+        resolved_repo_root = _repo_root()
         write_run_config(
             run_dir / "training_config.yaml",
             {
-                "model_config": (asdict(model_config) if model_config is not None else None),
-                "resume_run": resume_run,
+                "model_config": (asdict(config.model_config) if config.model_config is not None else None),
+                "resume_run": config.resume_run,
                 "train_config": asdict(resolved_train_config),
-                "data_loader_config": asdict(data_loader_config),
+                "data_loader_config": asdict(config.data_loader_config),
             },
             repo_root=resolved_repo_root,
             git_key_prefix="translator",
@@ -151,7 +151,7 @@ def train(
             detect_compute_hardware(),
             resolved_train_config.training_runs_dir / resolved_train_config.run_name,
             resolved_train_config.epochs,
-            data_loader_config.batch_size,
+            config.data_loader_config.batch_size,
             resolved_device,
         )
 
@@ -173,9 +173,9 @@ def train(
     trainer = Trainer(
         Factory(metadata),
         resolved_train_config,
-        data_loader_config,
-        model_config=model_config,
-        resume_run=resume_run,
+        config.data_loader_config,
+        model_config=config.model_config,
+        resume_run=config.resume_run,
     )
     summary = trainer.train(examples, validation_examples)
 
@@ -189,9 +189,9 @@ def train(
     )
     _write_training_summary(summary_path, summary)
     append_checkpoint_register(
-        train_config.training_runs_dir,
-        checkpoint=resume_run or "",
-        dataset_path=train_config.dataset,
+        config.train_config.training_runs_dir,
+        checkpoint=config.resume_run or "",
+        dataset_path=config.train_config.dataset,
         git_commit=git_commit,
         output_ckpt=resolved_train_config.run_name,
         validation_loss=summary.validation_loss,

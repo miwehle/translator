@@ -13,7 +13,7 @@ if str(SHARED_SRC_DIR) not in sys.path:
 
 
 def main() -> int:
-    from lab_infrastructure.run_config import read_run_config
+    from lab_infrastructure.run_config import read_run_config_as
 
     from translator import CometScoreConfig, comet_score
 
@@ -22,7 +22,7 @@ def main() -> int:
         return 1
 
     try:
-        print(comet_score(CometScoreConfig(**read_run_config(Path(sys.argv[1])))))  # type: ignore[reportArgumentType]
+        print(comet_score(read_run_config_as(Path(sys.argv[1]), CometScoreConfig)))
     except Exception as exc:
         print(f"COMET scoring failed: {exc}")
         return 1

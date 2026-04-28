@@ -11,25 +11,19 @@ if str(SRC_DIR) not in sys.path:
 if str(SHARED_SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SHARED_SRC_DIR))
 
-from lab_infrastructure.run_config import read_run_config
-
 
 def main() -> int:
-    from translator import DataLoaderConfig, ModelConfig, TrainConfig, train
+    from lab_infrastructure.run_config import read_run_config_as
+
+    from translator import TrainRunConfig, train
 
     if len(sys.argv) != 2:
         print("Usage: python scripts/train.py <config-path>")
         return 1
 
     try:
-        cfg = read_run_config(Path(sys.argv[1]))
-        model_cfg = cfg.get("model_config")
-        model_config = None if model_cfg is None else ModelConfig(**model_cfg)  # type: ignore[reportCallIssue]
-        resume_run = cfg.get("resume_run")
-
-        train_config = TrainConfig(**(cfg.get("train_config") or {}))  # type: ignore[reportCallIssue]
-        data_loader_config = DataLoaderConfig(**(cfg.get("data_loader_config") or {}))  # type: ignore[reportCallIssue]
-        train(train_config, data_loader_config, REPO_ROOT, model_config=model_config, resume_run=resume_run)  # type: ignore[reportArgumentType]
+        cfg = read_run_config_as(Path(sys.argv[1]), TrainRunConfig)
+        train(cfg)
     except Exception as exc:
         print(f"Training failed: {exc}")
         return 1
@@ -39,4 +33,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

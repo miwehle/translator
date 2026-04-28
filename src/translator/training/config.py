@@ -1,12 +1,16 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import field
 from pathlib import Path
 
 import torch
+from pydantic import ConfigDict
+from pydantic.dataclasses import dataclass
+
+_CONFIG = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, config=_CONFIG)
 class ModelConfig:
     d_model: int = 256
     ff_dim: int = 1024
@@ -17,7 +21,7 @@ class ModelConfig:
     attention: str = "torch"
 
 
-@dataclass(frozen=True, kw_only=True)
+@dataclass(frozen=True, kw_only=True, config=_CONFIG)
 class TrainConfig:
     artifacts_dir: str = "/content/drive/MyDrive/nmt_lab/artifacts"
     dataset: str
@@ -46,7 +50,7 @@ class TrainConfig:
         return Path(self.artifacts_dir) / "training_runs"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, config=_CONFIG)
 class DataLoaderConfig:
     batch_size: int = 64
     shuffle: bool = True
@@ -54,3 +58,18 @@ class DataLoaderConfig:
     prefetch_factor: int | None = None
     persistent_workers: bool | None = None
     pin_memory: bool | None = None
+
+
+@dataclass(frozen=True, kw_only=True, config=_CONFIG)
+class TrainRunConfig:
+    train_config: TrainConfig
+    data_loader_config: DataLoaderConfig = field(default_factory=DataLoaderConfig)
+    model_config: ModelConfig | None = None
+    resume_run: str | None = None
+
+
+@dataclass(frozen=True, kw_only=True, config=_CONFIG)
+class PreflightConfig:
+    dataset_path: str
+    require_unique_ids: bool = True
+    min_seq_len: int = 2

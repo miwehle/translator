@@ -1,10 +1,14 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from pathlib import Path
 
+from pydantic import ConfigDict
+from pydantic.dataclasses import dataclass
 
-@dataclass(frozen=True)
+_CONFIG = ConfigDict(extra="forbid")
+
+
+@dataclass(frozen=True, config=_CONFIG)
 class DatasetConfig:
     path: str
     name: str | None = None
@@ -13,13 +17,13 @@ class DatasetConfig:
     datasets_dir: str = "/content/drive/MyDrive/nmt_lab/artifacts/datasets"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, config=_CONFIG)
 class MappingConfig:
     src: str
     ref: str
 
 
-@dataclass(frozen=True, kw_only=True)
+@dataclass(frozen=True, kw_only=True, config=_CONFIG)
 class CometScoreConfig:
     checkpoint: str
     dataset_config: DatasetConfig
@@ -27,12 +31,8 @@ class CometScoreConfig:
     model: str = "Unbabel/wmt22-comet-da"
     output_path: str | None = None
 
-    def __post_init__(self) -> None:
-        if not isinstance(self.dataset_config, DatasetConfig):
-            object.__setattr__(self, "dataset_config", DatasetConfig(**self.dataset_config))
-        if not isinstance(self.mapping_config, MappingConfig):
-            object.__setattr__(self, "mapping_config", MappingConfig(**self.mapping_config))
-
     @property
     def checkpoint_file(self) -> Path:
-        return Path("/content/drive/MyDrive/nmt_lab/artifacts/training_runs") / self.checkpoint / "checkpoint.pt"
+        return (
+            Path("/content/drive/MyDrive/nmt_lab/artifacts/training_runs") / self.checkpoint / "checkpoint.pt"
+        )

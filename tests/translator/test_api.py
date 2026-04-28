@@ -11,9 +11,24 @@ from lab_infrastructure.run_config import read_run_config
 from tests.translator.training.support import create_valid_mapped_dataset, train_config_for_test
 from translator.api import check_dataset, comet_score, train
 from translator.evaluation import CometScoreConfig
-from translator.training import DataLoaderConfig, ModelConfig
+from translator.training import DataLoaderConfig, ModelConfig, PreflightConfig, TrainRunConfig
 
 _MODEL_CONFIG = ModelConfig(d_model=32, ff_dim=64, num_heads=4, num_layers=2, dropout=0.0)
+
+
+def _train_run_config(artifacts_dir: Path, **overrides: object) -> TrainRunConfig:
+    train_overrides = {
+        key: value
+        for key, value in overrides.items()
+        if key not in {"data_loader_config", "model_config", "resume_run"}
+    }
+    data_loader_config = overrides.get("data_loader_config", DataLoaderConfig(batch_size=32, shuffle=False))
+    return TrainRunConfig(
+        train_config=train_config_for_test(str(artifacts_dir), **train_overrides),
+        data_loader_config=cast(DataLoaderConfig, data_loader_config),
+        model_config=cast(ModelConfig | None, overrides.get("model_config")),
+        resume_run=cast(str | None, overrides.get("resume_run")),
+    )
 
 
 def _write_dataset_manifest(dataset_dir: Path, **overrides: object) -> None:
@@ -55,12 +70,16 @@ def test_train_avoids_run_dir_name_collisions(tmp_path: Path, monkeypatch) -> No
     monkeypatch.setattr("translator.api.git_head_commit", lambda _: "test-commit")
 
     summary = train(
-        train_config_for_test(
-            str(artifacts_dir), run_name="run1", device="cpu", epochs=1, log_every=1000, lr=1e-3, seed=7
-        ),
-        DataLoaderConfig(batch_size=32, shuffle=False),
-        tmp_path,
-        model_config=_MODEL_CONFIG,
+        _train_run_config(
+            artifacts_dir,
+            run_name="run1",
+            device="cpu",
+            epochs=1,
+            log_every=1000,
+            lr=1e-3,
+            seed=7,
+            model_config=_MODEL_CONFIG,
+        )
     )
 
     new_run_dir = run_root / "run1 (1)"
@@ -95,8 +114,8 @@ def test_train_resumes_from_checkpoint(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr("translator.api.git_head_commit", lambda _: "test-commit")
 
     train(
-        train_config_for_test(
-            str(artifacts_dir),
+        _train_run_config(
+            artifacts_dir,
             dataset=dataset_name,
             run_name="run1",
             device="cpu",
@@ -104,15 +123,13 @@ def test_train_resumes_from_checkpoint(tmp_path: Path, monkeypatch) -> None:
             log_every=1000,
             lr=1e-3,
             seed=7,
-        ),
-        DataLoaderConfig(batch_size=32, shuffle=False),
-        tmp_path,
-        model_config=_MODEL_CONFIG,
+            model_config=_MODEL_CONFIG,
+        )
     )
 
     second_summary = train(
-        train_config_for_test(
-            str(artifacts_dir),
+        _train_run_config(
+            artifacts_dir,
             dataset=dataset_name,
             run_name="run2",
             device="cpu",
@@ -120,10 +137,8 @@ def test_train_resumes_from_checkpoint(tmp_path: Path, monkeypatch) -> None:
             log_every=1000,
             lr=5e-4,
             seed=7,
-        ),
-        DataLoaderConfig(batch_size=32, shuffle=False),
-        tmp_path,
-        resume_run="run1",
+            resume_run="run1",
+        )
     )
 
     second_run_dir = run_root / "run2"
@@ -164,12 +179,15 @@ def test_train_rejects_incompatible_validation_dataset(tmp_path: Path, monkeypat
 
     with pytest.raises(ValueError, match="Validation dataset metadata mismatch"):
         train(
-            train_config_for_test(
-                str(artifacts_dir), device="cpu", epochs=1, log_every=1000, lr=1e-3, seed=7
-            ),
-            DataLoaderConfig(batch_size=32, shuffle=False),
-            tmp_path,
-            model_config=_MODEL_CONFIG,
+            _train_run_config(
+                artifacts_dir,
+                device="cpu",
+                epochs=1,
+                log_every=1000,
+                lr=1e-3,
+                seed=7,
+                model_config=_MODEL_CONFIG,
+            )
         )
 
 
@@ -182,19 +200,16 @@ def test_train_rejects_validate_every_without_validation_dataset(tmp_path: Path,
 
     with pytest.raises(ValueError, match="validate_every requires validation_dataset"):
         train(
-            train_config_for_test(
-                str(artifacts_dir),
+            _train_run_config(
+                artifacts_dir,
+                validation_dataset=None,
                 device="cpu",
                 epochs=1,
                 log_every=1000,
                 lr=1e-3,
                 seed=7,
-                validation_dataset=None,
                 validate_every=10,
             ),
-            DataLoaderConfig(batch_size=32, shuffle=False),
-            tmp_path,
-            model_config=_MODEL_CONFIG,
         )
 
 
@@ -202,7 +217,9 @@ def test_check_dataset_uses_dataset_manifest_defaults(tmp_path: Path) -> None:
     dataset_dir = create_valid_mapped_dataset(tmp_path / "dataset.mapped")
     _write_dataset_manifest(dataset_dir)
 
-    result = check_dataset(dataset_path=dataset_dir, require_unique_ids=True, min_seq_len=2)
+    result = check_dataset(
+        PreflightConfig(dataset_path=str(dataset_dir), require_unique_ids=True, min_seq_len=2)
+    )
 
     assert result["id_field"] == "id"
     assert result["src_field"] == "src_ids"
@@ -225,7 +242,9 @@ def test_comet_score_uses_convention_checkpoint_path(tmp_path: Path, monkeypatch
             return 0.88
 
     monkeypatch.setattr("translator.evaluation.CometScorer", _FakeScorer)
-    monkeypatch.setattr(CometScoreConfig, "checkpoint_file", property(lambda self: checkpoint_dir / "checkpoint.pt"))
+    monkeypatch.setattr(
+        CometScoreConfig, "checkpoint_file", property(lambda self: checkpoint_dir / "checkpoint.pt")
+    )
 
     score = comet_score(
         CometScoreConfig(
@@ -249,7 +268,8 @@ def test_comet_score_uses_convention_checkpoint_path(tmp_path: Path, monkeypatch
     assert scorer_kwargs["mapping"].src == "translation.de"
     assert scorer_kwargs["mapping"].ref == "translation.en"
     comet_score_summary = yaml.safe_load((checkpoint_dir / "comet_score.yaml").read_text(encoding="utf-8"))
-    with checkpoint_dir.parent.joinpath("comet_score_register.csv").open("r", encoding="utf-8", newline="") as handle:
+    register_path = checkpoint_dir.parent / "comet_score_register.csv"
+    with register_path.open("r", encoding="utf-8", newline="") as handle:
         register_rows = list(csv.DictReader(handle, delimiter=";"))
 
     assert comet_score_summary == {
