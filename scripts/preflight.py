@@ -4,13 +4,9 @@ import json
 import sys
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
-SRC_DIR = REPO_ROOT / "src"
-SHARED_SRC_DIR = REPO_ROOT.parent / "lab_infrastructure" / "src"
-if str(SRC_DIR) not in sys.path:
-    sys.path.insert(0, str(SRC_DIR))
-if str(SHARED_SRC_DIR) not in sys.path:
-    sys.path.insert(0, str(SHARED_SRC_DIR))
+from _bootstrap import add_src_dirs
+
+add_src_dirs(__file__)
 
 
 def main() -> int:
