@@ -8,9 +8,9 @@ add_src_dirs(__file__)
 def main() -> int:
     from lab_infrastructure import run
 
-    from translator import TrainRunConfig, train
+    from translator import train
 
-    run(train, TrainRunConfig)
+    run(train)
     return 0
 
 

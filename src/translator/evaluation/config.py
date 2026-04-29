@@ -24,7 +24,7 @@ class MappingConfig:
 
 
 @dataclass(frozen=True, kw_only=True, config=_CONFIG)
-class CometScoreConfig:
+class CometScoreRunConfig:
     checkpoint: str
     dataset_config: DatasetConfig
     mapping_config: MappingConfig

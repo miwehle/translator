@@ -30,6 +30,8 @@ def test_script_train_loads_yaml_and_calls_api(monkeypatch):
     def fake_train(config):
         calls.append({"config": config})
 
+    fake_train.__module__ = "translator"
+    fake_train.__name__ = "train"
     monkeypatch.setattr(sys, "argv", ["train.py", str(config_path)])
     monkeypatch.syspath_prepend(str(Path(__file__).resolve().parents[1] / "src"))
     monkeypatch.syspath_prepend(str(Path(__file__).resolve().parents[1] / "scripts"))

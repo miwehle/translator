@@ -13,7 +13,7 @@ from lab_infrastructure.compute_metrics import detect_compute_hardware
 from lab_infrastructure.logging import get_logger
 from lab_infrastructure.run_config import git_head_commit, write_run_config
 
-from .evaluation.config import CometScoreConfig
+from .evaluation.config import CometScoreRunConfig
 from .registers import append_checkpoint_register, append_comet_score_register
 from .shared import Example
 from .training import Factory, PreflightConfig, Trainer, TrainingSummary, TrainRunConfig, preflight
@@ -28,7 +28,7 @@ def _write_training_summary(summary_path: Path, summary: TrainingSummary) -> Non
     summary_path.write_text(yaml.safe_dump(asdict(summary), sort_keys=True), encoding="utf-8")
 
 
-def _write_comet_score(summary_path: Path, score: float, config: CometScoreConfig) -> None:
+def _write_comet_score(summary_path: Path, score: float, config: CometScoreRunConfig) -> None:
     summary_path.parent.mkdir(parents=True, exist_ok=True)
     summary_path.write_text(
         yaml.safe_dump({"score": score, "config": asdict(config)}, sort_keys=False), encoding="utf-8"
@@ -78,7 +78,7 @@ def check_dataset(config: PreflightConfig) -> dict[str, object]:
 
 
 def comet_score(
-    config: CometScoreConfig,
+    config: CometScoreRunConfig,
 ) -> float:
     from .evaluation import CometScorer
 

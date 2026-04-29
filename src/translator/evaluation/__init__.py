@@ -1,8 +1,8 @@
 from .comet_scoring import CometScorer, comet_score, translate
-from .config import CometScoreConfig, DatasetConfig, MappingConfig
+from .config import CometScoreRunConfig, DatasetConfig, MappingConfig
 
 __all__ = [
-    "CometScoreConfig",
+    "CometScoreRunConfig",
     "DatasetConfig",
     "MappingConfig",
     "CometScorer",

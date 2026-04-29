@@ -8,9 +8,9 @@ add_src_dirs(__file__)
 def main() -> int:
     from lab_infrastructure import run
 
-    from translator import CometScoreConfig, comet_score
+    from translator import comet_score
 
-    print(run(comet_score, CometScoreConfig))
+    print(run(comet_score))
     return 0
 
 

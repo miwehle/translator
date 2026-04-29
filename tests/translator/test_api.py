@@ -10,7 +10,7 @@ from lab_infrastructure.run_config import read_run_config
 
 from tests.translator.training.support import create_valid_mapped_dataset, train_config_for_test
 from translator.api import check_dataset, comet_score, train
-from translator.evaluation import CometScoreConfig
+from translator.evaluation import CometScoreRunConfig
 from translator.training import DataLoaderConfig, ModelConfig, PreflightConfig, TrainRunConfig
 
 _MODEL_CONFIG = ModelConfig(d_model=32, ff_dim=64, num_heads=4, num_layers=2, dropout=0.0)
@@ -243,11 +243,11 @@ def test_comet_score_uses_convention_checkpoint_path(tmp_path: Path, monkeypatch
 
     monkeypatch.setattr("translator.evaluation.CometScorer", _FakeScorer)
     monkeypatch.setattr(
-        CometScoreConfig, "checkpoint_file", property(lambda self: checkpoint_dir / "checkpoint.pt")
+        CometScoreRunConfig, "checkpoint_file", property(lambda self: checkpoint_dir / "checkpoint.pt")
     )
 
     score = comet_score(
-        CometScoreConfig(
+        CometScoreRunConfig(
             checkpoint="ttc10-lr1",
             dataset_config={
                 "path": "IWSLT/iwslt2017",

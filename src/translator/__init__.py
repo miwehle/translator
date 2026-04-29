@@ -20,7 +20,7 @@ MIT motto "Mens et Manus":
 """
 
 from .api import check_dataset, comet_score, train
-from .evaluation.config import CometScoreConfig, DatasetConfig, MappingConfig
+from .evaluation.config import CometScoreRunConfig, DatasetConfig, MappingConfig
 from .inference import Translator
 from .training import DataLoaderConfig, ModelConfig, PreflightConfig, TrainConfig, TrainRunConfig
 from .training.trainer import TrainingSummary
@@ -30,7 +30,7 @@ __all__ = [
     "comet_score",
     "check_dataset",
     "Translator",
-    "CometScoreConfig",
+    "CometScoreRunConfig",
     "DatasetConfig",
     "MappingConfig",
     "DataLoaderConfig",
