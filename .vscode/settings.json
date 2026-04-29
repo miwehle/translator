@@ -8,7 +8,8 @@
     "not slow"
   ],
   "python.analysis.extraPaths": [
-    "${workspaceFolder}/src"
+    "${workspaceFolder}/src",
+    "${workspaceFolder}/../lab_infrastructure/src"
   ],
   "python.analysis.diagnosticMode": "workspace",
   "python.analysis.typeCheckingMode": "basic",
