@@ -6,11 +6,11 @@ add_src_dirs(__file__)
 
 
 def main() -> int:
-    from lab_infrastructure import run
+    from lab_infrastructure import run_cli
 
     from translator import comet_score
 
-    print(run(comet_score))
+    print(run_cli(comet_score))
     return 0
 
 
