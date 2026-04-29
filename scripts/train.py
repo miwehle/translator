@@ -6,11 +6,11 @@ add_src_dirs(__file__)
 
 
 def main() -> int:
-    from lab_infrastructure import run_config_cli
+    from lab_infrastructure import run
 
     from translator import TrainRunConfig, train
 
-    run_config_cli(train, TrainRunConfig)
+    run(train, TrainRunConfig)
     return 0
 
 
