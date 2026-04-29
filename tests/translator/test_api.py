@@ -6,7 +6,6 @@ from typing import cast
 
 import pytest
 import yaml
-from lab_infrastructure.run_config import read_run_config
 
 from tests.translator.training.support import create_valid_mapped_dataset, train_config_for_test
 from translator.api import check_dataset, comet_score, train
@@ -143,7 +142,7 @@ def test_train_resumes_from_checkpoint(tmp_path: Path, monkeypatch) -> None:
 
     second_run_dir = run_root / "run2"
     manifest = yaml.safe_load(second_run_dir.joinpath("checkpoint_manifest.yaml").read_text(encoding="utf-8"))
-    train_cfg = read_run_config(second_run_dir / "training_config.yaml")
+    train_cfg = yaml.safe_load(second_run_dir.joinpath("training_config.yaml").read_text(encoding="utf-8"))
     training_summary = yaml.safe_load(
         second_run_dir.joinpath("training_summary.yaml").read_text(encoding="utf-8")
     )

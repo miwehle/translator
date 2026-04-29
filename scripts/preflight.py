@@ -10,7 +10,7 @@ add_src_dirs(__file__)
 
 
 def main() -> int:
-    from lab_infrastructure.run_config import read_run_config_as
+    from lab_infrastructure import run
 
     from translator import PreflightConfig, check_dataset
 
@@ -20,13 +20,7 @@ def main() -> int:
 
     config_path = Path(sys.argv[1])
     try:
-        cfg = read_run_config_as(config_path, PreflightConfig)
-    except Exception as exc:
-        print(f"Failed to load config: {exc}")
-        return 1
-
-    try:
-        result = check_dataset(cfg)
+        result = run(check_dataset, config_path, PreflightConfig)
     except Exception as exc:
         print(f"Preflight check failed: {exc}")
         return 1
