@@ -160,9 +160,9 @@ def train(config: TrainRunConfig) -> TrainingSummary:
             )
 
         # preprocess flow
+        logger.info("Prepare training")
         if config.train_config.validate_every is not None and config.train_config.validation_dataset is None:
             raise ValueError("validate_every requires validation_dataset.")
-        logger.info("Prepare training")
         if config.model_config is not None and config.resume_run is not None:
             raise ValueError("resume_run requires model_config to be omitted.")
 
