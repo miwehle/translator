@@ -159,7 +159,6 @@ def train(config: TrainRunConfig) -> TrainingSummary:
                 resolved_device,
             )
 
-        # preprocess flow
         logger.info("Prepare training")
         if config.train_config.validate_every is not None and config.train_config.validation_dataset is None:
             raise ValueError("validate_every requires validation_dataset.")
@@ -227,7 +226,6 @@ def train(config: TrainRunConfig) -> TrainingSummary:
                 summary.validation_loss,
             )
 
-        # postprocess flow
         if validation_examples is not None:
             validation_loss = trainer.validate(validation_examples)
             summary = replace(summary, validation_loss=validation_loss)
