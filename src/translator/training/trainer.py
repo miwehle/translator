@@ -54,6 +54,11 @@ class TrainingSummary:
 
 
 class Trainer:
+    """Train a Seq2Seq model from scratch or from a checkpoint.
+
+    Also computes loss on a validation dataset.
+    """
+
     def __init__(
         self,
         factory: Factory,
