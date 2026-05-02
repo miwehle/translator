@@ -34,21 +34,6 @@ class Factory:
     def __init__(self, dataset_metadata: DatasetMetadata) -> None:
         self.dataset_metadata = dataset_metadata
 
-    def _collate_examples(self, batch: list[Example]) -> tuple[torch.Tensor, torch.Tensor, list[int]]:
-        normalized = [
-            (
-                int(item[self.dataset_metadata.id_field]),
-                [int(x) for x in item[self.dataset_metadata.src_field]],
-                [int(x) for x in item[self.dataset_metadata.tgt_field]],
-            )
-            for item in batch
-        ]
-        return collate_fn_prod(
-            normalized,
-            pad_idx_src=self.dataset_metadata.src_pad_id,
-            pad_idx_tgt=self.dataset_metadata.tgt_pad_id,
-        )
-
     def create_model(self, model_config: ModelConfig, device: torch.device) -> Seq2Seq:
         return Seq2Seq(
             src_vocab_size=self.dataset_metadata.src_vocab_size,
@@ -71,6 +56,21 @@ class Factory:
         data_loader_config: DataLoaderConfig,
         device: torch.device,
     ) -> DataLoader:
+        def collate_examples(batch: list[Example]) -> tuple[torch.Tensor, torch.Tensor, list[int]]:
+            normalized = [
+                (
+                    int(item[self.dataset_metadata.id_field]),
+                    [int(x) for x in item[self.dataset_metadata.src_field]],
+                    [int(x) for x in item[self.dataset_metadata.tgt_field]],
+                )
+                for item in batch
+            ]
+            return collate_fn_prod(
+                normalized,
+                pad_idx_src=self.dataset_metadata.src_pad_id,
+                pad_idx_tgt=self.dataset_metadata.tgt_pad_id,
+            )
+
         if hasattr(examples, "__len__") and hasattr(examples, "__getitem__"):
             dataset = examples
             loader_shuffle = data_loader_config.shuffle
@@ -81,7 +81,7 @@ class Factory:
         loader_kwargs: dict[str, Any] = {
             "batch_size": data_loader_config.batch_size,
             "shuffle": loader_shuffle,
-            "collate_fn": self._collate_examples,
+            "collate_fn": collate_examples,
             "num_workers": data_loader_config.num_workers,
             "pin_memory": (
                 device.type == "cuda"
