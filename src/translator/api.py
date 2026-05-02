@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from collections.abc import Sequence
 from dataclasses import asdict, replace
 from pathlib import Path
@@ -14,41 +15,15 @@ from lab_infrastructure.logging import get_logger
 from lab_infrastructure.run_config import git_head_commit, write_run_config
 
 from .evaluation.config import CometScoreRunConfig
-from .registers import append_checkpoint_register, append_comet_score_register
+from .registers import append_checkpoint_register, append_comet_score_register, append_experiment_register
 from .shared import Example
 from .training import Factory, PreflightConfig, Trainer, TrainingSummary, TrainRunConfig, preflight
 from .training.config import TrainConfig
 from .training.dataset import DatasetMetadata, load_arrow_records
 
 logger = logging.getLogger(__name__)
-
-
-def _write_training_summary(summary_path: Path, summary: TrainingSummary) -> None:
-    summary_path.parent.mkdir(parents=True, exist_ok=True)
-    summary_path.write_text(yaml.safe_dump(asdict(summary), sort_keys=True), encoding="utf-8")
-
-
-def _write_comet_score(summary_path: Path, score: float, config: CometScoreRunConfig) -> None:
-    summary_path.parent.mkdir(parents=True, exist_ok=True)
-    summary_path.write_text(
-        yaml.safe_dump({"score": score, "config": asdict(config)}, sort_keys=False), encoding="utf-8"
-    )
-
-
-def _next_available_run_dir(base_dir: Path) -> Path:
-    if not base_dir.exists():
-        return base_dir
-
-    i = 1
-    while True:
-        candidate = base_dir.with_name(f"{base_dir.name} ({i})")
-        if not candidate.exists():
-            return candidate
-        i += 1
-
-
-def _repo_root() -> Path:
-    return Path(__file__).resolve().parents[2]
+_RUN_ID_RE = re.compile(r"^R(?P<run_id>\d{3})$")
+_RUN_REF_RE = re.compile(r"^E(?P<experiment_id>\d{3})/R(?P<run_id>\d{3})$")
 
 
 def _load_dataset(dataset_path: str | Path) -> tuple[Path, Sequence[Example], DatasetMetadata]:
@@ -89,7 +64,11 @@ def comet_score(
         output_path=config.output_path,
     )
     score = scorer.score_checkpoint(config.checkpoint_file)
-    _write_comet_score(config.checkpoint_file.parent / "comet_score.yaml", score, config)
+    summary_path = config.checkpoint_file.parent / "comet_score.yaml"
+    summary_path.parent.mkdir(parents=True, exist_ok=True)
+    summary_path.write_text(
+        yaml.safe_dump({"score": score, "config": asdict(config)}, sort_keys=False), encoding="utf-8"
+    )
     append_comet_score_register(
         config.checkpoint_file.parent.parent,
         checkpoint=config.checkpoint,
@@ -103,28 +82,83 @@ def comet_score(
 def train(config: TrainRunConfig) -> TrainingSummary:
     """Train the translator on `config.train_config.dataset`.
 
-    Use `config.model_config` to start a new run from scratch. Use `config.resume_run` to
-    continue a previous run from its checkpoint.
+    Use `config.model_config` to start a new run from scratch. Without `model_config`,
+    resume either `config.resume_run` or the latest run in `config.train_config.experiment_id`.
     """
-
     def prepare_training():
+        """
+        Determine whether training starts from scratch with a new model or resumes from a checkpoint,
+        load the dataset, create the output run directory, and record the effective run configuration.
+        """
+        def experiment_name() -> str:
+            experiment_id = config.train_config.experiment_id
+            if not 1 <= experiment_id <= 999:
+                raise ValueError("experiment_id must be between 1 and 999.")
+            return f"E{experiment_id:03d}"
+
+        def existing_run_ids(experiment_dir: Path) -> list[int]:
+            if not experiment_dir.exists():
+                return []
+            return [
+                int(match.group("run_id"))
+                for child in experiment_dir.iterdir()
+                if child.is_dir() and (match := _RUN_ID_RE.fullmatch(child.name)) is not None
+            ]
+
+        def create_next_run_dir() -> tuple[Path, str]:
+            experiment_dir = config.train_config.training_runs_dir / experiment_name()
+            experiment_is_new = not experiment_dir.exists()
+            experiment_dir.mkdir(parents=True, exist_ok=True)
+            if experiment_is_new:
+                append_experiment_register(
+                    config.train_config.training_runs_dir, experiment_id=config.train_config.experiment_id
+                )
+
+            run_id = max(existing_run_ids(experiment_dir), default=0) + 1
+            while True:
+                run_ref = f"{experiment_dir.name}/R{run_id:03d}"
+                run_dir = config.train_config.training_runs_dir / run_ref
+                try:
+                    run_dir.mkdir(exist_ok=False)
+                    return run_dir, run_ref
+                except FileExistsError:
+                    run_id += 1
+
+        def resolve_run_ref(run_ref: str) -> None:
+            if _RUN_REF_RE.fullmatch(run_ref) is None:
+                raise ValueError(f"resume_run must use E###/R### format, got: {run_ref}")
+            if not (config.train_config.training_runs_dir / run_ref).is_dir():
+                raise FileNotFoundError(f"Resume run not found: {run_ref}")
+
+        def latest_run_ref() -> str:
+            experiment_dir = config.train_config.training_runs_dir / experiment_name()
+            run_id = max(existing_run_ids(experiment_dir), default=0)
+            if run_id == 0:
+                raise FileNotFoundError(f"Cannot resume latest run from {experiment_name()}: no runs found.")
+            return f"{experiment_dir.name}/R{run_id:03d}"
+
         logger.info("Prepare training")
+        if config.model_config is not None and config.resume_run is not None:
+            raise ValueError("resume_run requires model_config to be omitted.")
+
+        effective_resume_run = config.resume_run
+        if config.model_config is None and effective_resume_run is None:
+            effective_resume_run = latest_run_ref()
+        if effective_resume_run is not None:
+            resolve_run_ref(effective_resume_run)
+
         dataset_path = config.train_config.datasets_dir / config.train_config.dataset
         _, examples, metadata = _load_dataset(dataset_path)
 
-        # Avoid overwriting earlier runs by picking the next free run directory.
-        run_dir = _next_available_run_dir(
-            config.train_config.training_runs_dir / config.train_config.run_name
-        )
-        run_dir.mkdir(parents=True, exist_ok=False)
-        resolved_train_config = replace(config.train_config, run_name=run_dir.name)
+        run_dir, run_ref = create_next_run_dir()
+        resolved_train_config = replace(config.train_config, run_name=run_ref)
         get_logger("translator", log_path=run_dir / "training.log", stream=False)
-        resolved_repo_root = _repo_root()
+        resolved_repo_root = Path(__file__).resolve().parents[2]
         write_run_config(
             run_dir / "training_config.yaml",
             {
                 "model_config": (asdict(config.model_config) if config.model_config is not None else None),
-                "resume_run": config.resume_run,
+                "resume_run": effective_resume_run,
                 "train_config": asdict(resolved_train_config),
                 "data_loader_config": asdict(config.data_loader_config),
             },
@@ -132,7 +166,8 @@ def train(config: TrainRunConfig) -> TrainingSummary:
             git_key_prefix="translator",
         )
 
-        return examples, metadata, str(git_head_commit(resolved_repo_root) or ""), resolved_train_config
+        git_commit = str(git_head_commit(resolved_repo_root) or "")
+        return examples, metadata, git_commit, resolved_train_config, effective_resume_run
 
     def load_validation_dataset(
         resolved_train_config: TrainConfig, training_metadata: DatasetMetadata
@@ -161,10 +196,10 @@ def train(config: TrainRunConfig) -> TrainingSummary:
         )
 
     # main flow
-    examples, metadata, git_commit, resolved_train_config = prepare_training()
-    validation_examples = None
-    if resolved_train_config.validate_every is not None and resolved_train_config.validation_dataset is None:
+    if config.train_config.validate_every is not None and config.train_config.validation_dataset is None:
         raise ValueError("validate_every requires validation_dataset.")
+    examples, metadata, git_commit, resolved_train_config, effective_resume_run = prepare_training()
+    validation_examples = None
     if resolved_train_config.validation_dataset is not None:
         validation_examples = load_validation_dataset(resolved_train_config, metadata)
     log_training_start(resolved_train_config)
@@ -175,7 +210,7 @@ def train(config: TrainRunConfig) -> TrainingSummary:
         resolved_train_config,
         config.data_loader_config,
         model_config=config.model_config,
-        resume_run=config.resume_run,
+        resume_run=effective_resume_run,
     )
     summary = trainer.train(examples, validation_examples)
 
@@ -187,10 +222,10 @@ def train(config: TrainRunConfig) -> TrainingSummary:
     summary_path = (
         resolved_train_config.training_runs_dir / resolved_train_config.run_name / "training_summary.yaml"
     )
-    _write_training_summary(summary_path, summary)
+    summary_path.write_text(yaml.safe_dump(asdict(summary), sort_keys=True), encoding="utf-8")
     append_checkpoint_register(
         config.train_config.training_runs_dir,
-        checkpoint=config.resume_run or "",
+        checkpoint=effective_resume_run or "",
         dataset_path=config.train_config.dataset,
         git_commit=git_commit,
         output_ckpt=resolved_train_config.run_name,

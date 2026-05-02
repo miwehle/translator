@@ -1,5 +1,4 @@
-# ttc10-lr1
-checkpoint: val4__1euc-lr2_2euc-lr2_1euc-lr2_1euc-lr2
+checkpoint: E001/R001
 
 dataset_config:
   path: json

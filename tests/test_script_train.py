@@ -16,9 +16,8 @@ def test_script_train_loads_yaml_and_calls_api(monkeypatch):
     config_path.write_text(
         yaml.safe_dump(
             {
-                "resume_run": "older-run",
                 "model_config": {"d_model": 128},
-                "train_config": {"dataset": "demo-dataset", "run_name": "exp1"},
+                "train_config": {"dataset": "demo-dataset", "experiment_id": 1},
                 "data_loader_config": {"batch_size": 16, "shuffle": False},
             }
         ),
@@ -46,10 +45,9 @@ def test_script_train_loads_yaml_and_calls_api(monkeypatch):
     assert calls == [
         {
             "config": api.TrainRunConfig(
-                train_config=api.TrainConfig(dataset="demo-dataset", run_name="exp1"),
+                train_config=api.TrainConfig(dataset="demo-dataset", experiment_id=1),
                 data_loader_config=api.DataLoaderConfig(batch_size=16, shuffle=False),
                 model_config=api.ModelConfig(d_model=128),
-                resume_run="older-run",
             )
         }
     ]

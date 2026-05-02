@@ -54,7 +54,7 @@ def _write_dataset_manifest(dataset_dir: Path, **overrides: object) -> None:
     )
 
 
-def test_train_avoids_run_dir_name_collisions(tmp_path: Path, monkeypatch) -> None:
+def test_train_creates_next_run_dir_in_experiment(tmp_path: Path, monkeypatch) -> None:
     artifacts_dir = tmp_path / "artifacts"
     dataset_dir = create_valid_mapped_dataset(artifacts_dir / "datasets" / "dataset.mapped")
     validation_dir = create_valid_mapped_dataset(artifacts_dir / "datasets" / "validation.mapped")
@@ -62,7 +62,7 @@ def test_train_avoids_run_dir_name_collisions(tmp_path: Path, monkeypatch) -> No
     _write_dataset_manifest(validation_dir)
 
     run_root = artifacts_dir / "training_runs"
-    existing_run_dir = run_root / "run1"
+    existing_run_dir = run_root / "E001" / "R001"
     existing_run_dir.mkdir(parents=True)
     (existing_run_dir / "checkpoint.pt").write_text("existing checkpoint", encoding="utf-8")
 
@@ -71,7 +71,6 @@ def test_train_avoids_run_dir_name_collisions(tmp_path: Path, monkeypatch) -> No
     summary = train(
         _train_run_config(
             artifacts_dir,
-            run_name="run1",
             device="cpu",
             epochs=1,
             log_every=1000,
@@ -81,7 +80,7 @@ def test_train_avoids_run_dir_name_collisions(tmp_path: Path, monkeypatch) -> No
         )
     )
 
-    new_run_dir = run_root / "run1 (1)"
+    new_run_dir = run_root / "E001" / "R002"
     training_summary = yaml.safe_load(
         new_run_dir.joinpath("training_summary.yaml").read_text(encoding="utf-8")
     )
@@ -99,6 +98,7 @@ def test_train_avoids_run_dir_name_collisions(tmp_path: Path, monkeypatch) -> No
     assert summary.validation_loss is not None
     assert training_summary["validation_loss"] == summary.validation_loss
     assert register_rows[0]["validation_loss"] == str(summary.validation_loss).replace(".", ",")
+    assert register_rows[0]["output_ckpt"] == "E001/R002"
 
 
 def test_train_resumes_from_checkpoint(tmp_path: Path, monkeypatch) -> None:
@@ -116,7 +116,6 @@ def test_train_resumes_from_checkpoint(tmp_path: Path, monkeypatch) -> None:
         _train_run_config(
             artifacts_dir,
             dataset=dataset_name,
-            run_name="run1",
             device="cpu",
             epochs=1,
             log_every=1000,
@@ -130,17 +129,16 @@ def test_train_resumes_from_checkpoint(tmp_path: Path, monkeypatch) -> None:
         _train_run_config(
             artifacts_dir,
             dataset=dataset_name,
-            run_name="run2",
             device="cpu",
             epochs=1,
             log_every=1000,
             lr=5e-4,
             seed=7,
-            resume_run="run1",
+            resume_run="E001/R001",
         )
     )
 
-    second_run_dir = run_root / "run2"
+    second_run_dir = run_root / "E001" / "R002"
     manifest = yaml.safe_load(second_run_dir.joinpath("checkpoint_manifest.yaml").read_text(encoding="utf-8"))
     train_cfg = yaml.safe_load(second_run_dir.joinpath("training_config.yaml").read_text(encoding="utf-8"))
     training_summary = yaml.safe_load(
@@ -155,16 +153,60 @@ def test_train_resumes_from_checkpoint(tmp_path: Path, monkeypatch) -> None:
     assert manifest["tokenizer"]["model_name"] == "test-tokenizer"
     assert "summary" not in manifest
     assert train_cfg["model_config"] is None
-    assert train_cfg["resume_run"] == "run1"
+    assert train_cfg["resume_run"] == "E001/R001"
     assert training_summary["checkpoint_path"] == second_summary.checkpoint_path
     assert training_summary["final_loss"] == second_summary.final_loss
     assert training_summary["validation_loss"] == second_summary.validation_loss
     assert len(register_rows) == 2
-    assert register_rows[1]["input_ckpt"] == "run1"
+    assert register_rows[1]["input_ckpt"] == "E001/R001"
     assert register_rows[1]["dataset_path"] == dataset_name
     assert register_rows[1]["git_commit"] == "test-commit"
-    assert register_rows[1]["output_ckpt"] == "run2"
+    assert register_rows[1]["output_ckpt"] == "E001/R002"
     assert register_rows[1]["validation_loss"] == str(second_summary.validation_loss).replace(".", ",")
+
+
+def test_train_resumes_latest_run_from_experiment(tmp_path: Path, monkeypatch) -> None:
+    artifacts_dir = tmp_path / "artifacts"
+    dataset_dir = create_valid_mapped_dataset(artifacts_dir / "datasets" / "dataset.mapped")
+    validation_dir = create_valid_mapped_dataset(artifacts_dir / "datasets" / "validation.mapped")
+    _write_dataset_manifest(dataset_dir)
+    _write_dataset_manifest(validation_dir)
+    run_root = artifacts_dir / "training_runs"
+
+    monkeypatch.setattr("translator.api.git_head_commit", lambda _: "test-commit")
+
+    train(
+        _train_run_config(
+            artifacts_dir,
+            device="cpu",
+            epochs=1,
+            log_every=1000,
+            lr=1e-3,
+            seed=7,
+            model_config=_MODEL_CONFIG,
+        )
+    )
+    train(
+        _train_run_config(
+            artifacts_dir,
+            device="cpu",
+            epochs=1,
+            log_every=1000,
+            lr=5e-4,
+            seed=7,
+        )
+    )
+
+    train_cfg = yaml.safe_load(
+        (run_root / "E001" / "R002" / "training_config.yaml").read_text(encoding="utf-8")
+    )
+
+    assert train_cfg["resume_run"] == "E001/R001"
+
+
+def test_train_rejects_resume_latest_without_existing_run(tmp_path: Path) -> None:
+    with pytest.raises(FileNotFoundError, match="Cannot resume latest run from E001: no runs found"):
+        train(_train_run_config(tmp_path / "artifacts", device="cpu"))
 
 
 def test_train_rejects_incompatible_validation_dataset(tmp_path: Path, monkeypatch) -> None:
@@ -208,6 +250,7 @@ def test_train_rejects_validate_every_without_validation_dataset(tmp_path: Path,
                 lr=1e-3,
                 seed=7,
                 validate_every=10,
+                model_config=_MODEL_CONFIG,
             ),
         )
 

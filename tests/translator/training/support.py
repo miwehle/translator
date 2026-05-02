@@ -42,6 +42,7 @@ def train_config_for_test(run_root: str, **overrides: object) -> TrainConfig:
     config = {
         "artifacts_dir": run_root,
         "dataset": "dataset.mapped",
+        "experiment_id": 1,
         "validation_dataset": "validation.mapped",
         "run_name": "run1",
         **overrides,

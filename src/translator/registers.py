@@ -19,7 +19,14 @@ def append_checkpoint_register(
     with register_path.open("a", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(
             handle,
-            fieldnames=["timestamp", "input_ckpt", "dataset_path", "git_commit", "output_ckpt", "validation_loss"],
+            fieldnames=[
+                "timestamp",
+                "input_ckpt",
+                "dataset_path",
+                "git_commit",
+                "output_ckpt",
+                "validation_loss",
+            ],
             delimiter=";",
         )
         if write_header:
@@ -31,7 +38,25 @@ def append_checkpoint_register(
                 "dataset_path": dataset_path,
                 "git_commit": git_commit[:20],
                 "output_ckpt": output_ckpt,
-                "validation_loss": ("" if validation_loss is None else _format_decimal_for_sheet(validation_loss)),
+                "validation_loss": (
+                    "" if validation_loss is None else _format_decimal_for_sheet(validation_loss)
+                ),
+            }
+        )
+
+
+def append_experiment_register(register_dir: Path, *, experiment_id: int) -> None:
+    register_path = register_dir / "experiment_register.csv"
+    write_header = not register_path.exists()
+    with register_path.open("a", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=["experiment_id", "timestamp", "notes"], delimiter=";")
+        if write_header:
+            writer.writeheader()
+        writer.writerow(
+            {
+                "experiment_id": experiment_id,
+                "timestamp": datetime.now().isoformat(timespec="seconds"),
+                "notes": "",
             }
         )
 

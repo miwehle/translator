@@ -25,11 +25,12 @@ class ModelConfig:
 class TrainConfig:
     artifacts_dir: str = "/content/drive/MyDrive/nmt_lab/artifacts"
     dataset: str
+    experiment_id: int
     validation_dataset: str | None = None
     validate_every: int | None = None
     enable_tensorboard: bool = False
     use_bf16: bool = False
-    run_name: str = "run1"
+    run_name: str = ""
     force: bool = False
     device: str | torch.device | None = None
     seed: int = 42
