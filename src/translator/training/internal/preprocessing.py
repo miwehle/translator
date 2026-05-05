@@ -35,7 +35,11 @@ def _load_dataset(dataset_path: str | Path) -> tuple[Path, Sequence[Example], Da
 def preprocess(
     config: TrainRunConfig,
 ) -> tuple[Sequence[Example], DatasetMetadata, str, TrainConfig, str | None, Sequence[Example] | None]:
-    """Prepare this training run."""
+    """Prepare this training run.
+
+    Determine whether training starts from scratch with a new model or resumes from a checkpoint,
+    load the dataset, create the output run directory, and record the effective run configuration.
+    """
 
     def experiment_name() -> str | None:
         experiment_id = config.train_config.experiment_id
