@@ -148,8 +148,6 @@ def preprocess(
         )
         return train_config
 
-    logger.info("Prepare training")
-
     # check input parameter
     if config.train_config.validate_every is not None and config.train_config.validation_dataset is None:
         raise ValueError("validate_every requires validation_dataset.")
