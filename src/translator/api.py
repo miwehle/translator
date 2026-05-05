@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 def check_dataset(config: PreflightConfig) -> dict[str, object]:
-    _, examples, metadata = _load_dataset(config.dataset_path)
+    examples, metadata = _load_dataset(config.dataset_path)
 
     return preflight.check_dataset(
         examples,

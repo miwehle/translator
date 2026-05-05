@@ -21,7 +21,7 @@ _RUN_ID_RE = re.compile(r"^R(?P<run_id>\d{3})$")
 _RUN_REF_RE = re.compile(r"^E(?P<experiment_id>\d{3})/R(?P<run_id>\d{3})$")
 
 
-def _load_dataset(dataset_path: str | Path) -> tuple[Path, Sequence[Example], DatasetMetadata]:
+def _load_dataset(dataset_path: str | Path) -> tuple[Sequence[Example], DatasetMetadata]:
     dataset_dir = Path(dataset_path)
     if not dataset_dir.exists():
         raise FileNotFoundError(f"Dataset not found: {dataset_dir}")
@@ -29,7 +29,7 @@ def _load_dataset(dataset_path: str | Path) -> tuple[Path, Sequence[Example], Da
     logger.info("Load arrow dataset from %s", dataset_dir)
     examples = cast(Sequence[Example], load_arrow_records(dataset_dir))
     metadata = DatasetMetadata.from_file(dataset_dir / "dataset_manifest.yaml")
-    return dataset_dir, examples, metadata
+    return examples, metadata
 
 
 def preprocess(
@@ -87,28 +87,37 @@ def preprocess(
             except FileExistsError:
                 run_id += 1
 
-    def resolve_run_ref(run_ref: str) -> None:
-        if _RUN_REF_RE.fullmatch(run_ref) is None and _RUN_ID_RE.fullmatch(run_ref) is None:
-            raise ValueError(f"resume_run must use E###/R### or R### format, got: {run_ref}")
-        if not (config.train_config.training_runs_dir / run_ref).is_dir():
-            raise FileNotFoundError(f"Resume run not found: {run_ref}")
+    def determine_resume_run() -> str | None:
+        def resolve_run_ref(run_ref: str) -> None:
+            if _RUN_REF_RE.fullmatch(run_ref) is None and _RUN_ID_RE.fullmatch(run_ref) is None:
+                raise ValueError(f"resume_run must use E###/R### or R### format, got: {run_ref}")
+            if not (config.train_config.training_runs_dir / run_ref).is_dir():
+                raise FileNotFoundError(f"Resume run not found: {run_ref}")
 
-    def latest_run_ref() -> str:
-        scope_name = experiment_name()
-        scope_dir = run_scope_dir(scope_name)
-        run_id = max(existing_run_ids(scope_dir), default=0)
-        if run_id == 0:
-            scope_label = scope_name or config.train_config.training_runs_dir.name
-            raise FileNotFoundError(f"Cannot resume latest run from {scope_label}: no runs found.")
-        return format_run_ref(scope_name, run_id)
+        def latest_run_ref() -> str:
+            scope_name = experiment_name()
+            scope_dir = run_scope_dir(scope_name)
+            run_id = max(existing_run_ids(scope_dir), default=0)
+            if run_id == 0:
+                scope_label = scope_name or config.train_config.training_runs_dir.name
+                raise FileNotFoundError(f"Cannot resume latest run from {scope_label}: no runs found.")
+            return format_run_ref(scope_name, run_id)
+
+        resume_run = config.resume_run
+        if config.model_config is None and resume_run is None:
+            resume_run = latest_run_ref()
+        if resume_run is not None:
+            resolve_run_ref(resume_run)
+        return resume_run
 
     def load_validation_dataset(
         train_config: TrainConfig, training_metadata: DatasetMetadata
     ) -> Sequence[Example]:
         validation_dataset = train_config.validation_dataset
         assert validation_dataset is not None
-        validation_path = train_config.datasets_dir / validation_dataset
-        _, validation_examples, validation_metadata = _load_dataset(validation_path)
+        validation_examples, validation_metadata = _load_dataset(
+            train_config.datasets_dir / validation_dataset
+        )
         if replace(validation_metadata, num_examples=training_metadata.num_examples) != training_metadata:
             raise ValueError("Validation dataset metadata mismatch.")
         return validation_examples
@@ -124,55 +133,46 @@ def preprocess(
             resolved_device,
         )
 
+    def write_training_config(run_dir: Path, run_ref: str, resume_run: str | None) -> TrainConfig:
+        train_config = replace(config.train_config, run_name=run_ref)
+        write_run_config(
+            run_dir / "training_config.yaml",
+            {
+                "model_config": (asdict(config.model_config) if config.model_config is not None else None),
+                "resume_run": resume_run,
+                "train_config": asdict(train_config),
+                "data_loader_config": asdict(config.data_loader_config),
+            },
+            repo_root=Path(__file__).resolve().parents[3],
+            git_key_prefix="translator",
+        )
+        return train_config
+
     logger.info("Prepare training")
 
-    # check input parameters
+    # check input parameter
     if config.train_config.validate_every is not None and config.train_config.validation_dataset is None:
         raise ValueError("validate_every requires validation_dataset.")
     if config.model_config is not None and config.resume_run is not None:
         raise ValueError("resume_run requires model_config to be omitted.")
 
-    # EXTRACT METHOD
-    # determine resume run
-    resume_run = config.resume_run
-    if config.model_config is None and resume_run is None:
-        resume_run = latest_run_ref()
-    if resume_run is not None:
-        resolve_run_ref(resume_run)
+    resume_run = determine_resume_run()
 
-    # load dataset
-    dataset_path = config.train_config.datasets_dir / config.train_config.dataset
-    _, examples, dataset_metadata = _load_dataset(dataset_path)
+    examples, dataset_metadata = _load_dataset(config.train_config.datasets_dir / config.train_config.dataset)
 
-    # create run dir
     run_dir, run_ref = create_next_run_dir()
     get_logger("translator", log_path=run_dir / "training.log", stream=False)
 
-    # EXTRACT METHOD
-    # write training_config.yaml
-    train_config = replace(config.train_config, run_name=run_ref)
-    resolved_repo_root = Path(__file__).resolve().parents[3]
-    write_run_config(
-        run_dir / "training_config.yaml",
-        {
-            "model_config": (asdict(config.model_config) if config.model_config is not None else None),
-            "resume_run": resume_run,
-            "train_config": asdict(train_config),
-            "data_loader_config": asdict(config.data_loader_config),
-        },
-        repo_root=resolved_repo_root,
-        git_key_prefix="translator",
-    )
-    
-    # load validation dataset
+    train_config = write_training_config(run_dir, run_ref, resume_run)
+
     validation_examples = (
         load_validation_dataset(train_config, dataset_metadata)
         if train_config.validation_dataset is not None
         else None
     )
-    
+
     log_training_start(train_config)
-    git_commit = str(git_head_commit(resolved_repo_root) or "")
+    git_commit = str(git_head_commit(Path(__file__).resolve().parents[3]) or "")
     return (
         examples,
         dataset_metadata,
