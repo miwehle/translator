@@ -125,23 +125,32 @@ def preprocess(
         )
 
     logger.info("Prepare training")
+
+    # check input parameters
     if config.train_config.validate_every is not None and config.train_config.validation_dataset is None:
         raise ValueError("validate_every requires validation_dataset.")
     if config.model_config is not None and config.resume_run is not None:
         raise ValueError("resume_run requires model_config to be omitted.")
 
+    # EXTRACT METHOD
+    # determine resume run
     resume_run = config.resume_run
     if config.model_config is None and resume_run is None:
         resume_run = latest_run_ref()
     if resume_run is not None:
         resolve_run_ref(resume_run)
 
+    # load dataset
     dataset_path = config.train_config.datasets_dir / config.train_config.dataset
     _, examples, dataset_metadata = _load_dataset(dataset_path)
 
+    # create run dir
     run_dir, run_ref = create_next_run_dir()
-    train_config = replace(config.train_config, run_name=run_ref)
     get_logger("translator", log_path=run_dir / "training.log", stream=False)
+
+    # EXTRACT METHOD
+    # write training_config.yaml
+    train_config = replace(config.train_config, run_name=run_ref)
     resolved_repo_root = Path(__file__).resolve().parents[3]
     write_run_config(
         run_dir / "training_config.yaml",
@@ -154,14 +163,16 @@ def preprocess(
         repo_root=resolved_repo_root,
         git_key_prefix="translator",
     )
-
-    git_commit = str(git_head_commit(resolved_repo_root) or "")
+    
+    # load validation dataset
     validation_examples = (
         load_validation_dataset(train_config, dataset_metadata)
         if train_config.validation_dataset is not None
         else None
     )
+    
     log_training_start(train_config)
+    git_commit = str(git_head_commit(resolved_repo_root) or "")
     return (
         examples,
         dataset_metadata,
