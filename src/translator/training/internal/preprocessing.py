@@ -11,10 +11,10 @@ from lab_infrastructure.compute_metrics import detect_compute_hardware
 from lab_infrastructure.logging import get_logger
 from lab_infrastructure.run_config import git_head_commit, write_run_config
 
-from ..registers import append_experiment_register
-from ..shared import Example
-from .config import TrainConfig, TrainRunConfig
-from .dataset import DatasetMetadata, load_arrow_records
+from ...registers import append_experiment_register
+from ...shared import Example
+from ..config import TrainConfig, TrainRunConfig
+from ..dataset import DatasetMetadata, load_arrow_records
 
 logger = logging.getLogger(__name__)
 _RUN_ID_RE = re.compile(r"^R(?P<run_id>\d{3})$")
