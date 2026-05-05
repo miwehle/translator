@@ -101,6 +101,45 @@ def test_train_creates_next_run_dir_in_experiment(tmp_path: Path, monkeypatch) -
     assert register_rows[0]["output_ckpt"] == "E001/R002"
 
 
+def test_train_creates_next_run_dir_without_experiment(tmp_path: Path, monkeypatch) -> None:
+    artifacts_dir = tmp_path / "artifacts"
+    dataset_dir = create_valid_mapped_dataset(artifacts_dir / "datasets" / "dataset.mapped")
+    validation_dir = create_valid_mapped_dataset(artifacts_dir / "datasets" / "validation.mapped")
+    _write_dataset_manifest(dataset_dir)
+    _write_dataset_manifest(validation_dir)
+
+    run_root = artifacts_dir / "training_runs"
+    existing_run_dir = run_root / "R001"
+    existing_run_dir.mkdir(parents=True)
+    (existing_run_dir / "checkpoint.pt").write_text("existing checkpoint", encoding="utf-8")
+
+    monkeypatch.setattr("translator.api.git_head_commit", lambda _: "test-commit")
+
+    summary = train(
+        _train_run_config(
+            artifacts_dir,
+            experiment_id=None,
+            device="cpu",
+            epochs=1,
+            log_every=1000,
+            lr=1e-3,
+            seed=7,
+            model_config=_MODEL_CONFIG,
+        )
+    )
+
+    new_run_dir = run_root / "R002"
+    with run_root.joinpath("checkpoint_register.csv").open("r", encoding="utf-8", newline="") as handle:
+        register_rows = list(csv.DictReader(handle, delimiter=";"))
+
+    assert existing_run_dir.joinpath("checkpoint.pt").read_text(encoding="utf-8") == "existing checkpoint"
+    assert new_run_dir.is_dir()
+    assert not run_root.joinpath("experiment_register.csv").exists()
+    assert Path(summary.checkpoint_path) == new_run_dir / "checkpoint.pt"
+    assert register_rows[0]["input_ckpt"] == ""
+    assert register_rows[0]["output_ckpt"] == "R002"
+
+
 def test_train_resumes_from_checkpoint(tmp_path: Path, monkeypatch) -> None:
     artifacts_dir = tmp_path / "artifacts"
     dataset_name = "source/curation/dataset.mapped"
@@ -202,6 +241,49 @@ def test_train_resumes_latest_run_from_experiment(tmp_path: Path, monkeypatch) -
     )
 
     assert train_cfg["resume_run"] == "E001/R001"
+
+
+def test_train_resumes_latest_run_without_experiment(tmp_path: Path, monkeypatch) -> None:
+    artifacts_dir = tmp_path / "artifacts"
+    dataset_dir = create_valid_mapped_dataset(artifacts_dir / "datasets" / "dataset.mapped")
+    validation_dir = create_valid_mapped_dataset(artifacts_dir / "datasets" / "validation.mapped")
+    _write_dataset_manifest(dataset_dir)
+    _write_dataset_manifest(validation_dir)
+    run_root = artifacts_dir / "training_runs"
+
+    monkeypatch.setattr("translator.api.git_head_commit", lambda _: "test-commit")
+
+    train(
+        _train_run_config(
+            artifacts_dir,
+            experiment_id=None,
+            device="cpu",
+            epochs=1,
+            log_every=1000,
+            lr=1e-3,
+            seed=7,
+            model_config=_MODEL_CONFIG,
+        )
+    )
+    train(
+        _train_run_config(
+            artifacts_dir,
+            experiment_id=None,
+            device="cpu",
+            epochs=1,
+            log_every=1000,
+            lr=5e-4,
+            seed=7,
+        )
+    )
+
+    train_cfg = yaml.safe_load((run_root / "R002" / "training_config.yaml").read_text(encoding="utf-8"))
+    with run_root.joinpath("checkpoint_register.csv").open("r", encoding="utf-8", newline="") as handle:
+        register_rows = list(csv.DictReader(handle, delimiter=";"))
+
+    assert train_cfg["resume_run"] == "R001"
+    assert register_rows[1]["input_ckpt"] == "R001"
+    assert register_rows[1]["output_ckpt"] == "R002"
 
 
 def test_train_rejects_resume_latest_without_existing_run(tmp_path: Path) -> None:

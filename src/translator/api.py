@@ -83,7 +83,7 @@ def train(config: TrainRunConfig) -> TrainingSummary:
     """Train the translator on `config.train_config.dataset`.
 
     Use `config.model_config` to start a new run from scratch. Without `model_config`,
-    resume either `config.resume_run` or the latest run in `config.train_config.experiment_id`.
+    resume either `config.resume_run` or the latest run in the configured run scope.
     """
     def preprocess():
         """Prepare this training run.
@@ -91,8 +91,10 @@ def train(config: TrainRunConfig) -> TrainingSummary:
         Determine whether training starts from scratch with a new model or resumes from a checkpoint,
         load the dataset, create the output run directory, and record the effective run configuration.
         """
-        def experiment_name() -> str:
+        def experiment_name() -> str | None:
             experiment_id = config.train_config.experiment_id
+            if experiment_id is None:
+                return None
             if not 1 <= experiment_id <= 999:
                 raise ValueError("experiment_id must be between 1 and 999.")
             return f"E{experiment_id:03d}"
@@ -106,42 +108,55 @@ def train(config: TrainRunConfig) -> TrainingSummary:
                 if child.is_dir() and (match := _RUN_ID_RE.fullmatch(child.name)) is not None
             ]
 
-        def create_next_run_dir() -> tuple[Path, str]:
-            experiment_dir = config.train_config.training_runs_dir / experiment_name()
-            experiment_is_new = not experiment_dir.exists()
-            experiment_dir.mkdir(parents=True, exist_ok=True)
-            if experiment_is_new:
-                append_experiment_register(
-                    config.train_config.training_runs_dir, experiment_id=config.train_config.experiment_id
-                )
+        def run_scope_dir(scope_name: str | None) -> Path:
+            return (
+                config.train_config.training_runs_dir / scope_name
+                if scope_name is not None
+                else config.train_config.training_runs_dir
+            )
 
-            run_id = max(existing_run_ids(experiment_dir), default=0) + 1
+        def format_run_ref(scope_name: str | None, run_id: int) -> str:
+            return f"{scope_name}/R{run_id:03d}" if scope_name is not None else f"R{run_id:03d}"
+
+        def create_next_run_dir() -> tuple[Path, str]:
+            scope_name = experiment_name()
+            experiment_id = config.train_config.experiment_id
+            scope_dir = run_scope_dir(scope_name)
+            scope_is_new = not scope_dir.exists()
+            scope_dir.mkdir(parents=True, exist_ok=True)
+            if scope_name is not None and scope_is_new and experiment_id is not None:
+                append_experiment_register(config.train_config.training_runs_dir, experiment_id=experiment_id)
+
+            run_id = max(existing_run_ids(scope_dir), default=0) + 1
             while True:
-                run_ref = f"{experiment_dir.name}/R{run_id:03d}"
-                run_dir = config.train_config.training_runs_dir / run_ref
+                ref = format_run_ref(scope_name, run_id)
+                run_dir = config.train_config.training_runs_dir / ref
                 try:
                     run_dir.mkdir(exist_ok=False)
-                    return run_dir, run_ref
+                    return run_dir, ref
                 except FileExistsError:
                     run_id += 1
 
         def resolve_run_ref(run_ref: str) -> None:
-            if _RUN_REF_RE.fullmatch(run_ref) is None:
-                raise ValueError(f"resume_run must use E###/R### format, got: {run_ref}")
+            if _RUN_REF_RE.fullmatch(run_ref) is None and _RUN_ID_RE.fullmatch(run_ref) is None:
+                raise ValueError(f"resume_run must use E###/R### or R### format, got: {run_ref}")
             if not (config.train_config.training_runs_dir / run_ref).is_dir():
                 raise FileNotFoundError(f"Resume run not found: {run_ref}")
 
         def latest_run_ref() -> str:
-            experiment_dir = config.train_config.training_runs_dir / experiment_name()
-            run_id = max(existing_run_ids(experiment_dir), default=0)
+            scope_name = experiment_name()
+            scope_dir = run_scope_dir(scope_name)
+            run_id = max(existing_run_ids(scope_dir), default=0)
             if run_id == 0:
-                raise FileNotFoundError(f"Cannot resume latest run from {experiment_name()}: no runs found.")
-            return f"{experiment_dir.name}/R{run_id:03d}"
+                scope_label = scope_name or config.train_config.training_runs_dir.name
+                raise FileNotFoundError(f"Cannot resume latest run from {scope_label}: no runs found.")
+            return format_run_ref(scope_name, run_id)
 
         def load_validation_dataset(
             train_config: TrainConfig, training_metadata: DatasetMetadata
         ) -> Sequence[Example]:
             validation_dataset = train_config.validation_dataset
+            assert validation_dataset is not None
             validation_path = train_config.datasets_dir / validation_dataset
             _, validation_examples, validation_metadata = _load_dataset(validation_path)
             if replace(validation_metadata, num_examples=training_metadata.num_examples) != training_metadata:
