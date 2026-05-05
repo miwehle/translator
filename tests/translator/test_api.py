@@ -66,7 +66,7 @@ def test_train_creates_next_run_dir_in_experiment(tmp_path: Path, monkeypatch) -
     existing_run_dir.mkdir(parents=True)
     (existing_run_dir / "checkpoint.pt").write_text("existing checkpoint", encoding="utf-8")
 
-    monkeypatch.setattr("translator.api.git_head_commit", lambda _: "test-commit")
+    monkeypatch.setattr("translator.training.preprocessing.git_head_commit", lambda _: "test-commit")
 
     summary = train(
         _train_run_config(
@@ -113,7 +113,7 @@ def test_train_creates_next_run_dir_without_experiment(tmp_path: Path, monkeypat
     existing_run_dir.mkdir(parents=True)
     (existing_run_dir / "checkpoint.pt").write_text("existing checkpoint", encoding="utf-8")
 
-    monkeypatch.setattr("translator.api.git_head_commit", lambda _: "test-commit")
+    monkeypatch.setattr("translator.training.preprocessing.git_head_commit", lambda _: "test-commit")
 
     summary = train(
         _train_run_config(
@@ -149,7 +149,7 @@ def test_train_resumes_from_checkpoint(tmp_path: Path, monkeypatch) -> None:
     _write_dataset_manifest(validation_dir)
     run_root = artifacts_dir / "training_runs"
 
-    monkeypatch.setattr("translator.api.git_head_commit", lambda _: "test-commit")
+    monkeypatch.setattr("translator.training.preprocessing.git_head_commit", lambda _: "test-commit")
 
     train(
         _train_run_config(
@@ -212,7 +212,7 @@ def test_train_resumes_latest_run_from_experiment(tmp_path: Path, monkeypatch) -
     _write_dataset_manifest(validation_dir)
     run_root = artifacts_dir / "training_runs"
 
-    monkeypatch.setattr("translator.api.git_head_commit", lambda _: "test-commit")
+    monkeypatch.setattr("translator.training.preprocessing.git_head_commit", lambda _: "test-commit")
 
     train(
         _train_run_config(
@@ -251,7 +251,7 @@ def test_train_resumes_latest_run_without_experiment(tmp_path: Path, monkeypatch
     _write_dataset_manifest(validation_dir)
     run_root = artifacts_dir / "training_runs"
 
-    monkeypatch.setattr("translator.api.git_head_commit", lambda _: "test-commit")
+    monkeypatch.setattr("translator.training.preprocessing.git_head_commit", lambda _: "test-commit")
 
     train(
         _train_run_config(
@@ -298,7 +298,7 @@ def test_train_rejects_incompatible_validation_dataset(tmp_path: Path, monkeypat
     _write_dataset_manifest(dataset_dir)
     _write_dataset_manifest(validation_dir, src_pad_id=999)
 
-    monkeypatch.setattr("translator.api.git_head_commit", lambda _: "test-commit")
+    monkeypatch.setattr("translator.training.preprocessing.git_head_commit", lambda _: "test-commit")
 
     with pytest.raises(ValueError, match="Validation dataset metadata mismatch"):
         train(
@@ -319,7 +319,7 @@ def test_train_rejects_validate_every_without_validation_dataset(tmp_path: Path,
     dataset_dir = create_valid_mapped_dataset(artifacts_dir / "datasets" / "dataset.mapped")
     _write_dataset_manifest(dataset_dir)
 
-    monkeypatch.setattr("translator.api.git_head_commit", lambda _: "test-commit")
+    monkeypatch.setattr("translator.training.preprocessing.git_head_commit", lambda _: "test-commit")
 
     with pytest.raises(ValueError, match="validate_every requires validation_dataset"):
         train(
