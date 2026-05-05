@@ -28,6 +28,14 @@ python simple_attention_translator.py --epochs 120
 
 Training speichert automatisch ein Checkpoint unter `checkpoints/translator.pt` (anpassbar mit `--checkpoint-path`).
 
+### Training runs
+
+For regular training, use `train_config.experiment_id` to group related runs:
+
+`training_runs/E001/R001`, `training_runs/E001/R002`, ...
+
+This keeps the top-level `training_runs` directory small and makes related runs easier to find. For simple ad-hoc runs, `experiment_id` can be omitted; those runs are stored directly as `training_runs/R001`, `training_runs/R002`, ...
+
 Einzelsatz uebersetzen:
 
 ```bash
