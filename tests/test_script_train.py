@@ -31,7 +31,22 @@ def test_script_train_loads_yaml_and_calls_api(monkeypatch):
 
     fake_train.__module__ = "translator"
     fake_train.__name__ = "train"
-    monkeypatch.setattr(sys, "argv", ["train.py", str(config_path)])
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "train.py",
+            str(config_path),
+            "--dataset",
+            "cli-dataset",
+            "--validation-dataset",
+            "cli-validation",
+            "--lr",
+            "0.0005",
+            "--epochs",
+            "3",
+        ],
+    )
     monkeypatch.syspath_prepend(str(Path(__file__).resolve().parents[1] / "src"))
     monkeypatch.syspath_prepend(str(Path(__file__).resolve().parents[1] / "scripts"))
     import translator as api
@@ -45,7 +60,13 @@ def test_script_train_loads_yaml_and_calls_api(monkeypatch):
     assert calls == [
         {
             "config": api.TrainRunConfig(
-                train_config=api.TrainConfig(dataset="demo-dataset", experiment_id=1),
+                train_config=api.TrainConfig(
+                    dataset="cli-dataset",
+                    experiment_id=1,
+                    validation_dataset="cli-validation",
+                    lr=0.0005,
+                    epochs=3,
+                ),
                 data_loader_config=api.DataLoaderConfig(batch_size=16, shuffle=False),
                 model_config=api.ModelConfig(d_model=128),
             )
