@@ -1,5 +1,5 @@
 from ..shared.types import Example
-from .config import DataLoaderConfig, ModelConfig, PreflightConfig, TrainConfig, TrainRunConfig
+from .config import DataLoaderConfig, ModelConfig, PreflightCheckRunConfig, TrainConfig, TrainRunConfig
 from .internal.factory import Factory
 from .preflight import check_dataset
 from .trainer import Trainer, TrainingSummary
@@ -10,7 +10,7 @@ __all__ = [
     "DataLoaderConfig",
     "Factory",
     "ModelConfig",
-    "PreflightConfig",
+    "PreflightCheckRunConfig",
     "TrainingSummary",
     "TrainConfig",
     "TrainRunConfig",

@@ -116,3 +116,5 @@ Lokale Hilfsfunktionen innerhalb einer Funktion oder Methode nicht mitten im Hau
 Temporäre Verzeichnisse und Dateien für Tests, Verifikation und ad-hoc Läufe sind im Repo-Root ausschließlich unter `.local_tmp/` anzulegen.
 
 Keine neuen temporären Root-Ordner wie `.tmp_pytest*`, `.pytest_tmp*` oder ähnliche Namen anlegen.
+
+Pytest normal starten. Nur bei konkreten Sandbox-/Permission-Fehlern mit begruendeter Eskalation erneut ausfuehren.

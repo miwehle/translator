@@ -12,7 +12,7 @@ add_src_dirs(__file__)
 def main() -> int:
     from lab_infrastructure import run
 
-    from translator import PreflightConfig, check_dataset
+    from translator import preflight_check
 
     if len(sys.argv) != 2:
         print("Usage: python scripts/preflight.py <config-path>")
@@ -20,7 +20,7 @@ def main() -> int:
 
     config_path = Path(sys.argv[1])
     try:
-        result = run(check_dataset, config_path, PreflightConfig)
+        result = run(preflight_check, config_path)
     except Exception as exc:
         print(f"Preflight check failed: {exc}")
         return 1

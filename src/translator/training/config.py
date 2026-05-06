@@ -70,7 +70,7 @@ class TrainRunConfig:
 
 
 @dataclass(frozen=True, kw_only=True, config=_CONFIG)
-class PreflightConfig:
+class PreflightCheckRunConfig:
     dataset_path: str
     require_unique_ids: bool = True
     min_seq_len: int = 2

@@ -11,14 +11,14 @@ import yaml
 from .evaluation.config import CometScoreRunConfig
 from .registers import append_checkpoint_register, append_comet_score_register
 from .shared import Example
-from .training import Factory, PreflightConfig, Trainer, TrainingSummary, TrainRunConfig, preflight
+from .training import Factory, PreflightCheckRunConfig, Trainer, TrainingSummary, TrainRunConfig, preflight
 from .training.config import TrainConfig
 from .training.internal.preprocessing import _load_dataset, preprocess
 
 logger = logging.getLogger(__name__)
 
 
-def check_dataset(config: PreflightConfig) -> dict[str, object]:
+def preflight_check(config: PreflightCheckRunConfig) -> dict[str, object]:
     examples, metadata = _load_dataset(config.dataset_path)
 
     return preflight.check_dataset(

@@ -8,9 +8,9 @@ import pytest
 import yaml
 
 from tests.translator.training.support import create_valid_mapped_dataset, train_config_for_test
-from translator.api import check_dataset, comet_score, train
+from translator.api import comet_score, preflight_check, train
 from translator.evaluation import CometScoreRunConfig
-from translator.training import DataLoaderConfig, ModelConfig, PreflightConfig, TrainRunConfig
+from translator.training import DataLoaderConfig, ModelConfig, PreflightCheckRunConfig, TrainRunConfig
 
 _MODEL_CONFIG = ModelConfig(d_model=32, ff_dim=64, num_heads=4, num_layers=2, dropout=0.0)
 
@@ -337,12 +337,12 @@ def test_train_rejects_validate_every_without_validation_dataset(tmp_path: Path,
         )
 
 
-def test_check_dataset_uses_dataset_manifest_defaults(tmp_path: Path) -> None:
+def test_preflight_check_uses_dataset_manifest_defaults(tmp_path: Path) -> None:
     dataset_dir = create_valid_mapped_dataset(tmp_path / "dataset.mapped")
     _write_dataset_manifest(dataset_dir)
 
-    result = check_dataset(
-        PreflightConfig(dataset_path=str(dataset_dir), require_unique_ids=True, min_seq_len=2)
+    result = preflight_check(
+        PreflightCheckRunConfig(dataset_path=str(dataset_dir), require_unique_ids=True, min_seq_len=2)
     )
 
     assert result["id_field"] == "id"
