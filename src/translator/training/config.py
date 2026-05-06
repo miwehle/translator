@@ -25,7 +25,7 @@ class ModelConfig:
 class TrainConfig:
     artifacts_dir: str = "/content/drive/MyDrive/nmt_lab/artifacts"
     dataset: str
-    experiment_id: int | None = None
+    experiment_id: str | None = None
     validation_dataset: str | None = None
     validate_every: int | None = None
     enable_tensorboard: bool = False

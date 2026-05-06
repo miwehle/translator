@@ -7,10 +7,10 @@ model_config:
   max_seq_len: 250
   attention: torch
 
-#resume_run: E001/R001
+#resume_run: de-en-translator/r1
 
 train_config:
-  experiment_id: 1
+  experiment_id: de-en-translator
   # europarl_de-en_train (8), iwslt2017_iwslt2017-de-en_train (7), news_commentary_de-en_train (5) 
   dataset: europarl_de-en_train (8)/curation/curated_dataset
   # iwslt2017_iwslt2017-de-en_validation

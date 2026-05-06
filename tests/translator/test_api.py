@@ -62,7 +62,7 @@ def test_train_creates_next_run_dir_in_experiment(tmp_path: Path, monkeypatch) -
     _write_dataset_manifest(validation_dir)
 
     run_root = artifacts_dir / "training_runs"
-    existing_run_dir = run_root / "E001" / "R001"
+    existing_run_dir = run_root / "de-en-translator" / "r1"
     existing_run_dir.mkdir(parents=True)
     (existing_run_dir / "checkpoint.pt").write_text("existing checkpoint", encoding="utf-8")
 
@@ -80,7 +80,7 @@ def test_train_creates_next_run_dir_in_experiment(tmp_path: Path, monkeypatch) -
         )
     )
 
-    new_run_dir = run_root / "E001" / "R002"
+    new_run_dir = run_root / "de-en-translator" / "r2"
     training_summary = yaml.safe_load(
         new_run_dir.joinpath("training_summary.yaml").read_text(encoding="utf-8")
     )
@@ -98,7 +98,7 @@ def test_train_creates_next_run_dir_in_experiment(tmp_path: Path, monkeypatch) -
     assert summary.validation_loss is not None
     assert training_summary["validation_loss"] == summary.validation_loss
     assert register_rows[0]["validation_loss"] == str(summary.validation_loss).replace(".", ",")
-    assert register_rows[0]["output_ckpt"] == "E001/R002"
+    assert register_rows[0]["output_ckpt"] == "de-en-translator/r2"
 
 
 def test_train_creates_next_run_dir_without_experiment(tmp_path: Path, monkeypatch) -> None:
@@ -109,7 +109,7 @@ def test_train_creates_next_run_dir_without_experiment(tmp_path: Path, monkeypat
     _write_dataset_manifest(validation_dir)
 
     run_root = artifacts_dir / "training_runs"
-    existing_run_dir = run_root / "R001"
+    existing_run_dir = run_root / "r1"
     existing_run_dir.mkdir(parents=True)
     (existing_run_dir / "checkpoint.pt").write_text("existing checkpoint", encoding="utf-8")
 
@@ -128,7 +128,7 @@ def test_train_creates_next_run_dir_without_experiment(tmp_path: Path, monkeypat
         )
     )
 
-    new_run_dir = run_root / "R002"
+    new_run_dir = run_root / "r2"
     with run_root.joinpath("checkpoint_register.csv").open("r", encoding="utf-8", newline="") as handle:
         register_rows = list(csv.DictReader(handle, delimiter=";"))
 
@@ -137,7 +137,7 @@ def test_train_creates_next_run_dir_without_experiment(tmp_path: Path, monkeypat
     assert not run_root.joinpath("experiment_register.csv").exists()
     assert Path(summary.checkpoint_path) == new_run_dir / "checkpoint.pt"
     assert register_rows[0]["input_ckpt"] == ""
-    assert register_rows[0]["output_ckpt"] == "R002"
+    assert register_rows[0]["output_ckpt"] == "r2"
 
 
 def test_train_resumes_from_checkpoint(tmp_path: Path, monkeypatch) -> None:
@@ -173,11 +173,11 @@ def test_train_resumes_from_checkpoint(tmp_path: Path, monkeypatch) -> None:
             log_every=1000,
             lr=5e-4,
             seed=7,
-            resume_run="E001/R001",
+            resume_run="de-en-translator/r1",
         )
     )
 
-    second_run_dir = run_root / "E001" / "R002"
+    second_run_dir = run_root / "de-en-translator" / "r2"
     manifest = yaml.safe_load(second_run_dir.joinpath("checkpoint_manifest.yaml").read_text(encoding="utf-8"))
     train_cfg = yaml.safe_load(second_run_dir.joinpath("training_config.yaml").read_text(encoding="utf-8"))
     training_summary = yaml.safe_load(
@@ -192,15 +192,15 @@ def test_train_resumes_from_checkpoint(tmp_path: Path, monkeypatch) -> None:
     assert manifest["tokenizer"]["model_name"] == "test-tokenizer"
     assert "summary" not in manifest
     assert train_cfg["model_config"] is None
-    assert train_cfg["resume_run"] == "E001/R001"
+    assert train_cfg["resume_run"] == "de-en-translator/r1"
     assert training_summary["checkpoint_path"] == second_summary.checkpoint_path
     assert training_summary["final_loss"] == second_summary.final_loss
     assert training_summary["validation_loss"] == second_summary.validation_loss
     assert len(register_rows) == 2
-    assert register_rows[1]["input_ckpt"] == "E001/R001"
+    assert register_rows[1]["input_ckpt"] == "de-en-translator/r1"
     assert register_rows[1]["dataset_path"] == dataset_name
     assert register_rows[1]["git_commit"] == "test-commit"
-    assert register_rows[1]["output_ckpt"] == "E001/R002"
+    assert register_rows[1]["output_ckpt"] == "de-en-translator/r2"
     assert register_rows[1]["validation_loss"] == str(second_summary.validation_loss).replace(".", ",")
 
 
@@ -237,10 +237,10 @@ def test_train_resumes_latest_run_from_experiment(tmp_path: Path, monkeypatch) -
     )
 
     train_cfg = yaml.safe_load(
-        (run_root / "E001" / "R002" / "training_config.yaml").read_text(encoding="utf-8")
+        (run_root / "de-en-translator" / "r2" / "training_config.yaml").read_text(encoding="utf-8")
     )
 
-    assert train_cfg["resume_run"] == "E001/R001"
+    assert train_cfg["resume_run"] == "de-en-translator/r1"
 
 
 def test_train_resumes_latest_run_without_experiment(tmp_path: Path, monkeypatch) -> None:
@@ -277,17 +277,18 @@ def test_train_resumes_latest_run_without_experiment(tmp_path: Path, monkeypatch
         )
     )
 
-    train_cfg = yaml.safe_load((run_root / "R002" / "training_config.yaml").read_text(encoding="utf-8"))
+    train_cfg = yaml.safe_load((run_root / "r2" / "training_config.yaml").read_text(encoding="utf-8"))
     with run_root.joinpath("checkpoint_register.csv").open("r", encoding="utf-8", newline="") as handle:
         register_rows = list(csv.DictReader(handle, delimiter=";"))
 
-    assert train_cfg["resume_run"] == "R001"
-    assert register_rows[1]["input_ckpt"] == "R001"
-    assert register_rows[1]["output_ckpt"] == "R002"
+    assert train_cfg["resume_run"] == "r1"
+    assert register_rows[1]["input_ckpt"] == "r1"
+    assert register_rows[1]["output_ckpt"] == "r2"
 
 
 def test_train_rejects_resume_latest_without_existing_run(tmp_path: Path) -> None:
-    with pytest.raises(FileNotFoundError, match="Cannot resume latest run from E001: no runs found"):
+    match = "Cannot resume latest run from de-en-translator: no runs found"
+    with pytest.raises(FileNotFoundError, match=match):
         train(_train_run_config(tmp_path / "artifacts", device="cpu"))
 
 

@@ -45,7 +45,7 @@ def append_checkpoint_register(
         )
 
 
-def append_experiment_register(register_dir: Path, *, experiment_id: int) -> None:
+def append_experiment_register(register_dir: Path, *, experiment_id: str) -> None:
     register_path = register_dir / "experiment_register.csv"
     write_header = not register_path.exists()
     with register_path.open("a", encoding="utf-8", newline="") as handle:

@@ -17,8 +17,8 @@ from ..config import TrainConfig, TrainRunConfig
 from ..dataset import DatasetMetadata, load_arrow_records
 
 logger = logging.getLogger(__name__)
-_RUN_ID_RE = re.compile(r"^R(?P<run_id>\d{3})$")
-_RUN_REF_RE = re.compile(r"^E(?P<experiment_id>\d{3})/R(?P<run_id>\d{3})$")
+_RUN_ID_RE = re.compile(r"^r(?P<run_id>\d+)$")
+_EXPERIMENT_ID_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$")
 
 
 def _load_dataset(dataset_path: str | Path) -> tuple[Sequence[Example], DatasetMetadata]:
@@ -41,13 +41,13 @@ def preprocess(
     load the dataset, create the output run directory, and record the effective run configuration.
     """
 
-    def experiment_name() -> str | None:
+    def experiment_scope() -> str | None:
         experiment_id = config.train_config.experiment_id
         if experiment_id is None:
             return None
-        if not 1 <= experiment_id <= 999:
-            raise ValueError("experiment_id must be between 1 and 999.")
-        return f"E{experiment_id:03d}"
+        if _EXPERIMENT_ID_RE.fullmatch(experiment_id) is None:
+            raise ValueError(f"experiment_id must be a lowercase slug, got: {experiment_id}")
+        return experiment_id
 
     def existing_run_ids(experiment_dir: Path) -> list[int]:
         if not experiment_dir.exists():
@@ -66,16 +66,15 @@ def preprocess(
         )
 
     def format_run_ref(scope_name: str | None, run_id: int) -> str:
-        return f"{scope_name}/R{run_id:03d}" if scope_name is not None else f"R{run_id:03d}"
+        return f"{scope_name}/r{run_id}" if scope_name is not None else f"r{run_id}"
 
     def create_next_run_dir() -> tuple[Path, str]:
-        scope_name = experiment_name()
-        experiment_id = config.train_config.experiment_id
+        scope_name = experiment_scope()
         scope_dir = run_scope_dir(scope_name)
         scope_is_new = not scope_dir.exists()
         scope_dir.mkdir(parents=True, exist_ok=True)
-        if scope_name is not None and scope_is_new and experiment_id is not None:
-            append_experiment_register(config.train_config.training_runs_dir, experiment_id=experiment_id)
+        if scope_name is not None and scope_is_new:
+            append_experiment_register(config.train_config.training_runs_dir, experiment_id=scope_name)
 
         run_id = max(existing_run_ids(scope_dir), default=0) + 1
         while True:
@@ -89,13 +88,16 @@ def preprocess(
 
     def determine_resume_run() -> str | None:
         def resolve_run_ref(run_ref: str) -> None:
-            if _RUN_REF_RE.fullmatch(run_ref) is None and _RUN_ID_RE.fullmatch(run_ref) is None:
-                raise ValueError(f"resume_run must use E###/R### or R### format, got: {run_ref}")
+            parts = run_ref.split("/")
+            if len(parts) > 2 or _RUN_ID_RE.fullmatch(parts[-1]) is None:
+                raise ValueError(f"resume_run must use experiment-id/rN or rN format, got: {run_ref}")
+            if len(parts) == 2 and _EXPERIMENT_ID_RE.fullmatch(parts[0]) is None:
+                raise ValueError(f"resume_run must use experiment-id/rN or rN format, got: {run_ref}")
             if not (config.train_config.training_runs_dir / run_ref).is_dir():
                 raise FileNotFoundError(f"Resume run not found: {run_ref}")
 
         def latest_run_ref() -> str:
-            scope_name = experiment_name()
+            scope_name = experiment_scope()
             scope_dir = run_scope_dir(scope_name)
             run_id = max(existing_run_ids(scope_dir), default=0)
             if run_id == 0:

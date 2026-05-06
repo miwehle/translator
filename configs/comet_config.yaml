@@ -1,4 +1,4 @@
-checkpoint: E001/R001
+checkpoint: de-en-translator/r1
 
 dataset_config:
   path: json
