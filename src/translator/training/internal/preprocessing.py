@@ -18,7 +18,7 @@ from ..dataset import DatasetMetadata, load_arrow_records
 
 logger = logging.getLogger(__name__)
 _RUN_ID_RE = re.compile(r"^r(?P<run_id>\d+)$")
-_EXPERIMENT_ID_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$")
+_EXPERIMENT_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$")
 
 
 def _load_dataset(dataset_path: str | Path) -> tuple[Sequence[Example], DatasetMetadata]:
@@ -42,12 +42,12 @@ def preprocess(
     """
 
     def experiment_scope() -> str | None:
-        experiment_id = config.train_config.experiment_id
-        if experiment_id is None:
+        experiment = config.train_config.experiment
+        if experiment is None:
             return None
-        if _EXPERIMENT_ID_RE.fullmatch(experiment_id) is None:
-            raise ValueError(f"experiment_id must be a lowercase slug, got: {experiment_id}")
-        return experiment_id
+        if _EXPERIMENT_RE.fullmatch(experiment) is None:
+            raise ValueError(f"experiment must be a lowercase slug, got: {experiment}")
+        return experiment
 
     def existing_run_ids(experiment_dir: Path) -> list[int]:
         if not experiment_dir.exists():
@@ -74,7 +74,7 @@ def preprocess(
         scope_is_new = not scope_dir.exists()
         scope_dir.mkdir(parents=True, exist_ok=True)
         if scope_name is not None and scope_is_new:
-            append_experiment_register(config.train_config.training_runs_dir, experiment_id=scope_name)
+            append_experiment_register(config.train_config.training_runs_dir, experiment=scope_name)
 
         run_id = max(existing_run_ids(scope_dir), default=0) + 1
         while True:
@@ -90,9 +90,9 @@ def preprocess(
         def resolve_run_ref(run_ref: str) -> None:
             parts = run_ref.split("/")
             if len(parts) > 2 or _RUN_ID_RE.fullmatch(parts[-1]) is None:
-                raise ValueError(f"resume_run must use experiment-id/rN or rN format, got: {run_ref}")
-            if len(parts) == 2 and _EXPERIMENT_ID_RE.fullmatch(parts[0]) is None:
-                raise ValueError(f"resume_run must use experiment-id/rN or rN format, got: {run_ref}")
+                raise ValueError(f"resume_run must use experiment/rN or rN format, got: {run_ref}")
+            if len(parts) == 2 and _EXPERIMENT_RE.fullmatch(parts[0]) is None:
+                raise ValueError(f"resume_run must use experiment/rN or rN format, got: {run_ref}")
             if not (config.train_config.training_runs_dir / run_ref).is_dir():
                 raise FileNotFoundError(f"Resume run not found: {run_ref}")
 

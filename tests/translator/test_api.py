@@ -118,7 +118,7 @@ def test_train_creates_next_run_dir_without_experiment(tmp_path: Path, monkeypat
     summary = train(
         _train_run_config(
             artifacts_dir,
-            experiment_id=None,
+            experiment=None,
             device="cpu",
             epochs=1,
             log_every=1000,
@@ -256,7 +256,7 @@ def test_train_resumes_latest_run_without_experiment(tmp_path: Path, monkeypatch
     train(
         _train_run_config(
             artifacts_dir,
-            experiment_id=None,
+            experiment=None,
             device="cpu",
             epochs=1,
             log_every=1000,
@@ -268,7 +268,7 @@ def test_train_resumes_latest_run_without_experiment(tmp_path: Path, monkeypatch
     train(
         _train_run_config(
             artifacts_dir,
-            experiment_id=None,
+            experiment=None,
             device="cpu",
             epochs=1,
             log_every=1000,

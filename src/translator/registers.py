@@ -45,16 +45,16 @@ def append_checkpoint_register(
         )
 
 
-def append_experiment_register(register_dir: Path, *, experiment_id: str) -> None:
+def append_experiment_register(register_dir: Path, *, experiment: str) -> None:
     register_path = register_dir / "experiment_register.csv"
     write_header = not register_path.exists()
     with register_path.open("a", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=["experiment_id", "timestamp", "notes"], delimiter=";")
+        writer = csv.DictWriter(handle, fieldnames=["experiment", "timestamp", "notes"], delimiter=";")
         if write_header:
             writer.writeheader()
         writer.writerow(
             {
-                "experiment_id": experiment_id,
+                "experiment": experiment,
                 "timestamp": datetime.now().isoformat(timespec="seconds"),
                 "notes": "",
             }

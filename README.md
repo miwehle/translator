@@ -30,11 +30,11 @@ Training speichert automatisch ein Checkpoint unter `checkpoints/translator.pt` 
 
 ### Training runs
 
-For regular training, use `train_config.experiment_id` to group related runs:
+For regular training, use `train_config.experiment` to group related runs:
 
 `training_runs/de-en-translator/r1`, `training_runs/de-en-translator/r2`, ...
 
-This keeps the top-level `training_runs` directory small and makes related runs easier to find. For simple ad-hoc runs, `experiment_id` can be omitted; those runs are stored directly as `training_runs/r1`, `training_runs/r2`, ...
+This keeps the top-level `training_runs` directory small and makes related runs easier to find. For simple ad-hoc runs, `experiment` can be omitted; those runs are stored directly as `training_runs/r1`, `training_runs/r2`, ...
 
 Einzelsatz uebersetzen:
 
