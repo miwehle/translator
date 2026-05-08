@@ -7,6 +7,7 @@ from dataclasses import asdict, replace
 from pathlib import Path
 from typing import cast
 
+from lab_infrastructure.artifact_paths import artifact_ref, next_numbered_path
 from lab_infrastructure.compute_metrics import detect_compute_hardware
 from lab_infrastructure.logging import get_logger
 from lab_infrastructure.run_config import git_head_commit, write_run_config
@@ -65,9 +66,6 @@ def preprocess(
             else config.train_config.training_runs_dir
         )
 
-    def format_run_ref(scope_name: str | None, run_id: int) -> str:
-        return f"{scope_name}/r{run_id}" if scope_name is not None else f"r{run_id}"
-
     def create_next_run_dir() -> tuple[Path, str]:
         scope_name = experiment_scope()
         scope_dir = run_scope_dir(scope_name)
@@ -76,15 +74,13 @@ def preprocess(
         if scope_name is not None and scope_is_new:
             append_experiment_register(config.train_config.training_runs_dir, experiment=scope_name)
 
-        run_id = max(existing_run_ids(scope_dir), default=0) + 1
         while True:
-            ref = format_run_ref(scope_name, run_id)
-            run_dir = config.train_config.training_runs_dir / ref
+            run_dir = next_numbered_path(scope_dir, "r")
             try:
                 run_dir.mkdir(exist_ok=False)
-                return run_dir, ref
+                return run_dir, artifact_ref(config.train_config.training_runs_dir, run_dir)
             except FileExistsError:
-                run_id += 1
+                pass
 
     def determine_resume_run() -> str | None:
         def resolve_run_ref(run_ref: str) -> None:
@@ -103,7 +99,7 @@ def preprocess(
             if run_id == 0:
                 scope_label = scope_name or config.train_config.training_runs_dir.name
                 raise FileNotFoundError(f"Cannot resume latest run from {scope_label}: no runs found.")
-            return format_run_ref(scope_name, run_id)
+            return artifact_ref(config.train_config.training_runs_dir, scope_dir / f"r{run_id}")
 
         resume_run = config.resume_run
         if config.model_config is None and resume_run is None:

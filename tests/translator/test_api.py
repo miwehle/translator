@@ -64,6 +64,7 @@ def test_train_creates_next_run_dir_in_experiment(tmp_path: Path, monkeypatch) -
     run_root = artifacts_dir / "training_runs"
     existing_run_dir = run_root / "de-en-translator" / "r1"
     existing_run_dir.mkdir(parents=True)
+    (run_root / "de-en-translator" / "r3").mkdir()
     (existing_run_dir / "checkpoint.pt").write_text("existing checkpoint", encoding="utf-8")
 
     monkeypatch.setattr("translator.training.internal.preprocessing.git_head_commit", lambda _: "test-commit")
