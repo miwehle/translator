@@ -76,7 +76,7 @@ def _assert_resume_rejects_configured_seq_len_above_model_limit(
     )
 
     with pytest.raises(ValueError, match="configured_max_seq_len"):
-        Trainer(factory, train_config_for_test(str(tmp_path), device="cpu"), resume_run="first_run")
+        Trainer(factory, train_config_for_test(str(tmp_path), device="cpu"), parent_checkpoint="first_run")
 
 
 class TestTrainer:

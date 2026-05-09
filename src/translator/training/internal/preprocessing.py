@@ -38,8 +38,9 @@ def preprocess(
 ) -> tuple[Sequence[Example], DatasetMetadata, str, TrainConfig, str | None, Sequence[Example] | None]:
     """Prepare this training run.
 
-    Determine whether training starts from scratch with a new model or resumes from a checkpoint,
-    load the dataset, create the output run directory, and record the effective run configuration.
+    Determine whether training starts from scratch with a new model or resumes from a parent
+    checkpoint, load the dataset, create the output run directory, and record the effective run
+    configuration.
     """
 
     def experiment_scope() -> str | None:
@@ -82,15 +83,19 @@ def preprocess(
             except FileExistsError:
                 pass
 
-    def determine_resume_run() -> str | None:
-        def resolve_run_ref(run_ref: str) -> None:
-            parts = run_ref.split("/")
+    def determine_parent_checkpoint() -> str | None:
+        def resolve_parent_checkpoint_ref(parent_checkpoint_ref: str) -> None:
+            parts = parent_checkpoint_ref.split("/")
             if len(parts) > 2 or _RUN_ID_RE.fullmatch(parts[-1]) is None:
-                raise ValueError(f"resume_run must use experiment/rN or rN format, got: {run_ref}")
+                raise ValueError(
+                    f"parent_checkpoint must use experiment/rN or rN format, got: {parent_checkpoint_ref}"
+                )
             if len(parts) == 2 and _EXPERIMENT_RE.fullmatch(parts[0]) is None:
-                raise ValueError(f"resume_run must use experiment/rN or rN format, got: {run_ref}")
-            if not (config.train_config.training_runs_dir / run_ref).is_dir():
-                raise FileNotFoundError(f"Resume run not found: {run_ref}")
+                raise ValueError(
+                    f"parent_checkpoint must use experiment/rN or rN format, got: {parent_checkpoint_ref}"
+                )
+            if not (config.train_config.training_runs_dir / parent_checkpoint_ref).is_dir():
+                raise FileNotFoundError(f"Parent checkpoint not found: {parent_checkpoint_ref}")
 
         def latest_run_ref() -> str:
             scope_name = experiment_scope()
@@ -101,12 +106,12 @@ def preprocess(
                 raise FileNotFoundError(f"Cannot resume latest run from {scope_label}: no runs found.")
             return artifact_ref(config.train_config.training_runs_dir, scope_dir / f"r{run_id}")
 
-        resume_run = config.resume_run
-        if config.model_config is None and resume_run is None:
-            resume_run = latest_run_ref()
-        if resume_run is not None:
-            resolve_run_ref(resume_run)
-        return resume_run
+        parent_checkpoint = config.parent_checkpoint
+        if config.model_config is None and parent_checkpoint is None:
+            parent_checkpoint = latest_run_ref()
+        if parent_checkpoint is not None:
+            resolve_parent_checkpoint_ref(parent_checkpoint)
+        return parent_checkpoint
 
     def load_validation_dataset(
         train_config: TrainConfig, training_metadata: DatasetMetadata
@@ -131,13 +136,13 @@ def preprocess(
             resolved_device,
         )
 
-    def write_training_config(run_dir: Path, run_ref: str, resume_run: str | None) -> TrainConfig:
+    def write_training_config(run_dir: Path, run_ref: str, parent_checkpoint: str | None) -> TrainConfig:
         train_config = replace(config.train_config, run_name=run_ref)
         write_run_config(
             run_dir / "training_config.yaml",
             {
                 "model_config": (asdict(config.model_config) if config.model_config is not None else None),
-                "resume_run": resume_run,
+                "parent_checkpoint": parent_checkpoint,
                 "train_config": asdict(train_config),
                 "data_loader_config": asdict(config.data_loader_config),
             },
@@ -149,17 +154,17 @@ def preprocess(
     # check input parameter
     if config.train_config.validate_every is not None and config.train_config.validation_dataset is None:
         raise ValueError("validate_every requires validation_dataset.")
-    if config.model_config is not None and config.resume_run is not None:
-        raise ValueError("resume_run requires model_config to be omitted.")
+    if config.model_config is not None and config.parent_checkpoint is not None:
+        raise ValueError("parent_checkpoint requires model_config to be omitted.")
 
-    resume_run = determine_resume_run()
+    parent_checkpoint = determine_parent_checkpoint()
 
     examples, dataset_metadata = _load_dataset(config.train_config.datasets_dir / config.train_config.dataset)
 
     run_dir, run_ref = create_next_run_dir()
     get_logger("translator", log_path=run_dir / "training.log", stream=False)
 
-    train_config = write_training_config(run_dir, run_ref, resume_run)
+    train_config = write_training_config(run_dir, run_ref, parent_checkpoint)
 
     validation_examples = (
         load_validation_dataset(train_config, dataset_metadata)
@@ -174,6 +179,6 @@ def preprocess(
         dataset_metadata,
         git_commit,
         train_config,
-        resume_run,
+        parent_checkpoint,
         validation_examples,
     )

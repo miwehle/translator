@@ -66,7 +66,7 @@ class TrainRunConfig:
     train_config: TrainConfig
     data_loader_config: DataLoaderConfig = field(default_factory=DataLoaderConfig)
     model_config: ModelConfig | None = None
-    resume_run: str | None = None
+    parent_checkpoint: str | None = None
 
 
 @dataclass(frozen=True, kw_only=True, config=_CONFIG)

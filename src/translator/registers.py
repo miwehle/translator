@@ -9,9 +9,9 @@ def append_checkpoint_register(
     register_dir: Path,
     *,
     checkpoint: str,
-    dataset_path: str,
+    dataset: str,
+    parent: str,
     git_commit: str,
-    output_ckpt: str,
     validation_loss: float | None,
 ) -> None:
     register_path = register_dir / "checkpoint_register.csv"
@@ -21,11 +21,11 @@ def append_checkpoint_register(
             handle,
             fieldnames=[
                 "timestamp",
-                "input_ckpt",
-                "dataset_path",
-                "git_commit",
-                "output_ckpt",
+                "checkpoint",
                 "validation_loss",
+                "dataset",
+                "parent",
+                "git_commit",
             ],
             delimiter=";",
         )
@@ -34,13 +34,13 @@ def append_checkpoint_register(
         writer.writerow(
             {
                 "timestamp": datetime.now().isoformat(timespec="seconds"),
-                "input_ckpt": checkpoint,
-                "dataset_path": dataset_path,
-                "git_commit": git_commit[:20],
-                "output_ckpt": output_ckpt,
+                "checkpoint": checkpoint,
                 "validation_loss": (
                     "" if validation_loss is None else _format_decimal_for_sheet(validation_loss)
                 ),
+                "dataset": dataset,
+                "parent": parent,
+                "git_commit": git_commit[:20],
             }
         )
 
@@ -49,7 +49,7 @@ def append_experiment_register(register_dir: Path, *, experiment: str) -> None:
     register_path = register_dir / "experiment_register.csv"
     write_header = not register_path.exists()
     with register_path.open("a", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=["experiment", "timestamp", "notes"], delimiter=";")
+        writer = csv.DictWriter(handle, fieldnames=["timestamp", "experiment", "notes"], delimiter=";")
         if write_header:
             writer.writeheader()
         writer.writerow(

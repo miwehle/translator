@@ -54,7 +54,7 @@ class TrainingSummary:
 
 
 class Trainer:
-    """Train a Seq2Seq model from scratch or from a checkpoint.
+    """Train a Seq2Seq model either from scratch or by resuming from a parent checkpoint.
 
     Also can compute loss on a validation dataset.
     """
@@ -65,12 +65,14 @@ class Trainer:
         train_config: TrainConfig,
         data_loader_config: DataLoaderConfig = DataLoaderConfig(),
         model_config: ModelConfig | None = None,
-        resume_run: str | None = None,
+        parent_checkpoint: str | None = None,
     ) -> None:
-        """Create a trainer in one of two modes.
+        """Create a trainer and initialize the model, optimizer, and device.
 
-        Use `model_config` to train from scratch. Use `resume_run` to resume from a
-        previous run.
+        Pass `model_config` to start a new lineage root from scratch. Pass
+        `parent_checkpoint` to resume from an existing checkpoint and create the next
+        checkpoint with that checkpoint as its lineage parent. Exactly one of
+        `model_config` or `parent_checkpoint` must be provided.
         """
 
         def validate_dataset_max_seq_len(max_seq_len: int) -> None:
@@ -94,17 +96,16 @@ class Trainer:
         if train_config.validate_every is not None and train_config.validation_dataset is None:
             raise ValueError("validate_every requires validation_dataset.")
 
-        if (model_config is None) == (resume_run is None):
-            raise ValueError("Exactly one of model_config or resume_run must be provided.")
+        if (model_config is None) == (parent_checkpoint is None):
+            raise ValueError("Exactly one of model_config or parent_checkpoint must be provided.")
 
         _set_seed(train_config.seed)
         self._device = _resolve_device(train_config.device)
         self._criterion = nn.CrossEntropyLoss(ignore_index=self._factory.dataset_metadata.tgt_pad_id)
 
-        if resume_run is not None:
-            loaded = load_checkpoint(
-                train_config.training_runs_dir / resume_run / "checkpoint.pt", self._factory, self._device
-            )
+        if parent_checkpoint is not None:
+            checkpoint_path = train_config.training_runs_dir / parent_checkpoint / "checkpoint.pt"
+            loaded = load_checkpoint(checkpoint_path, self._factory, self._device)
             validate_dataset_max_seq_len(loaded.model_config.max_seq_len)
             self._model = loaded.model
             self._optimizer = loaded.optimizer
@@ -121,7 +122,8 @@ class Trainer:
         return self._criterion(logits.reshape(-1, logits.size(-1)), tgt[:, 1:].reshape(-1))
 
     def _should_validate(self, step: int) -> bool:
-        return self._train_config.validate_every is not None and (step + 1) % self._train_config.validate_every == 0
+        validate_every = self._train_config.validate_every
+        return validate_every is not None and (step + 1) % validate_every == 0
 
     def _autocast_context(self):
         use_bf16 = self._train_config.use_bf16 and self._device.type == "cuda"

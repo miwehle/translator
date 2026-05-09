@@ -64,7 +64,7 @@ def train(config: TrainRunConfig) -> TrainingSummary:
     """Train the translator on `config.train_config.dataset`.
 
     Use `config.model_config` to start a new run from scratch. Without `model_config`,
-    resume either `config.resume_run` or the latest run in the configured run scope.
+    resume either `config.parent_checkpoint` or the latest run in the configured run scope.
     """
     def postprocess(
         summary: TrainingSummary,
@@ -72,7 +72,7 @@ def train(config: TrainRunConfig) -> TrainingSummary:
         validation_examples: Sequence[Example] | None,
         train_config: TrainConfig,
         git_commit: str,
-        resume_run: str | None,
+        parent_checkpoint: str | None,
     ) -> TrainingSummary:
         """Postprocess this training run.
 
@@ -96,25 +96,26 @@ def train(config: TrainRunConfig) -> TrainingSummary:
         summary_path.write_text(yaml.safe_dump(asdict(summary), sort_keys=True), encoding="utf-8")
         append_checkpoint_register(
             config.train_config.training_runs_dir,
-            checkpoint=resume_run or "",
-            dataset_path=config.train_config.dataset,
+            checkpoint=train_config.run_name,
+            dataset=config.train_config.dataset,
+            parent=parent_checkpoint or "",
             git_commit=git_commit,
-            output_ckpt=train_config.run_name,
             validation_loss=summary.validation_loss,
         )
         log_training_finish(summary)
         return summary
 
     # main flow
-    examples, dataset_metadata, git_commit, train_config, resume_run, validation_examples = preprocess(config)
+    preprocessed = preprocess(config)
+    examples, metadata, git_commit, train_config, parent_checkpoint, validation_examples = preprocessed
 
     trainer = Trainer(
-        Factory(dataset_metadata),
+        Factory(metadata),
         train_config,
         config.data_loader_config,
         model_config=config.model_config,
-        resume_run=resume_run,
+        parent_checkpoint=parent_checkpoint,
     )
     summary = trainer.train(examples, validation_examples)
 
-    return postprocess(summary, trainer, validation_examples, train_config, git_commit, resume_run)
+    return postprocess(summary, trainer, validation_examples, train_config, git_commit, parent_checkpoint)

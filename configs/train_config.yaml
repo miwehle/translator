@@ -7,7 +7,7 @@ model_config:
   max_seq_len: 250
   attention: torch
 
-#resume_run: de-en-translator/r1
+#parent_checkpoint: de-en-translator/r1
 
 train_config:
   experiment: de-en-translator
