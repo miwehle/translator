@@ -99,8 +99,7 @@ def train(config: TrainRunConfig) -> TrainingSummary:
         return summary
 
     # main flow
-    preprocessed = preprocess(config)
-    examples, metadata, git_commit, train_config, parent_checkpoint, validation_examples = preprocessed
+    examples, metadata, git_commit, train_config, parent_checkpoint, validation_examples = preprocess(config)
 
     trainer = Trainer(Factory(metadata), train_config)
     summary = trainer.train(examples, validation_examples)
