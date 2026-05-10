@@ -16,24 +16,15 @@ _MODEL_CFG = ModelConfig(d_model=32, ff_dim=64, num_heads=4, num_layers=2, dropo
 
 
 def _train_run_config(artifacts_dir: Path, **overrides: object) -> TrainRunConfig:
-    train_overrides = {
+    cfg = {
         "epochs": 1,
         "log_every": 1000,
         "lr": 1e-3,
         "seed": 7,
-    } | {
-        key: value
-        for key, value in overrides.items()
-        if key not in {"data_loader_config", "model_config", "parent_checkpoint"}
+        "data_loader_config": DataLoaderConfig(batch_size=32, shuffle=False),
     }
-    data_loader_config = overrides.get("data_loader_config", DataLoaderConfig(batch_size=32, shuffle=False))
-    return train_config(
-        str(artifacts_dir),
-        **train_overrides,
-        data_loader_config=cast(DataLoaderConfig, data_loader_config),
-        model_config=cast(ModelConfig | None, overrides.get("model_config")),
-        parent_checkpoint=cast(str | None, overrides.get("parent_checkpoint")),
-    )
+    cfg.update(overrides)
+    return train_config(str(artifacts_dir), **cfg)
 
 
 def _write_dataset_manifest(dataset_dir: Path, **overrides: object) -> None:
