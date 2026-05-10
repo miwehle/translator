@@ -45,22 +45,6 @@ def append_checkpoint_register(
         )
 
 
-def append_experiment_register(register_dir: Path, *, experiment: str) -> None:
-    register_path = register_dir / "experiment_register.csv"
-    write_header = not register_path.exists()
-    with register_path.open("a", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=["timestamp", "experiment", "notes"], delimiter=";")
-        if write_header:
-            writer.writeheader()
-        writer.writerow(
-            {
-                "experiment": experiment,
-                "timestamp": datetime.now().isoformat(timespec="seconds"),
-                "notes": "",
-            }
-        )
-
-
 def append_comet_score_register(
     register_dir: Path, *, checkpoint: str, eval_dataset: str, comet_model: str, comet_score: float
 ) -> None:

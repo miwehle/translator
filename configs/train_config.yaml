@@ -10,7 +10,7 @@ model_config:
 #parent_checkpoint: de-en-translator/r1
 
 train_config:
-  experiment: de-en-translator
+  work_dir: de-en-translator
   # europarl_de-en_train (8), iwslt2017_iwslt2017-de-en_train (7), news_commentary_de-en_train (5) 
   dataset: europarl_de-en_train (8)/curation/curated_dataset
   # iwslt2017_iwslt2017-de-en_validation

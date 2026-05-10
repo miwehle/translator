@@ -54,7 +54,7 @@ def _write_dataset_manifest(dataset_dir: Path, **overrides: object) -> None:
     )
 
 
-def test_train_creates_next_run_dir_in_experiment(tmp_path: Path, monkeypatch) -> None:
+def test_train_creates_next_run_dir_in_work_dir(tmp_path: Path, monkeypatch) -> None:
     artifacts_dir = tmp_path / "artifacts"
     dataset_dir = create_valid_mapped_dataset(artifacts_dir / "datasets" / "dataset.mapped")
     validation_dir = create_valid_mapped_dataset(artifacts_dir / "datasets" / "validation.mapped")
@@ -102,7 +102,7 @@ def test_train_creates_next_run_dir_in_experiment(tmp_path: Path, monkeypatch) -
     assert register_rows[0]["checkpoint"] == "de-en-translator/r2"
 
 
-def test_train_creates_next_run_dir_without_experiment(tmp_path: Path, monkeypatch) -> None:
+def test_train_creates_next_run_dir_without_work_dir(tmp_path: Path, monkeypatch) -> None:
     artifacts_dir = tmp_path / "artifacts"
     dataset_dir = create_valid_mapped_dataset(artifacts_dir / "datasets" / "dataset.mapped")
     validation_dir = create_valid_mapped_dataset(artifacts_dir / "datasets" / "validation.mapped")
@@ -119,7 +119,7 @@ def test_train_creates_next_run_dir_without_experiment(tmp_path: Path, monkeypat
     summary = train(
         _train_run_config(
             artifacts_dir,
-            experiment=None,
+            work_dir=None,
             device="cpu",
             epochs=1,
             log_every=1000,
@@ -135,7 +135,6 @@ def test_train_creates_next_run_dir_without_experiment(tmp_path: Path, monkeypat
 
     assert existing_run_dir.joinpath("checkpoint.pt").read_text(encoding="utf-8") == "existing checkpoint"
     assert new_run_dir.is_dir()
-    assert not run_root.joinpath("experiment_register.csv").exists()
     assert Path(summary.checkpoint_path) == new_run_dir / "checkpoint.pt"
     assert register_rows[0]["parent"] == ""
     assert register_rows[0]["checkpoint"] == "r2"
@@ -205,7 +204,7 @@ def test_train_resumes_from_checkpoint(tmp_path: Path, monkeypatch) -> None:
     assert register_rows[1]["validation_loss"] == str(second_summary.validation_loss).replace(".", ",")
 
 
-def test_train_resumes_latest_run_from_experiment(tmp_path: Path, monkeypatch) -> None:
+def test_train_resumes_latest_run_from_work_dir(tmp_path: Path, monkeypatch) -> None:
     artifacts_dir = tmp_path / "artifacts"
     dataset_dir = create_valid_mapped_dataset(artifacts_dir / "datasets" / "dataset.mapped")
     validation_dir = create_valid_mapped_dataset(artifacts_dir / "datasets" / "validation.mapped")
@@ -244,7 +243,7 @@ def test_train_resumes_latest_run_from_experiment(tmp_path: Path, monkeypatch) -
     assert train_cfg["parent_checkpoint"] == "de-en-translator/r1"
 
 
-def test_train_resumes_latest_run_without_experiment(tmp_path: Path, monkeypatch) -> None:
+def test_train_resumes_latest_run_without_work_dir(tmp_path: Path, monkeypatch) -> None:
     artifacts_dir = tmp_path / "artifacts"
     dataset_dir = create_valid_mapped_dataset(artifacts_dir / "datasets" / "dataset.mapped")
     validation_dir = create_valid_mapped_dataset(artifacts_dir / "datasets" / "validation.mapped")
@@ -257,7 +256,7 @@ def test_train_resumes_latest_run_without_experiment(tmp_path: Path, monkeypatch
     train(
         _train_run_config(
             artifacts_dir,
-            experiment=None,
+            work_dir=None,
             device="cpu",
             epochs=1,
             log_every=1000,
@@ -269,7 +268,7 @@ def test_train_resumes_latest_run_without_experiment(tmp_path: Path, monkeypatch
     train(
         _train_run_config(
             artifacts_dir,
-            experiment=None,
+            work_dir=None,
             device="cpu",
             epochs=1,
             log_every=1000,

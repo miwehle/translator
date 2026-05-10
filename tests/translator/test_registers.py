@@ -3,7 +3,7 @@ from __future__ import annotations
 import csv
 from pathlib import Path
 
-from translator.registers import append_checkpoint_register, append_experiment_register
+from translator.registers import append_checkpoint_register
 
 
 def _read_rows(path: Path) -> list[dict[str, str]]:
@@ -34,12 +34,3 @@ def test_append_checkpoint_register_writes_checkpoint_parent_columns(tmp_path: P
             "git_commit": "test-commit-abcdef",
         }
     ]
-
-
-def test_append_experiment_register_writes_experiment_column(tmp_path: Path) -> None:
-    append_experiment_register(tmp_path, experiment="de-en-translator")
-
-    rows = _read_rows(tmp_path / "experiment_register.csv")
-
-    assert list(rows[0]) == ["timestamp", "experiment", "notes"]
-    assert rows == [{"timestamp": rows[0]["timestamp"], "experiment": "de-en-translator", "notes": ""}]

@@ -12,14 +12,13 @@ from lab_infrastructure.compute_metrics import detect_compute_hardware
 from lab_infrastructure.logging import get_logger
 from lab_infrastructure.run_config import git_head_commit, write_run_config
 
-from ...registers import append_experiment_register
 from ...shared import Example
 from ..config import TrainConfig, TrainRunConfig
 from ..dataset import DatasetMetadata, load_arrow_records
 
 logger = logging.getLogger(__name__)
 _RUN_ID_RE = re.compile(r"^r(?P<run_id>\d+)$")
-_EXPERIMENT_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$")
+_WORK_DIR_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$")
 
 
 def _load_dataset(dataset_path: str | Path) -> tuple[Sequence[Example], DatasetMetadata]:
@@ -43,37 +42,34 @@ def preprocess(
     configuration.
     """
 
-    def experiment_scope() -> str | None:
-        experiment = config.train_config.experiment
-        if experiment is None:
+    def work_dir() -> str | None:
+        configured_work_dir = config.train_config.work_dir
+        if configured_work_dir is None:
             return None
-        if _EXPERIMENT_RE.fullmatch(experiment) is None:
-            raise ValueError(f"experiment must be a lowercase slug, got: {experiment}")
-        return experiment
+        if _WORK_DIR_RE.fullmatch(configured_work_dir) is None:
+            raise ValueError(f"work_dir must be a lowercase slug, got: {configured_work_dir}")
+        return configured_work_dir
 
-    def existing_run_ids(experiment_dir: Path) -> list[int]:
-        if not experiment_dir.exists():
+    def existing_run_ids(work_dir_path: Path) -> list[int]:
+        if not work_dir_path.exists():
             return []
         return [
             int(match.group("run_id"))
-            for child in experiment_dir.iterdir()
+            for child in work_dir_path.iterdir()
             if child.is_dir() and (match := _RUN_ID_RE.fullmatch(child.name)) is not None
         ]
 
-    def run_scope_dir(scope_name: str | None) -> Path:
+    def run_scope_dir(work_dir_name: str | None) -> Path:
         return (
-            config.train_config.training_runs_dir / scope_name
-            if scope_name is not None
+            config.train_config.training_runs_dir / work_dir_name
+            if work_dir_name is not None
             else config.train_config.training_runs_dir
         )
 
     def create_next_run_dir() -> tuple[Path, str]:
-        scope_name = experiment_scope()
-        scope_dir = run_scope_dir(scope_name)
-        scope_is_new = not scope_dir.exists()
+        work_dir_name = work_dir()
+        scope_dir = run_scope_dir(work_dir_name)
         scope_dir.mkdir(parents=True, exist_ok=True)
-        if scope_name is not None and scope_is_new:
-            append_experiment_register(config.train_config.training_runs_dir, experiment=scope_name)
 
         while True:
             run_dir = next_numbered_path(scope_dir, "r")
@@ -88,21 +84,21 @@ def preprocess(
             parts = parent_checkpoint_ref.split("/")
             if len(parts) > 2 or _RUN_ID_RE.fullmatch(parts[-1]) is None:
                 raise ValueError(
-                    f"parent_checkpoint must use experiment/rN or rN format, got: {parent_checkpoint_ref}"
+                    f"parent_checkpoint must use work_dir/rN or rN format, got: {parent_checkpoint_ref}"
                 )
-            if len(parts) == 2 and _EXPERIMENT_RE.fullmatch(parts[0]) is None:
+            if len(parts) == 2 and _WORK_DIR_RE.fullmatch(parts[0]) is None:
                 raise ValueError(
-                    f"parent_checkpoint must use experiment/rN or rN format, got: {parent_checkpoint_ref}"
+                    f"parent_checkpoint must use work_dir/rN or rN format, got: {parent_checkpoint_ref}"
                 )
             if not (config.train_config.training_runs_dir / parent_checkpoint_ref).is_dir():
                 raise FileNotFoundError(f"Parent checkpoint not found: {parent_checkpoint_ref}")
 
         def latest_run_ref() -> str:
-            scope_name = experiment_scope()
-            scope_dir = run_scope_dir(scope_name)
+            work_dir_name = work_dir()
+            scope_dir = run_scope_dir(work_dir_name)
             run_id = max(existing_run_ids(scope_dir), default=0)
             if run_id == 0:
-                scope_label = scope_name or config.train_config.training_runs_dir.name
+                scope_label = work_dir_name or config.train_config.training_runs_dir.name
                 raise FileNotFoundError(f"Cannot resume latest run from {scope_label}: no runs found.")
             return artifact_ref(config.train_config.training_runs_dir, scope_dir / f"r{run_id}")
 
