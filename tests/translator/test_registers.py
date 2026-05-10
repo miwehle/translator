@@ -3,7 +3,7 @@ from __future__ import annotations
 import csv
 from pathlib import Path
 
-from translator.registers import append_checkpoint_register
+from translator.registers import register_checkpoint
 
 
 def _read_rows(path: Path) -> list[dict[str, str]]:
@@ -11,8 +11,8 @@ def _read_rows(path: Path) -> list[dict[str, str]]:
         return list(csv.DictReader(handle, delimiter=";"))
 
 
-def test_append_checkpoint_register_writes_checkpoint_parent_columns(tmp_path: Path) -> None:
-    append_checkpoint_register(
+def test_register_checkpoint_writes_register_row(tmp_path: Path) -> None:
+    register_checkpoint(
         tmp_path,
         checkpoint="de-en-translator/r2",
         validation_loss=1.25,
@@ -23,7 +23,7 @@ def test_append_checkpoint_register_writes_checkpoint_parent_columns(tmp_path: P
 
     rows = _read_rows(tmp_path / "checkpoint_register.csv")
 
-    assert list(rows[0]) == ["timestamp", "checkpoint", "validation_loss", "dataset", "parent", "git_commit"]
+    assert list(rows[0]) == ["checkpoint", "validation_loss", "dataset", "parent", "timestamp", "git_commit"]
     assert rows == [
         {
             "timestamp": rows[0]["timestamp"],

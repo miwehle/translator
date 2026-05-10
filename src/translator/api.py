@@ -9,7 +9,7 @@ from dataclasses import asdict, replace
 import yaml
 
 from .evaluation.config import CometScoreRunConfig
-from .registers import append_checkpoint_register, append_comet_score_register
+from .registers import register_checkpoint, register_comet_score
 from .shared import Example
 from .training import Factory, PreflightCheckRunConfig, Trainer, TrainingSummary, TrainRunConfig, preflight
 from .training.internal.preprocessing import _load_dataset, preprocess
@@ -47,7 +47,7 @@ def comet_score(config: CometScoreRunConfig) -> float:
     summary_path.write_text(
         yaml.safe_dump({"score": score, "config": asdict(config)}, sort_keys=False), encoding="utf-8"
     )
-    append_comet_score_register(
+    register_comet_score(
         config.checkpoint_file.parent.parent,
         checkpoint=config.checkpoint,
         eval_dataset=config.dataset_config.data_file or config.dataset_config.path,
@@ -87,7 +87,7 @@ def train(config: TrainRunConfig) -> TrainingSummary:
 
         summary_path = train_config.training_runs_dir / train_config.run_name / "training_summary.yaml"
         summary_path.write_text(yaml.safe_dump(asdict(summary), sort_keys=True), encoding="utf-8")
-        append_checkpoint_register(
+        register_checkpoint(
             train_config.training_runs_dir,
             checkpoint=train_config.run_name,
             dataset=train_config.dataset,
