@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import field
+from dataclasses import field, fields
 from pathlib import Path
 
 import torch
@@ -62,11 +62,15 @@ class DataLoaderConfig:
 
 
 @dataclass(frozen=True, kw_only=True, config=_CONFIG)
-class TrainRunConfig:
-    train_config: TrainConfig
+class TrainRunConfig(TrainConfig):
     data_loader_config: DataLoaderConfig = field(default_factory=DataLoaderConfig)
     model_config: ModelConfig | None = None
     parent_checkpoint: str | None = None
+
+    @property
+    def train_config(self) -> TrainConfig:
+        values = {config_field.name: getattr(self, config_field.name) for config_field in fields(TrainConfig)}
+        return TrainConfig(**values)
 
 
 @dataclass(frozen=True, kw_only=True, config=_CONFIG)

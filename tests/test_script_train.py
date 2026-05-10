@@ -16,8 +16,9 @@ def test_script_train_loads_yaml_and_calls_api(monkeypatch):
     config_path.write_text(
         yaml.safe_dump(
             {
+                "dataset": "demo-dataset",
+                "work_dir": "de-en-translator",
                 "model_config": {"d_model": 128},
-                "train_config": {"dataset": "demo-dataset", "work_dir": "de-en-translator"},
                 "data_loader_config": {"batch_size": 16, "shuffle": False},
             }
         ),
@@ -60,13 +61,11 @@ def test_script_train_loads_yaml_and_calls_api(monkeypatch):
     assert calls == [
         {
             "config": api.TrainRunConfig(
-                train_config=api.TrainConfig(
-                    dataset="cli-dataset",
-                    work_dir="de-en-translator",
-                    validation_dataset="cli-validation",
-                    lr=0.0005,
-                    epochs=3,
-                ),
+                dataset="cli-dataset",
+                work_dir="de-en-translator",
+                validation_dataset="cli-validation",
+                lr=0.0005,
+                epochs=3,
                 data_loader_config=api.DataLoaderConfig(batch_size=16, shuffle=False),
                 model_config=api.ModelConfig(d_model=128),
             )

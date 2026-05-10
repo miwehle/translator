@@ -13,10 +13,10 @@ def main() -> int:
     run_cli(
         train,
         cli_override_map={
-            "dataset": "train_config.dataset",
-            "validation-dataset": "train_config.validation_dataset",
-            "lr": "train_config.lr",
-            "epochs": "train_config.epochs",
+            "dataset": "dataset",
+            "validation-dataset": "validation_dataset",
+            "lr": "lr",
+            "epochs": "epochs",
         },
     )
     return 0

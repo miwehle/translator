@@ -137,9 +137,9 @@ def preprocess(
         write_run_config(
             run_dir / "training_config.yaml",
             {
+                **asdict(train_config),
                 "model_config": (asdict(config.model_config) if config.model_config is not None else None),
                 "parent_checkpoint": parent_checkpoint,
-                "train_config": asdict(train_config),
                 "data_loader_config": asdict(config.data_loader_config),
             },
             repo_root=Path(__file__).resolve().parents[3],

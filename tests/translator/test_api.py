@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+from dataclasses import asdict
 from pathlib import Path
 from typing import cast
 
@@ -22,8 +23,9 @@ def _train_run_config(artifacts_dir: Path, **overrides: object) -> TrainRunConfi
         if key not in {"data_loader_config", "model_config", "parent_checkpoint"}
     }
     data_loader_config = overrides.get("data_loader_config", DataLoaderConfig(batch_size=32, shuffle=False))
+    train_config = train_config_for_test(str(artifacts_dir), **train_overrides)
     return TrainRunConfig(
-        train_config=train_config_for_test(str(artifacts_dir), **train_overrides),
+        **asdict(train_config),
         data_loader_config=cast(DataLoaderConfig, data_loader_config),
         model_config=cast(ModelConfig | None, overrides.get("model_config")),
         parent_checkpoint=cast(str | None, overrides.get("parent_checkpoint")),
@@ -191,6 +193,8 @@ def test_train_resumes_from_checkpoint(tmp_path: Path, monkeypatch) -> None:
     assert manifest["checkpoint_file"] == "checkpoint.pt"
     assert manifest["tokenizer"]["model_name"] == "test-tokenizer"
     assert "summary" not in manifest
+    assert "train_config" not in train_cfg
+    assert train_cfg["dataset"] == dataset_name
     assert train_cfg["model_config"] is None
     assert train_cfg["parent_checkpoint"] == "de-en-translator/r1"
     assert training_summary["checkpoint_path"] == second_summary.checkpoint_path

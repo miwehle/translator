@@ -1,3 +1,28 @@
+work_dir: de-en-translator
+# europarl_de-en_train (8), iwslt2017_iwslt2017-de-en_train (7), news_commentary_de-en_train (5) 
+dataset: europarl_de-en_train (8)/curation/curated_dataset
+# iwslt2017_iwslt2017-de-en_validation
+validation_dataset: europarl_de-en_train (8)/curation/curated_dataset_split-validation
+validate_every: 1000
+lr: 0.0005
+epochs: 1
+##########
+use_bf16: true
+enable_tensorboard: true
+seed: 42
+log_every: 100
+translate_every: 5000
+translate_examples:
+  - Wir brauchen einen klaren Plan für den nächsten Schritt.
+  - Der Ausschuss hat den Vorschlag gestern gebilligt.
+  - Dieses Abkommen wird die Zusammenarbeit zwischen unseren Ländern stärken.
+  - Das Morgenlicht fiel sanft über die Blumenwiese.
+  - Sie lächelte, als die ersten Noten des Liedes den Raum füllten.
+spike_window: 100
+spike_factor: 3.0
+
+#parent_checkpoint: de-en-translator/r1
+
 model_config:
   d_model: 256
   ff_dim: 1024
@@ -6,32 +31,6 @@ model_config:
   dropout: 0.1
   max_seq_len: 250
   attention: torch
-
-#parent_checkpoint: de-en-translator/r1
-
-train_config:
-  work_dir: de-en-translator
-  # europarl_de-en_train (8), iwslt2017_iwslt2017-de-en_train (7), news_commentary_de-en_train (5) 
-  dataset: europarl_de-en_train (8)/curation/curated_dataset
-  # iwslt2017_iwslt2017-de-en_validation
-  validation_dataset: europarl_de-en_train (8)/curation/curated_dataset_split-validation
-  validate_every: 1000
-  lr: 0.0005
-  epochs: 1
-  ##########
-  use_bf16: true
-  enable_tensorboard: true
-  seed: 42
-  log_every: 100
-  translate_every: 5000
-  translate_examples:
-    - Wir brauchen einen klaren Plan für den nächsten Schritt.
-    - Der Ausschuss hat den Vorschlag gestern gebilligt.
-    - Dieses Abkommen wird die Zusammenarbeit zwischen unseren Ländern stärken.
-    - Das Morgenlicht fiel sanft über die Blumenwiese.
-    - Sie lächelte, als die ersten Noten des Liedes den Raum füllten.
-  spike_window: 100
-  spike_factor: 3.0
 
 data_loader_config:
   batch_size: 128
