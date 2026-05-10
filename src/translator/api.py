@@ -12,7 +12,6 @@ from .evaluation.config import CometScoreRunConfig
 from .registers import append_checkpoint_register, append_comet_score_register
 from .shared import Example
 from .training import Factory, PreflightCheckRunConfig, Trainer, TrainingSummary, TrainRunConfig, preflight
-from .training.config import TrainConfig
 from .training.internal.preprocessing import _load_dataset, preprocess
 
 logger = logging.getLogger(__name__)
@@ -33,9 +32,7 @@ def preflight_check(config: PreflightCheckRunConfig) -> dict[str, object]:
     )
 
 
-def comet_score(
-    config: CometScoreRunConfig,
-) -> float:
+def comet_score(config: CometScoreRunConfig) -> float:
     from .evaluation import CometScorer
 
     scorer = CometScorer(
@@ -61,7 +58,7 @@ def comet_score(
 
 
 def train(config: TrainRunConfig) -> TrainingSummary:
-    """Train the translator on `config.train_config.dataset`.
+    """Train the translator on `config.dataset`.
 
     Use `config.model_config` to start a new run from scratch. Without `model_config`,
     resume either `config.parent_checkpoint` or the latest run in the configured run scope.
@@ -70,7 +67,7 @@ def train(config: TrainRunConfig) -> TrainingSummary:
         summary: TrainingSummary,
         trainer: Trainer,
         validation_examples: Sequence[Example] | None,
-        train_config: TrainConfig,
+        train_config: TrainRunConfig,
         git_commit: str,
         parent_checkpoint: str | None,
     ) -> TrainingSummary:
@@ -81,23 +78,19 @@ def train(config: TrainRunConfig) -> TrainingSummary:
         """
         def log_training_finish(summary: TrainingSummary) -> None:
             logger.info(
-                "Finished training final_loss=%s validation_loss=%s",
-                summary.final_loss,
-                summary.validation_loss,
+                "Finished training loss=%s val_loss=%s", summary.final_loss, summary.validation_loss
             )
 
         if validation_examples is not None:
             validation_loss = trainer.validate(validation_examples)
             summary = replace(summary, validation_loss=validation_loss)
 
-        summary_path = (
-            train_config.training_runs_dir / train_config.run_name / "training_summary.yaml"
-        )
+        summary_path = train_config.training_runs_dir / train_config.run_name / "training_summary.yaml"
         summary_path.write_text(yaml.safe_dump(asdict(summary), sort_keys=True), encoding="utf-8")
         append_checkpoint_register(
-            config.train_config.training_runs_dir,
+            train_config.training_runs_dir,
             checkpoint=train_config.run_name,
-            dataset=config.train_config.dataset,
+            dataset=train_config.dataset,
             parent=parent_checkpoint or "",
             git_commit=git_commit,
             validation_loss=summary.validation_loss,
@@ -109,13 +102,7 @@ def train(config: TrainRunConfig) -> TrainingSummary:
     preprocessed = preprocess(config)
     examples, metadata, git_commit, train_config, parent_checkpoint, validation_examples = preprocessed
 
-    trainer = Trainer(
-        Factory(metadata),
-        train_config,
-        config.data_loader_config,
-        model_config=config.model_config,
-        parent_checkpoint=parent_checkpoint,
-    )
+    trainer = Trainer(Factory(metadata), train_config)
     summary = trainer.train(examples, validation_examples)
 
     return postprocess(summary, trainer, validation_examples, train_config, git_commit, parent_checkpoint)

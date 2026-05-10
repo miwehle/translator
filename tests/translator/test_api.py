@@ -1,31 +1,35 @@
 from __future__ import annotations
 
 import csv
-from dataclasses import asdict
 from pathlib import Path
 from typing import cast
 
 import pytest
 import yaml
 
-from tests.translator.training.support import create_valid_mapped_dataset, train_config_for_test
+from tests.translator.training.support import create_valid_mapped_dataset, train_config
 from translator.api import comet_score, preflight_check, train
 from translator.evaluation import CometScoreRunConfig
 from translator.training import DataLoaderConfig, ModelConfig, PreflightCheckRunConfig, TrainRunConfig
 
-_MODEL_CONFIG = ModelConfig(d_model=32, ff_dim=64, num_heads=4, num_layers=2, dropout=0.0)
+_MODEL_CFG = ModelConfig(d_model=32, ff_dim=64, num_heads=4, num_layers=2, dropout=0.0)
 
 
 def _train_run_config(artifacts_dir: Path, **overrides: object) -> TrainRunConfig:
     train_overrides = {
+        "epochs": 1,
+        "log_every": 1000,
+        "lr": 1e-3,
+        "seed": 7,
+    } | {
         key: value
         for key, value in overrides.items()
         if key not in {"data_loader_config", "model_config", "parent_checkpoint"}
     }
     data_loader_config = overrides.get("data_loader_config", DataLoaderConfig(batch_size=32, shuffle=False))
-    train_config = train_config_for_test(str(artifacts_dir), **train_overrides)
-    return TrainRunConfig(
-        **asdict(train_config),
+    return train_config(
+        str(artifacts_dir),
+        **train_overrides,
         data_loader_config=cast(DataLoaderConfig, data_loader_config),
         model_config=cast(ModelConfig | None, overrides.get("model_config")),
         parent_checkpoint=cast(str | None, overrides.get("parent_checkpoint")),
@@ -71,17 +75,7 @@ def test_train_creates_next_run_dir_in_work_dir(tmp_path: Path, monkeypatch) -> 
 
     monkeypatch.setattr("translator.training.internal.preprocessing.git_head_commit", lambda _: "test-commit")
 
-    summary = train(
-        _train_run_config(
-            artifacts_dir,
-            device="cpu",
-            epochs=1,
-            log_every=1000,
-            lr=1e-3,
-            seed=7,
-            model_config=_MODEL_CONFIG,
-        )
-    )
+    summary = train(_train_run_config(artifacts_dir, model_config=_MODEL_CFG))
 
     new_run_dir = run_root / "de-en-translator" / "r2"
     training_summary = yaml.safe_load(
@@ -118,18 +112,7 @@ def test_train_creates_next_run_dir_without_work_dir(tmp_path: Path, monkeypatch
 
     monkeypatch.setattr("translator.training.internal.preprocessing.git_head_commit", lambda _: "test-commit")
 
-    summary = train(
-        _train_run_config(
-            artifacts_dir,
-            work_dir=None,
-            device="cpu",
-            epochs=1,
-            log_every=1000,
-            lr=1e-3,
-            seed=7,
-            model_config=_MODEL_CONFIG,
-        )
-    )
+    summary = train(_train_run_config(artifacts_dir, work_dir=None, model_config=_MODEL_CFG))
 
     new_run_dir = run_root / "r2"
     with run_root.joinpath("checkpoint_register.csv").open("r", encoding="utf-8", newline="") as handle:
@@ -153,31 +136,11 @@ def test_train_resumes_from_checkpoint(tmp_path: Path, monkeypatch) -> None:
 
     monkeypatch.setattr("translator.training.internal.preprocessing.git_head_commit", lambda _: "test-commit")
 
-    train(
-        _train_run_config(
-            artifacts_dir,
-            dataset=dataset_name,
-            device="cpu",
-            epochs=1,
-            log_every=1000,
-            lr=1e-3,
-            seed=7,
-            model_config=_MODEL_CONFIG,
-        )
-    )
+    train(_train_run_config(artifacts_dir, dataset=dataset_name, model_config=_MODEL_CFG))
 
-    second_summary = train(
-        _train_run_config(
-            artifacts_dir,
-            dataset=dataset_name,
-            device="cpu",
-            epochs=1,
-            log_every=1000,
-            lr=5e-4,
-            seed=7,
-            parent_checkpoint="de-en-translator/r1",
-        )
-    )
+    parent = "de-en-translator/r1"
+    cfg = _train_run_config(artifacts_dir, dataset=dataset_name, lr=5e-4, parent_checkpoint=parent)
+    second_summary = train(cfg)
 
     second_run_dir = run_root / "de-en-translator" / "r2"
     manifest = yaml.safe_load(second_run_dir.joinpath("checkpoint_manifest.yaml").read_text(encoding="utf-8"))
@@ -196,12 +159,12 @@ def test_train_resumes_from_checkpoint(tmp_path: Path, monkeypatch) -> None:
     assert "train_config" not in train_cfg
     assert train_cfg["dataset"] == dataset_name
     assert train_cfg["model_config"] is None
-    assert train_cfg["parent_checkpoint"] == "de-en-translator/r1"
+    assert train_cfg["parent_checkpoint"] == parent
     assert training_summary["checkpoint_path"] == second_summary.checkpoint_path
     assert training_summary["final_loss"] == second_summary.final_loss
     assert training_summary["validation_loss"] == second_summary.validation_loss
     assert len(register_rows) == 2
-    assert register_rows[1]["parent"] == "de-en-translator/r1"
+    assert register_rows[1]["parent"] == parent
     assert register_rows[1]["dataset"] == dataset_name
     assert register_rows[1]["git_commit"] == "test-commit"
     assert register_rows[1]["checkpoint"] == "de-en-translator/r2"
@@ -218,27 +181,8 @@ def test_train_resumes_latest_run_from_work_dir(tmp_path: Path, monkeypatch) -> 
 
     monkeypatch.setattr("translator.training.internal.preprocessing.git_head_commit", lambda _: "test-commit")
 
-    train(
-        _train_run_config(
-            artifacts_dir,
-            device="cpu",
-            epochs=1,
-            log_every=1000,
-            lr=1e-3,
-            seed=7,
-            model_config=_MODEL_CONFIG,
-        )
-    )
-    train(
-        _train_run_config(
-            artifacts_dir,
-            device="cpu",
-            epochs=1,
-            log_every=1000,
-            lr=5e-4,
-            seed=7,
-        )
-    )
+    train(_train_run_config(artifacts_dir, model_config=_MODEL_CFG))
+    train(_train_run_config(artifacts_dir, lr=5e-4))
 
     train_cfg = yaml.safe_load(
         (run_root / "de-en-translator" / "r2" / "training_config.yaml").read_text(encoding="utf-8")
@@ -257,29 +201,8 @@ def test_train_resumes_latest_run_without_work_dir(tmp_path: Path, monkeypatch) 
 
     monkeypatch.setattr("translator.training.internal.preprocessing.git_head_commit", lambda _: "test-commit")
 
-    train(
-        _train_run_config(
-            artifacts_dir,
-            work_dir=None,
-            device="cpu",
-            epochs=1,
-            log_every=1000,
-            lr=1e-3,
-            seed=7,
-            model_config=_MODEL_CONFIG,
-        )
-    )
-    train(
-        _train_run_config(
-            artifacts_dir,
-            work_dir=None,
-            device="cpu",
-            epochs=1,
-            log_every=1000,
-            lr=5e-4,
-            seed=7,
-        )
-    )
+    train(_train_run_config(artifacts_dir, work_dir=None, model_config=_MODEL_CFG))
+    train(_train_run_config(artifacts_dir, work_dir=None, lr=5e-4))
 
     train_cfg = yaml.safe_load((run_root / "r2" / "training_config.yaml").read_text(encoding="utf-8"))
     with run_root.joinpath("checkpoint_register.csv").open("r", encoding="utf-8", newline="") as handle:
@@ -293,7 +216,7 @@ def test_train_resumes_latest_run_without_work_dir(tmp_path: Path, monkeypatch) 
 def test_train_rejects_resume_latest_without_existing_run(tmp_path: Path) -> None:
     match = "Cannot resume latest run from de-en-translator: no runs found"
     with pytest.raises(FileNotFoundError, match=match):
-        train(_train_run_config(tmp_path / "artifacts", device="cpu"))
+        train(_train_run_config(tmp_path / "artifacts"))
 
 
 def test_train_rejects_incompatible_validation_dataset(tmp_path: Path, monkeypatch) -> None:
@@ -306,17 +229,7 @@ def test_train_rejects_incompatible_validation_dataset(tmp_path: Path, monkeypat
     monkeypatch.setattr("translator.training.internal.preprocessing.git_head_commit", lambda _: "test-commit")
 
     with pytest.raises(ValueError, match="Validation dataset metadata mismatch"):
-        train(
-            _train_run_config(
-                artifacts_dir,
-                device="cpu",
-                epochs=1,
-                log_every=1000,
-                lr=1e-3,
-                seed=7,
-                model_config=_MODEL_CONFIG,
-            )
-        )
+        train(_train_run_config(artifacts_dir, model_config=_MODEL_CFG))
 
 
 def test_train_rejects_validate_every_without_validation_dataset(tmp_path: Path, monkeypatch) -> None:
@@ -325,21 +238,10 @@ def test_train_rejects_validate_every_without_validation_dataset(tmp_path: Path,
     _write_dataset_manifest(dataset_dir)
 
     monkeypatch.setattr("translator.training.internal.preprocessing.git_head_commit", lambda _: "test-commit")
+    cfg = _train_run_config(artifacts_dir, validation_dataset=None, validate_every=10)
 
     with pytest.raises(ValueError, match="validate_every requires validation_dataset"):
-        train(
-            _train_run_config(
-                artifacts_dir,
-                validation_dataset=None,
-                device="cpu",
-                epochs=1,
-                log_every=1000,
-                lr=1e-3,
-                seed=7,
-                validate_every=10,
-                model_config=_MODEL_CONFIG,
-            ),
-        )
+        train(cfg)
 
 
 def test_preflight_check_uses_dataset_manifest_defaults(tmp_path: Path) -> None:

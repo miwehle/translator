@@ -6,24 +6,24 @@ from collections.abc import Sequence
 from statistics import median
 
 from ...inference import Translator
-from ..config import TrainConfig
+from ..config import TrainRunConfig
 from .logging import TrainingLogger
 from .tensorboard_logger import TensorBoardLogger
 
 
 class TrainingObserver:
     def __init__(
-        self, train_config: TrainConfig, total_steps: int | None = None, translator: Translator | None = None
+        self, config: TrainRunConfig, total_steps: int | None = None, translator: Translator | None = None
     ) -> None:
-        run_dir = train_config.training_runs_dir / train_config.run_name
+        run_dir = config.training_runs_dir / config.run_name
         run_dir.mkdir(parents=True, exist_ok=True)
-        self.train_config = train_config
+        self.config = config
         self.training_logger = TrainingLogger(run_dir / "training.log", total_steps=total_steps)
-        self.tensorboard_logger = TensorBoardLogger(run_dir) if train_config.enable_tensorboard else None
+        self.tensorboard_logger = TensorBoardLogger(run_dir) if config.enable_tensorboard else None
         self.translation_examples_path = run_dir / "translation_examples.txt"
-        self.translate_examples = list(train_config.translate_examples)
+        self.translate_examples = list(config.translate_examples)
         self.translator = translator
-        self.loss_history: deque[float] = deque(maxlen=train_config.spike_window)
+        self.loss_history: deque[float] = deque(maxlen=config.spike_window)
         self.global_step = 0
         self.processed_examples = 0
         self.loss_value: float | None = None
@@ -52,10 +52,11 @@ class TrainingObserver:
         tgt_token_count: int,
     ) -> None:
         self.global_step += 1
+        step = self.global_step
         self.processed_examples += tgt_size
         self.loss_value = loss_value
         median_loss = median(self.loss_history) if self.loss_history else loss_value
-        is_spike = bool(self.loss_history) and (loss_value > (median_loss * self.train_config.spike_factor))
+        is_spike = bool(self.loss_history) and (loss_value > (median_loss * self.config.spike_factor))
         self.loss_history.append(loss_value)
         self.training_logger.add_decoder_tokens(tgt_token_count, tgt_size)
 
@@ -72,7 +73,7 @@ class TrainingObserver:
             )
 
         # log training progress
-        if self.global_step == 1 or self.global_step % self.train_config.log_every == 0 or validation_loss is not None:
+        if step == 1 or validation_loss is not None or not step % self.config.log_every:
             self.training_logger.log(
                 self.global_step,
                 epoch,
@@ -80,16 +81,18 @@ class TrainingObserver:
                 median_loss,
                 validation_loss=validation_loss,
                 grad_norm=grad_norm,
-                lr=self.train_config.lr,
+                lr=self.config.lr,
             )
         if self.tensorboard_logger is not None:
-            self.tensorboard_logger.log_scalars(self.global_step, loss=loss_value, validation_loss=validation_loss)
+            self.tensorboard_logger.log_scalars(
+                self.global_step, loss=loss_value, validation_loss=validation_loss
+            )
 
         # translate preview examples
         if (
-            self.train_config.translate_every is not None
+            self.config.translate_every is not None
             and self.translator is not None
-            and (self.global_step == 1 or self.global_step % self.train_config.translate_every == 0)
+            and (self.global_step == 1 or self.global_step % self.config.translate_every == 0)
         ):
             try:
                 translations = self.translator.translate_many(self.translate_examples)

@@ -22,7 +22,7 @@ MIT motto "Mens et Manus":
 from .api import comet_score, preflight_check, train
 from .evaluation.config import CometScoreRunConfig, DatasetConfig, MappingConfig
 from .inference import Translator
-from .training import DataLoaderConfig, ModelConfig, PreflightCheckRunConfig, TrainConfig, TrainRunConfig
+from .training import DataLoaderConfig, ModelConfig, PreflightCheckRunConfig, TrainRunConfig
 from .training.trainer import TrainingSummary
 
 __all__ = [
@@ -36,7 +36,6 @@ __all__ = [
     "DataLoaderConfig",
     "ModelConfig",
     "PreflightCheckRunConfig",
-    "TrainConfig",
     "TrainRunConfig",
     "TrainingSummary",
 ]

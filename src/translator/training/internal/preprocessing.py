@@ -13,7 +13,7 @@ from lab_infrastructure.logging import get_logger
 from lab_infrastructure.run_config import git_head_commit, write_run_config
 
 from ...shared import Example
-from ..config import TrainConfig, TrainRunConfig
+from ..config import TrainRunConfig
 from ..dataset import DatasetMetadata, load_arrow_records
 
 logger = logging.getLogger(__name__)
@@ -34,7 +34,7 @@ def _load_dataset(dataset_path: str | Path) -> tuple[Sequence[Example], DatasetM
 
 def preprocess(
     config: TrainRunConfig,
-) -> tuple[Sequence[Example], DatasetMetadata, str, TrainConfig, str | None, Sequence[Example] | None]:
+) -> tuple[Sequence[Example], DatasetMetadata, str, TrainRunConfig, str | None, Sequence[Example] | None]:
     """Prepare this training run.
 
     Determine whether training starts from scratch with a new model or resumes from a parent
@@ -43,7 +43,7 @@ def preprocess(
     """
 
     def work_dir() -> str | None:
-        configured_work_dir = config.train_config.work_dir
+        configured_work_dir = config.work_dir
         if configured_work_dir is None:
             return None
         if _WORK_DIR_RE.fullmatch(configured_work_dir) is None:
@@ -61,9 +61,9 @@ def preprocess(
 
     def run_scope_dir(work_dir_name: str | None) -> Path:
         return (
-            config.train_config.training_runs_dir / work_dir_name
+            config.training_runs_dir / work_dir_name
             if work_dir_name is not None
-            else config.train_config.training_runs_dir
+            else config.training_runs_dir
         )
 
     def create_next_run_dir() -> tuple[Path, str]:
@@ -75,7 +75,7 @@ def preprocess(
             run_dir = next_numbered_path(scope_dir, "r")
             try:
                 run_dir.mkdir(exist_ok=False)
-                return run_dir, artifact_ref(config.train_config.training_runs_dir, run_dir)
+                return run_dir, artifact_ref(config.training_runs_dir, run_dir)
             except FileExistsError:
                 pass
 
@@ -90,7 +90,7 @@ def preprocess(
                 raise ValueError(
                     f"parent_checkpoint must use work_dir/rN or rN format, got: {parent_checkpoint_ref}"
                 )
-            if not (config.train_config.training_runs_dir / parent_checkpoint_ref).is_dir():
+            if not (config.training_runs_dir / parent_checkpoint_ref).is_dir():
                 raise FileNotFoundError(f"Parent checkpoint not found: {parent_checkpoint_ref}")
 
         def latest_run_ref() -> str:
@@ -98,9 +98,9 @@ def preprocess(
             scope_dir = run_scope_dir(work_dir_name)
             run_id = max(existing_run_ids(scope_dir), default=0)
             if run_id == 0:
-                scope_label = work_dir_name or config.train_config.training_runs_dir.name
+                scope_label = work_dir_name or config.training_runs_dir.name
                 raise FileNotFoundError(f"Cannot resume latest run from {scope_label}: no runs found.")
-            return artifact_ref(config.train_config.training_runs_dir, scope_dir / f"r{run_id}")
+            return artifact_ref(config.training_runs_dir, scope_dir / f"r{run_id}")
 
         parent_checkpoint = config.parent_checkpoint
         if config.model_config is None and parent_checkpoint is None:
@@ -110,7 +110,7 @@ def preprocess(
         return parent_checkpoint
 
     def load_validation_dataset(
-        train_config: TrainConfig, training_metadata: DatasetMetadata
+        train_config: TrainRunConfig, training_metadata: DatasetMetadata
     ) -> Sequence[Example]:
         validation_dataset = train_config.validation_dataset
         assert validation_dataset is not None
@@ -121,7 +121,7 @@ def preprocess(
             raise ValueError("Validation dataset metadata mismatch.")
         return validation_examples
 
-    def log_training_start(train_config: TrainConfig) -> None:
+    def log_training_start(train_config: TrainRunConfig) -> None:
         resolved_device = train_config.device if train_config.device is not None else "auto"
         logger.info(
             "Start training hardware=%s run_dir=%s epochs=%s batch_size=%s device=%s",
@@ -132,30 +132,25 @@ def preprocess(
             resolved_device,
         )
 
-    def write_training_config(run_dir: Path, run_ref: str, parent_checkpoint: str | None) -> TrainConfig:
-        train_config = replace(config.train_config, run_name=run_ref)
+    def write_training_config(run_dir: Path, run_ref: str, parent_checkpoint: str | None) -> TrainRunConfig:
+        train_config = replace(config, run_name=run_ref, parent_checkpoint=parent_checkpoint)
         write_run_config(
             run_dir / "training_config.yaml",
-            {
-                **asdict(train_config),
-                "model_config": (asdict(config.model_config) if config.model_config is not None else None),
-                "parent_checkpoint": parent_checkpoint,
-                "data_loader_config": asdict(config.data_loader_config),
-            },
+            asdict(train_config),
             repo_root=Path(__file__).resolve().parents[3],
             git_key_prefix="translator",
         )
         return train_config
 
     # check input parameter
-    if config.train_config.validate_every is not None and config.train_config.validation_dataset is None:
+    if config.validate_every is not None and config.validation_dataset is None:
         raise ValueError("validate_every requires validation_dataset.")
     if config.model_config is not None and config.parent_checkpoint is not None:
         raise ValueError("parent_checkpoint requires model_config to be omitted.")
 
     parent_checkpoint = determine_parent_checkpoint()
 
-    examples, dataset_metadata = _load_dataset(config.train_config.datasets_dir / config.train_config.dataset)
+    examples, dataset_metadata = _load_dataset(config.datasets_dir / config.dataset)
 
     run_dir, run_ref = create_next_run_dir()
     get_logger("translator", log_path=run_dir / "training.log", stream=False)

@@ -6,10 +6,13 @@ from typing import cast
 
 import pytest
 
-from tests.translator.training.support import create_valid_mapped_dataset, train_config_for_test
+from tests.translator.training.support import create_valid_mapped_dataset, train_config
 from translator.training import DataLoaderConfig, Example, ModelConfig, Trainer, check_dataset
 from translator.training.dataset import load_arrow_records
 from translator.training.internal.factory import Factory
+
+_LOADER_CFG = DataLoaderConfig(batch_size=32, shuffle=False)
+_MODEL_CFG = ModelConfig(d_model=32, ff_dim=64, num_heads=4, num_layers=2, dropout=0.0)
 
 
 def test_trainer_writes_checkpoint_and_summary(tmp_path: Path) -> None:
@@ -21,14 +24,15 @@ def test_trainer_writes_checkpoint_and_summary(tmp_path: Path) -> None:
     log_path = run_dir / "training.log"
     metrics_log_path = run_dir / "training_metrics.log"
     translation_examples_path = run_dir / "translation_examples.txt"
-    train_config = train_config_for_test(
+    cfg = train_config(
         str(tmp_path / "test_run_root"),
         seed=7,
-        device="cpu",
         lr=1e-3,
         epochs=1,
         log_every=1000,
         run_name="artifacts_run",
+        data_loader_config=_LOADER_CFG,
+        model_config=_MODEL_CFG,
     )
 
     check_result = check_dataset(ds)
@@ -49,12 +53,7 @@ def test_trainer_writes_checkpoint_and_summary(tmp_path: Path) -> None:
             },
         )()
     )
-    out = Trainer(
-        factory,
-        train_config,
-        DataLoaderConfig(batch_size=32, shuffle=False),
-        model_config=ModelConfig(d_model=32, ff_dim=64, num_heads=4, num_layers=2, dropout=0.0),
-    ).train(ds)
+    out = Trainer(factory, cfg).train(ds)
 
     assert checkpoint_path.is_file()
     assert checkpoint_manifest_path.is_file()
@@ -73,16 +72,17 @@ def test_trainer_writes_translation_examples_to_separate_file(
     log_path = run_dir / "training.log"
     metrics_log_path = run_dir / "training_metrics.log"
     translation_examples_path = run_dir / "translation_examples.txt"
-    train_config = train_config_for_test(
+    cfg = train_config(
         str(tmp_path / "test_run_root"),
         seed=7,
-        device="cpu",
         lr=1e-3,
         epochs=1,
         log_every=1000,
         run_name="artifacts_run",
         translate_every=1000,
         translate_examples=("Hallo Welt.", "Ich mag Kaffee."),
+        data_loader_config=_LOADER_CFG,
+        model_config=_MODEL_CFG,
     )
 
     check_result = check_dataset(ds)
@@ -110,12 +110,7 @@ def test_trainer_writes_translation_examples_to_separate_file(
             "_FakeTranslator", (), {"translate_many": lambda self, texts: ["Hello world.", "I like coffee."]}
         )(),
     )
-    trainer = Trainer(
-        factory,
-        train_config,
-        DataLoaderConfig(batch_size=32, shuffle=False),
-        model_config=ModelConfig(d_model=32, ff_dim=64, num_heads=4, num_layers=2, dropout=0.0),
-    )
+    trainer = Trainer(factory, cfg)
     trainer.train(ds)
 
     translation_examples = translation_examples_path.read_text(encoding="utf-8")
@@ -137,7 +132,9 @@ def test_trainer_writes_translation_examples_to_separate_file(
     assert "TRAIN" in metrics_log
 
 
-def test_trainer_writes_tensorboard_events_when_enabled(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_trainer_writes_tensorboard_events_when_enabled(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     dataset_path = create_valid_mapped_dataset(tmp_path / "valid_training.mapped")
     ds = cast(Iterable[Example], load_arrow_records(dataset_path))
     run_dir = tmp_path / "test_run_root" / "training_runs" / "artifacts_run"
@@ -158,17 +155,20 @@ def test_trainer_writes_tensorboard_events_when_enabled(tmp_path: Path, monkeypa
             nonlocal closed
             closed = True
 
-    monkeypatch.setattr("translator.training.internal.training_observer.TensorBoardLogger", _FakeTensorBoardLogger)
-    train_config = train_config_for_test(
+    monkeypatch.setattr(
+        "translator.training.internal.training_observer.TensorBoardLogger", _FakeTensorBoardLogger
+    )
+    cfg = train_config(
         str(tmp_path / "test_run_root"),
         seed=7,
-        device="cpu",
         lr=1e-3,
         epochs=1,
         log_every=1000,
         run_name="artifacts_run",
         enable_tensorboard=True,
         validate_every=4,
+        data_loader_config=_LOADER_CFG,
+        model_config=_MODEL_CFG,
     )
     check_result = check_dataset(ds)
     factory = Factory(
@@ -188,12 +188,7 @@ def test_trainer_writes_tensorboard_events_when_enabled(tmp_path: Path, monkeypa
             },
         )()
     )
-    Trainer(
-        factory,
-        train_config,
-        DataLoaderConfig(batch_size=32, shuffle=False),
-        model_config=ModelConfig(d_model=32, ff_dim=64, num_heads=4, num_layers=2, dropout=0.0),
-    ).train(ds, ds)
+    Trainer(factory, cfg).train(ds, ds)
 
     assert tensorboard_dir.is_dir()
     assert list(tensorboard_dir.glob("events.out.tfevents.*"))

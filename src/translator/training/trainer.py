@@ -21,7 +21,7 @@ from ..inference import Translator
 from ..inference.tokenizer import create_tokenizer
 from ..model import Seq2Seq
 from ..shared import Example
-from .config import DataLoaderConfig, ModelConfig, TrainConfig
+from .config import TrainRunConfig
 from .internal.checkpointing import load as load_checkpoint
 from .internal.checkpointing import save as save_checkpoint
 from .internal.factory import Factory
@@ -62,17 +62,14 @@ class Trainer:
     def __init__(
         self,
         factory: Factory,
-        train_config: TrainConfig,
-        data_loader_config: DataLoaderConfig = DataLoaderConfig(),
-        model_config: ModelConfig | None = None,
-        parent_checkpoint: str | None = None,
+        config: TrainRunConfig,
     ) -> None:
         """Create a trainer and initialize the model, optimizer, and device.
 
-        Pass `model_config` to start a new lineage root from scratch. Pass
-        `parent_checkpoint` to resume from an existing checkpoint and create the next
+        Set `config.model_config` to start a new lineage root from scratch. Set
+        `config.parent_checkpoint` to resume from an existing checkpoint and create the next
         checkpoint with that checkpoint as its lineage parent. Exactly one of
-        `model_config` or `parent_checkpoint` must be provided.
+        them must be provided.
         """
 
         def validate_dataset_max_seq_len(max_seq_len: int) -> None:
@@ -87,11 +84,14 @@ class Trainer:
             if train_config.force:
                 logger.warning("%s; continue because force=True.", message)
                 return
-            raise ValueError(f"{message}. Set train_config.force=True to continue anyway.")
+            raise ValueError(f"{message}. Set force=True to continue anyway.")
 
+        train_config = config
+        model_config = config.model_config
+        parent_checkpoint = config.parent_checkpoint
         self._factory = factory
         self._train_config = train_config
-        self._data_loader_config = data_loader_config
+        self._data_loader_config = config.data_loader_config
 
         if train_config.validate_every is not None and train_config.validation_dataset is None:
             raise ValueError("validate_every requires validation_dataset.")

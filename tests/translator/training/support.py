@@ -7,7 +7,7 @@ from typing import cast
 
 from datasets import Dataset
 
-from translator.training import TrainConfig
+from translator.training import TrainRunConfig
 
 _INITIALIZED_LOG_PATHS: set[Path] = set()
 
@@ -38,16 +38,17 @@ def pad_index_from_records(dataset_path: Path, field: str) -> int:
     return max_token + 1
 
 
-def train_config_for_test(run_root: str, **overrides: object) -> TrainConfig:
+def train_config(run_root: str, **overrides: object) -> TrainRunConfig:
     config = {
         "artifacts_dir": run_root,
         "dataset": "dataset.mapped",
         "work_dir": "de-en-translator",
         "validation_dataset": "validation.mapped",
         "run_name": "run1",
+        "device": "cpu",
         **overrides,
     }
-    return TrainConfig(**config)
+    return TrainRunConfig(**config)
 
 
 def log(*, module_file: Path, test_name: str, body: str) -> Path:

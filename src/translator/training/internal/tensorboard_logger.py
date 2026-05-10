@@ -13,7 +13,7 @@ def _create_summary_writer(log_dir: Path) -> Any:
     except ModuleNotFoundError as exc:
         raise ModuleNotFoundError(
             "TensorBoard logging requires the 'tensorboard' package. Install it or disable "
-            "TrainConfig.enable_tensorboard."
+            "TrainRunConfig.enable_tensorboard."
         ) from exc
     return SummaryWriter(str(log_dir), flush_secs=_FLUSH_SECS)
 

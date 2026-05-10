@@ -13,7 +13,7 @@ from tests.translator.training.support import (
     create_valid_mapped_dataset,
     log,
     pad_index_from_records,
-    train_config_for_test,
+    train_config,
 )
 from translator.training import DataLoaderConfig, Example, ModelConfig, Trainer, check_dataset
 from translator.training.dataset import load_arrow_records
@@ -23,6 +23,8 @@ STEP_LINE_RE = re.compile(
     r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\s+(?:TRAIN|SPIKE)\s+\S+\s+"
     r"(?P<step>\d+)\s+(?P<epoch>\d+)\s+(?P<loss>\d+(?:\.\d+)?)\b"
 )
+_LOADER_CFG = DataLoaderConfig(batch_size=32, shuffle=False)
+_MODEL_CFG = ModelConfig(d_model=64, ff_dim=128, num_heads=4, num_layers=2, dropout=0.0)
 
 
 def _parse_losses(stdout_text: str) -> list[float]:
@@ -85,22 +87,18 @@ def test_trainer_loss_trend_decreases_on_synthetic_smoke_dataset(
             },
         )()
     )
-    train_config = train_config_for_test(
+    cfg = train_config(
         str(tmp_path),
         run_name="synthetic_run",
-        device="cpu",
         seed=7,
         lr=1e-3,
         epochs=2,
         log_every=1,
+        data_loader_config=_LOADER_CFG,
+        model_config=_MODEL_CFG,
     )
     t0 = time.perf_counter()
-    out = Trainer(
-        factory,
-        train_config,
-        DataLoaderConfig(batch_size=32, shuffle=False),
-        model_config=ModelConfig(d_model=64, ff_dim=128, num_heads=4, num_layers=2, dropout=0.0),
-    ).train(ds)
+    out = Trainer(factory, cfg).train(ds)
     training_duration_seconds = time.perf_counter() - t0
 
     assert out.num_examples > 0
@@ -171,22 +169,18 @@ def test_trainer_loss_trend_decreases_on_real_preprocessed_dataset(
             },
         )()
     )
-    train_config = train_config_for_test(
+    cfg = train_config(
         str(tmp_path),
         run_name="real_run",
-        device="cpu",
         seed=7,
         lr=1e-3,
         epochs=4,
         log_every=1,
+        data_loader_config=_LOADER_CFG,
+        model_config=_MODEL_CFG,
     )
     t0 = time.perf_counter()
-    out = Trainer(
-        factory,
-        train_config,
-        DataLoaderConfig(batch_size=32, shuffle=False),
-        model_config=ModelConfig(d_model=64, ff_dim=128, num_heads=4, num_layers=2, dropout=0.0),
-    ).train(ds)
+    out = Trainer(factory, cfg).train(ds)
     training_duration_seconds = time.perf_counter() - t0
 
     assert out.num_examples > 0

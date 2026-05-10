@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import field, fields
+from dataclasses import field
 from pathlib import Path
 
 import torch
@@ -21,8 +21,18 @@ class ModelConfig:
     attention: str = "torch"
 
 
+@dataclass(frozen=True, config=_CONFIG)
+class DataLoaderConfig:
+    batch_size: int = 64
+    shuffle: bool = True
+    num_workers: int = 0
+    prefetch_factor: int | None = None
+    persistent_workers: bool | None = None
+    pin_memory: bool | None = None
+
+
 @dataclass(frozen=True, kw_only=True, config=_CONFIG)
-class TrainConfig:
+class TrainRunConfig:
     artifacts_dir: str = "/content/drive/MyDrive/nmt_lab/artifacts"
     dataset: str
     work_dir: str | None = None
@@ -41,6 +51,9 @@ class TrainConfig:
     translate_examples: tuple[str, ...] = ()
     spike_window: int = 100
     spike_factor: float = 3.0
+    data_loader_config: DataLoaderConfig = field(default_factory=DataLoaderConfig)
+    model_config: ModelConfig | None = None
+    parent_checkpoint: str | None = None
 
     @property
     def datasets_dir(self) -> Path:
@@ -49,28 +62,6 @@ class TrainConfig:
     @property
     def training_runs_dir(self) -> Path:
         return Path(self.artifacts_dir) / "training_runs"
-
-
-@dataclass(frozen=True, config=_CONFIG)
-class DataLoaderConfig:
-    batch_size: int = 64
-    shuffle: bool = True
-    num_workers: int = 0
-    prefetch_factor: int | None = None
-    persistent_workers: bool | None = None
-    pin_memory: bool | None = None
-
-
-@dataclass(frozen=True, kw_only=True, config=_CONFIG)
-class TrainRunConfig(TrainConfig):
-    data_loader_config: DataLoaderConfig = field(default_factory=DataLoaderConfig)
-    model_config: ModelConfig | None = None
-    parent_checkpoint: str | None = None
-
-    @property
-    def train_config(self) -> TrainConfig:
-        values = {config_field.name: getattr(self, config_field.name) for config_field in fields(TrainConfig)}
-        return TrainConfig(**values)
 
 
 @dataclass(frozen=True, kw_only=True, config=_CONFIG)

@@ -9,10 +9,12 @@ from typing import cast
 import pytest
 import torch
 
-from tests.translator.training.support import create_valid_mapped_dataset, train_config_for_test
+from tests.translator.training.support import create_valid_mapped_dataset, train_config
 from translator.training import Example, ModelConfig, Trainer, check_dataset
 from translator.training.dataset import DatasetMetadata, load_arrow_records
 from translator.training.internal.factory import Factory
+
+_MODEL_CFG = ModelConfig(d_model=32, ff_dim=64, num_heads=4, num_layers=2)
 
 
 def _create_factory(ds: Iterable[Example], *, configured_max_seq_len: int | None = None) -> Factory:
@@ -49,15 +51,13 @@ def _assert_init_handles_configured_seq_len_above_model_limit(
     warning_messages: list[str] = []
 
     with pytest.raises(ValueError, match="configured_max_seq_len"):
-        Trainer(factory, train_config_for_test(str(tmp_path), device="cpu"), model_config=model_config)
+        Trainer(factory, train_config(str(tmp_path), model_config=model_config))
 
     monkeypatch.setattr(
         "translator.training.trainer.logger.warning",
         lambda message, *args: warning_messages.append(message % args),
     )
-    Trainer(
-        factory, train_config_for_test(str(tmp_path), device="cpu", force=True), model_config=model_config
-    )
+    Trainer(factory, train_config(str(tmp_path), force=True, model_config=model_config))
 
     assert any("configured_max_seq_len" in message for message in warning_messages)
 
@@ -76,7 +76,7 @@ def _assert_resume_rejects_configured_seq_len_above_model_limit(
     )
 
     with pytest.raises(ValueError, match="configured_max_seq_len"):
-        Trainer(factory, train_config_for_test(str(tmp_path), device="cpu"), parent_checkpoint="first_run")
+        Trainer(factory, train_config(str(tmp_path), parent_checkpoint="first_run"))
 
 
 class TestTrainer:
@@ -91,22 +91,19 @@ class TestTrainer:
     def test_init_rejects_validate_every_without_validation_dataset(self, tmp_path: Path) -> None:
         dataset_path = create_valid_mapped_dataset(tmp_path / "valid_training.mapped")
         ds = cast(Iterable[Example], load_arrow_records(dataset_path))
+        cfg = train_config(str(tmp_path), validate_every=10, validation_dataset=None, model_config=_MODEL_CFG)
 
         with pytest.raises(ValueError, match="validate_every requires validation_dataset"):
-            Trainer(
-                _create_factory(ds),
-                train_config_for_test(str(tmp_path), device="cpu", validate_every=10, validation_dataset=None),
-                model_config=ModelConfig(d_model=32, ff_dim=64, num_heads=4, num_layers=2),
-            )
+            Trainer(_create_factory(ds), cfg)
 
     def test_train_runs_periodic_evaluation(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         dataset_path = create_valid_mapped_dataset(tmp_path / "valid_training.mapped")
         ds = cast(Iterable[Example], load_arrow_records(dataset_path))
         factory = _create_factory(ds)
-        train_config = train_config_for_test(
-            str(tmp_path), device="cpu", epochs=1, log_every=1000, validate_every=4, seed=7
+        cfg = train_config(
+            str(tmp_path), epochs=1, log_every=1000, validate_every=4, seed=7, model_config=_MODEL_CFG
         )
-        trainer = Trainer(factory, train_config, model_config=ModelConfig(d_model=32, ff_dim=64, num_heads=4, num_layers=2))
+        trainer = Trainer(factory, cfg)
         evaluate_call_count = 0
         observed_eval_steps: list[int] = []
 
@@ -148,8 +145,7 @@ class TestTrainer:
         ds = cast(Iterable[Example], load_arrow_records(dataset_path))
         trainer = Trainer(
             _create_factory(ds),
-            train_config_for_test(str(tmp_path), device="cpu", seed=7),
-            model_config=ModelConfig(d_model=32, ff_dim=64, num_heads=4, num_layers=2),
+            train_config(str(tmp_path), seed=7, model_config=_MODEL_CFG),
         )
 
         trainer._model.train()
@@ -162,8 +158,7 @@ class TestTrainer:
         ds = cast(Iterable[Example], load_arrow_records(dataset_path))
         trainer = Trainer(
             _create_factory(ds),
-            train_config_for_test(str(tmp_path), device="cpu", validate_every=10),
-            model_config=ModelConfig(d_model=32, ff_dim=64, num_heads=4, num_layers=2),
+            train_config(str(tmp_path), validate_every=10, model_config=_MODEL_CFG),
         )
 
         with pytest.raises(ValueError, match="validate_every requires validation_examples"):
@@ -176,8 +171,7 @@ class TestTrainer:
         ds = cast(Iterable[Example], load_arrow_records(dataset_path))
         trainer = Trainer(
             _create_factory(ds),
-            train_config_for_test(str(tmp_path), device="cpu", use_bf16=True),
-            model_config=ModelConfig(d_model=32, ff_dim=64, num_heads=4, num_layers=2),
+            train_config(str(tmp_path), use_bf16=True, model_config=_MODEL_CFG),
         )
         trainer._device = torch.device("cuda")
         seen_kwargs: dict[str, object] = {}
