@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
 
-from lab_infrastructure.register_csv import insert_row
+from lab_infrastructure.csv_register import insert_row
 
 
 def register_checkpoint(
