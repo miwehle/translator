@@ -63,6 +63,7 @@ def train(config: TrainRunConfig) -> TrainingSummary:
     Use `config.model_config` to start a new run from scratch. Without `model_config`,
     resume either `config.parent_checkpoint` or the latest run in the configured run scope.
     """
+    
     def postprocess(
         summary: TrainingSummary,
         trainer: Trainer,
@@ -76,6 +77,7 @@ def train(config: TrainRunConfig) -> TrainingSummary:
         Run final validation if configured, write the training summary, update the
         checkpoint register, and log completion.
         """
+
         def log_training_finish(summary: TrainingSummary) -> None:
             logger.info(
                 "Finished training loss=%s val_loss=%s", summary.final_loss, summary.validation_loss
