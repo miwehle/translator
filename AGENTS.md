@@ -2,7 +2,11 @@
 
 ## Gemeinsame Basis
 
-Lies vor der Arbeit [AGENTS_BASE.md](../../../dev/agents-base/AGENTS_BASE.md). Die dortigen Regeln einschließlich der eingebundenen Testregeln gelten verbindlich für dieses Repository. Die folgenden Regeln ergänzen diese Basis.
+Lies vor der Arbeit [AGENTS_BASE.md](../../../dev/agents-base/AGENTS_BASE.md). Die dortigen Regeln gelten verbindlich für dieses Repository. Die folgenden Regeln ergänzen diese Basis.
+
+## Testcode
+
+Für Testcode lies [how_to_test.md](../../../dev/agents-base/how_to_test.md). Die dortigen Regeln gelten verbindlich für dieses Repository.
 
 ## Workspace-Struktur
 
