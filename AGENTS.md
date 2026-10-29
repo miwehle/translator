@@ -1,3 +1,9 @@
+# AGENTS.md
+
+## Gemeinsame Basis
+
+Lies vor der Arbeit [AGENTS_BASE.md](../../../dev/agents-base/AGENTS_BASE.md). Die dortigen Regeln einschließlich der eingebundenen Testregeln gelten verbindlich für dieses Repository. Die folgenden Regeln ergänzen diese Basis.
+
 ## Workspace-Struktur
 
 Dies ist ein Multi-Ordner-Workspace.
@@ -13,26 +19,15 @@ Keine stillschweigende Code-Duplizierung bei Refactorings; Duplikationen muessen
 
 Provisorische Workarounds, Debug-Helfer und asymmetrische Zwischenloesungen sind nach Klaerung der Ursache im selben Task wieder zu entfernen oder explizit zu begruenden; kein liegengebliebenes "temporary fix".
 
-## Testcode
-
-Für Testcode gelten verbindlich die Regeln in `how_to_test.md`; vor Änderungen an Testcode ist diese Datei zu lesen. Die Regeln dort sind Teil dieser AGENTS.md-Anweisungen.
-
-
 ## Production-Code-Aenderungen
 
 Aenderungen im Paket `model` nur nach Ruecksprache.
 
 Im Paket `model` auf keinen Fall voreilig oder auf Verdacht aendern.
 
-Bei nicht-trivialen Aenderungen am Production-Code vor der Umsetzung kurz und buendig beschreiben, was geaendert werden soll, und ein Go einholen.
-
-KISS-Prinzip beachten: Production-Code moeglichst einfach und klein halten; Zusatzlogik und Diagnose nur behalten, wenn ihr Nutzen die Komplexitaet klar rechtfertigt.
-
 ## Kleinste wirksame Aenderung
 
 Erst die kleinste wirksame Aenderung suchen.
-
-KISS-Prinzip beachten: `LOC` und mentale Last sind als harte Kosten zu behandeln. Zusaetzliche `LOC` sind nur gerechtfertigt, wenn sie einen klaren fachlichen Mehrwert bringen, vor allem in Form zusaetzlicher oder deutlich besserer Funktion.
 
 ## Kompakte Python-Schreibweise
 
@@ -49,8 +44,6 @@ Zur Einordnung: In einer Stichprobe des Hugging Face Transformers-Codes liegt de
 Bestehende kompakte Aufruf-Layouts nicht ohne fachlichen Grund aufspreizen. Reine Stil-Umbauten hin zu mehr vertikaler Länge vermeiden.
 
 Positionale Parameter bevorzugen, wenn der Aufruf dadurch kürzer und trotzdem klar bleibt. Keyword-only-Parameter nur mit klarem Mehrwert für Lesbarkeit, Sicherheit oder Eindeutigkeit. Aufgeblähte Funktionsaufrufe durch unnötige Keywords vermeiden.
-
-Zusätzliche Hilfsfunktionen, Basismodule und Abstraktionen nur einführen, wenn sie echte Wiederverwendung oder klare fachliche Vereinfachung bringen. Ein bloß generischerer oder vermeintlich saubererer Stil rechtfertigt keinen zusätzlichen Code.
 
 Bei kleinen oder lokalen Änderungen sind kleiner Diff und geringe LOC wichtiger als stilistische Umformungen ohne fachlichen Nutzen.
 
@@ -69,7 +62,3 @@ Temporäre Verzeichnisse und Dateien für Tests, Verifikation und ad-hoc Läufe 
 Keine neuen temporären Root-Ordner wie `.tmp_pytest*`, `.pytest_tmp*` oder ähnliche Namen anlegen.
 
 Pytest normal starten. Nur bei konkreten Sandbox-/Permission-Fehlern mit begruendeter Eskalation erneut ausfuehren.
-
-## Abschlussgedanke
-
-Sapere aude: Dieses Regelwerk soll als Werkzeug und Orientierung dienen, aber nicht den Sachverstand verdrängen und nicht das Denken ersetzen. Codex ist ein sehr gut ausgebildeter Softwareentwickler und herzlich eingeladen, sein Können zum Nutzen dieses Projekts einzubringen.
